@@ -6,6 +6,7 @@ import Accounts from './pages/Accounts';
 import Transactions from './pages/Transactions';
 import Friends from './pages/Friends';
 import Investments from './pages/Investments';
+import Budget from './pages/Budget';
 import Login from './pages/Login';
 import Register from './pages/Register';
 import ProtectedRoute from './components/ProtectedRoute';
@@ -26,6 +27,7 @@ function App() {
           <Route path="/transactions" element={<Transactions />} />
           <Route path="/friends" element={<Friends />} />
           <Route path="/investments" element={<Investments />} />
+          <Route path="/budget" element={<Budget />} />
           </Route>
         </Route>
 

@@ -14,6 +14,7 @@ import {
 } from 'recharts';
 import useDashboardStore from '../store/dashboardStore';
 import useAccountStore from '../store/accountStore';
+import useBudgetStore from '../store/budgetStore';
 
 const PIE_COLORS = [
   '#3B82F6', '#EF4444', '#10B981', '#F59E0B', '#8B5CF6',
@@ -49,6 +50,7 @@ function Dashboard() {
   } = useDashboardStore();
 
   const { accounts, fetchAccounts } = useAccountStore();
+  const { todaySummary, fetchTodaySummary } = useBudgetStore();
 
   useEffect(() => {
     fetchSummary();
@@ -56,7 +58,8 @@ function Dashboard() {
     fetchMonthlyTrend();
     fetchRecentTransactions();
     fetchAccounts();
-  }, [fetchSummary, fetchCategoryBreakdown, fetchMonthlyTrend, fetchRecentTransactions, fetchAccounts]);
+    fetchTodaySummary();
+  }, [fetchSummary, fetchCategoryBreakdown, fetchMonthlyTrend, fetchRecentTransactions, fetchAccounts, fetchTodaySummary]);
 
   const totalBalance = accounts
     .filter((a) => a.isActive)
@@ -133,6 +136,52 @@ function Dashboard() {
           </p>
         </div>
       </div>
+
+      {/* Budget Alert */}
+      {todaySummary && (
+        <div className={`rounded-lg p-4 shadow ${todaySummary.isOver ? 'bg-red-50 border border-red-200' : 'bg-green-50 border border-green-200'}`}>
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+            <div>
+              <h3 className={`text-sm font-semibold ${todaySummary.isOver ? 'text-red-800' : 'text-green-800'}`}>
+                {todaySummary.isOver ? 'You\'ve exceeded today\'s budget!' : 'Today\'s Budget Status'}
+              </h3>
+              <p className={`mt-1 text-sm ${todaySummary.isOver ? 'text-red-700' : 'text-green-700'}`}>
+                Spent {formatCurrency(todaySummary.spent)}
+                {todaySummary.dailyLimit && ` of ${formatCurrency(todaySummary.dailyLimit)} daily limit`}
+              </p>
+              {todaySummary.isOver && (
+                <p className="mt-2 text-sm font-medium text-red-800">
+                  Think before you spend.
+                </p>
+              )}
+            </div>
+            <Link
+              to="/budget"
+              className="shrink-0 text-sm font-medium text-blue-600 hover:text-blue-700"
+            >
+              View Budget &rarr;
+            </Link>
+          </div>
+          {todaySummary.categoryStatus.length > 0 && todaySummary.categoryStatus.some((c) => c.isOver) && (
+            <div className="mt-3 border-t border-red-200 pt-3">
+              <p className="text-xs font-medium text-red-700">Categories over limit:</p>
+              <div className="mt-1 flex flex-wrap gap-2">
+                {todaySummary.categoryStatus
+                  .filter((c) => c.isOver)
+                  .map((c) => (
+                    <span
+                      key={c.categoryId._id}
+                      className="rounded-full bg-red-100 px-2.5 py-0.5 text-xs font-medium text-red-700"
+                    >
+                      {c.categoryId.icon} {c.categoryId.name}: {formatCurrency(c.spent)} / {formatCurrency(c.effectiveLimit)}
+                      {' '}({c.frequency})
+                    </span>
+                  ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Charts Row */}
       <div className="grid gap-6 lg:grid-cols-2">

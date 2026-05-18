@@ -8,6 +8,7 @@ import useTransactionStore, { type Transaction } from '../store/transactionStore
 import useCategoryStore from '../store/categoryStore';
 import useAccountStore from '../store/accountStore';
 import useFriendStore, { type Friend } from '../store/friendStore';
+import useBudgetStore from '../store/budgetStore';
 import { formatCurrency } from '../utils/format';
 
 const transactionSchema = z.object({
@@ -42,6 +43,7 @@ function Transactions() {
   const { categories, fetchCategories } = useCategoryStore();
   const { accounts, fetchAccounts } = useAccountStore();
   const { friends, fetchFriends } = useFriendStore();
+  const { todaySummary, fetchTodaySummary } = useBudgetStore();
 
   const location = useLocation();
   const navigate = useNavigate();
@@ -89,7 +91,8 @@ function Transactions() {
     fetchCategories();
     fetchAccounts();
     fetchFriends();
-  }, [fetchCategories, fetchAccounts, fetchFriends]);
+    fetchTodaySummary();
+  }, [fetchCategories, fetchAccounts, fetchFriends, fetchTodaySummary]);
 
   const loadTransactions = useCallback(
     (page?: number) => {
@@ -354,6 +357,7 @@ function Transactions() {
         accounts={activeAccounts}
         friends={friends}
         initialType={createInitialType}
+        todaySummary={todaySummary}
       />
 
       {/* Edit Modal */}
@@ -366,6 +370,7 @@ function Transactions() {
           accounts={activeAccounts}
           friends={friends}
           transaction={editingTransaction}
+          todaySummary={todaySummary}
         />
       )}
     </div>
@@ -381,6 +386,7 @@ function TransactionModal({
   friends,
   transaction,
   initialType,
+  todaySummary,
 }: {
   open: boolean;
   onClose: () => void;
@@ -390,6 +396,7 @@ function TransactionModal({
   friends: Friend[];
   transaction?: Transaction;
   initialType?: 'income' | 'expense';
+  todaySummary?: { dailyLimit: number | null; spent: number; isOver: boolean; categoryStatus: { categoryId: { _id: string; name: string; icon: string }; frequency: string; effectiveLimit: number; spent: number; isOver: boolean }[] } | null;
 }) {
   const isEdit = !!transaction;
 
@@ -438,8 +445,35 @@ function TransactionModal({
   const [splitAmounts, setSplitAmounts] = useState<Record<string, number>>({});
 
   const totalAmount = watch('amount');
+  const selectedCategoryId = watch('categoryId');
   const hasFriends = friends.length > 0;
   const showFriendFlow = hasFriends && selectedType === 'expense';
+
+  const budgetWarning = (() => {
+    if (!todaySummary || selectedType !== 'expense' || !totalAmount || totalAmount <= 0) return null;
+    const warnings: string[] = [];
+    if (todaySummary.dailyLimit !== null) {
+      const projected = todaySummary.spent + totalAmount;
+      if (projected > todaySummary.dailyLimit) {
+        warnings.push(
+          `This will push today's spending to ${formatCurrency(projected)} (limit: ${formatCurrency(todaySummary.dailyLimit)})`
+        );
+      }
+    }
+    if (selectedCategoryId) {
+      const cat = todaySummary.categoryStatus.find((c) => c.categoryId._id === selectedCategoryId);
+      if (cat) {
+        const projected = cat.spent + totalAmount;
+        if (projected > cat.effectiveLimit) {
+          const label = cat.frequency === 'daily' ? 'daily limit' : 'monthly limit';
+          warnings.push(
+            `${cat.categoryId.icon} ${cat.categoryId.name}: ${formatCurrency(projected)} (${label}: ${formatCurrency(cat.effectiveLimit)})`
+          );
+        }
+      }
+    }
+    return warnings.length > 0 ? warnings : null;
+  })();
   const friendPaid = whoPaid !== 'user';
 
   const toggleFriend = (friendId: string) => {
@@ -551,6 +585,14 @@ function TransactionModal({
                 placeholder="0.00"
               />
               {errors.amount && <p className="mt-1 text-sm text-red-600">{errors.amount.message}</p>}
+              {budgetWarning && (
+                <div className="mt-2 rounded-md bg-amber-50 border border-amber-200 p-2.5">
+                  <p className="text-xs font-semibold text-amber-800">Think before you spend</p>
+                  {budgetWarning.map((w, i) => (
+                    <p key={i} className="mt-0.5 text-xs text-amber-700">{w}</p>
+                  ))}
+                </div>
+              )}
             </div>
 
             {/* Category */}

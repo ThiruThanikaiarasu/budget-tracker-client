@@ -48,7 +48,7 @@ function Transactions() {
   const navState = location.state as { openCreate?: boolean; initialType?: 'income' | 'expense' } | null;
 
   const [showCreate, setShowCreate] = useState(!!navState?.openCreate);
-  const [createInitialType, setCreateInitialType] = useState<'income' | 'expense' | undefined>(
+  const [createInitialType] = useState<'income' | 'expense' | undefined>(
     navState?.initialType
   );
   const [returnToDashboardOnClose, setReturnToDashboardOnClose] = useState(!!navState?.openCreate);

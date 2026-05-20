@@ -6,6 +6,8 @@ import Accounts from './pages/Accounts';
 import Transactions from './pages/Transactions';
 import Friends from './pages/Friends';
 import Investments from './pages/Investments';
+import Categories from './pages/Categories';
+import Personalization from './pages/Personalization';
 import Budget from './pages/Budget';
 import Login from './pages/Login';
 import Register from './pages/Register';
@@ -28,6 +30,8 @@ function App() {
           <Route path="/friends" element={<Friends />} />
           <Route path="/investments" element={<Investments />} />
           <Route path="/budget" element={<Budget />} />
+          <Route path="/categories" element={<Categories />} />
+          <Route path="/personalization" element={<Personalization />} />
           </Route>
         </Route>
 

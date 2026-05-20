@@ -17,6 +17,7 @@ export interface Budget {
 
 export interface DaySummary {
   day: number;
+  date: string;
   spent: number;
   dailyLimit: number | null;
   isOver: boolean;
@@ -32,7 +33,8 @@ export interface CategorySummaryItem {
 
 export interface MonthlySummary {
   month: string;
-  daysInMonth: number;
+  daysInPeriod: number;
+  periodStart: string;
   overallLimit: number | null;
   dailyLimit: number | null;
   totalSpent: number;

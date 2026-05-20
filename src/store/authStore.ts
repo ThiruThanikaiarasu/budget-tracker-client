@@ -6,6 +6,7 @@ interface User {
   id: string;
   email: string;
   name: string;
+  financialMonthStartDay: number;
 }
 
 interface AuthState {
@@ -17,6 +18,7 @@ interface AuthState {
   register: (email: string, password: string, name: string) => Promise<void>;
   logout: () => void;
   fetchUser: () => Promise<void>;
+  updatePreferences: (prefs: { financialMonthStartDay: number }) => Promise<void>;
 }
 
 const useAuthStore = create<AuthState>((set) => ({
@@ -78,6 +80,19 @@ const useAuthStore = create<AuthState>((set) => ({
     } catch {
       localStorage.removeItem('token');
       set({ user: null, token: null, isAuthenticated: false, isLoading: false });
+    }
+  },
+
+  updatePreferences: async (prefs) => {
+    try {
+      const { data } = await api.put('/auth/preferences', prefs);
+      set((state) => ({
+        user: state.user ? { ...state.user, ...data.user } : null,
+      }));
+      toast.success('Preferences updated');
+    } catch (error: any) {
+      toast.error(error.response?.data?.message || 'Failed to update preferences');
+      throw error;
     }
   },
 }));

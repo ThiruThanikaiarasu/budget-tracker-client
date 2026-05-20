@@ -1,16 +1,30 @@
 import { useEffect, useState } from 'react';
 import useBudgetStore, { type DaySummary, type MonthlySummary } from '../store/budgetStore';
 import useCategoryStore from '../store/categoryStore';
+import useAuthStore from '../store/authStore';
 import { formatCurrency } from '../utils/format';
 
-function getCurrentMonth() {
+function getCurrentFinancialMonth(startDay: number) {
   const now = new Date();
-  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+  let year = now.getFullYear();
+  let month = now.getMonth() + 1;
+
+  if (startDay > 1 && now.getDate() >= startDay) {
+    month += 1;
+    if (month > 12) { month = 1; year += 1; }
+  }
+
+  return `${year}-${String(month).padStart(2, '0')}`;
 }
 
 function formatMonthLabel(month: string) {
   const [y, m] = month.split('-').map(Number);
   return new Date(y, m - 1).toLocaleDateString('en-IN', { month: 'long', year: 'numeric' });
+}
+
+function parseDateStr(dateStr: string): Date {
+  const [y, m, d] = dateStr.split('-').map(Number);
+  return new Date(y, m - 1, d);
 }
 
 function Budget() {
@@ -23,8 +37,10 @@ function Budget() {
     fetchMonthlySummary,
   } = useBudgetStore();
   const { categories, fetchCategories } = useCategoryStore();
+  const { user } = useAuthStore();
 
-  const [selectedMonth, setSelectedMonth] = useState(getCurrentMonth());
+  const startDay = user?.financialMonthStartDay ?? 1;
+  const [selectedMonth, setSelectedMonth] = useState(getCurrentFinancialMonth(startDay));
   const [showForm, setShowForm] = useState(false);
   const [showDetails, setShowDetails] = useState(false);
 
@@ -100,6 +116,18 @@ function Budget() {
     setSelectedMonth(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`);
   };
 
+  const periodLabel =
+    monthlySummary && startDay > 1
+      ? (() => {
+          const first = monthlySummary.days[0];
+          const last = monthlySummary.days[monthlySummary.days.length - 1];
+          if (!first || !last) return '';
+          const s = parseDateStr(first.date);
+          const e = parseDateStr(last.date);
+          return `${s.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })} – ${e.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}`;
+        })()
+      : null;
+
   if (showDetails && monthlySummary) {
     return (
       <DetailedView
@@ -127,20 +155,25 @@ function Budget() {
       </div>
 
       {/* Month Navigation */}
-      <div className="mt-6 flex items-center justify-center gap-4">
-        <button
-          onClick={() => navigateMonth(-1)}
-          className="rounded-md border border-gray-300 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50"
-        >
-          &larr; Prev
-        </button>
-        <h2 className="text-lg font-semibold text-gray-900">{formatMonthLabel(selectedMonth)}</h2>
-        <button
-          onClick={() => navigateMonth(1)}
-          className="rounded-md border border-gray-300 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50"
-        >
-          Next &rarr;
-        </button>
+      <div className="mt-6 flex flex-col items-center gap-1">
+        <div className="flex items-center gap-4">
+          <button
+            onClick={() => navigateMonth(-1)}
+            className="rounded-md border border-gray-300 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50"
+          >
+            &larr; Prev
+          </button>
+          <h2 className="text-lg font-semibold text-gray-900">{formatMonthLabel(selectedMonth)}</h2>
+          <button
+            onClick={() => navigateMonth(1)}
+            className="rounded-md border border-gray-300 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50"
+          >
+            Next &rarr;
+          </button>
+        </div>
+        {periodLabel && (
+          <p className="text-xs text-gray-400">{periodLabel}</p>
+        )}
       </div>
 
       {/* Budget Form */}
@@ -309,7 +342,7 @@ function Budget() {
 
           {/* Right sidebar — calendar + details button */}
           <div className="w-full space-y-4 lg:w-auto lg:shrink-0">
-            <CalendarGrid days={monthlySummary.days} month={selectedMonth} />
+            <CalendarGrid days={monthlySummary.days} periodStart={monthlySummary.periodStart} />
             <button
               onClick={() => setShowDetails(true)}
               className="w-full rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
@@ -336,12 +369,12 @@ function Budget() {
   );
 }
 
-function CalendarGrid({ days, month }: { days: DaySummary[]; month: string }) {
-  const [y, m] = month.split('-').map(Number);
-  const firstDayOfWeek = new Date(y, m - 1, 1).getDay();
+function CalendarGrid({ days, periodStart }: { days: DaySummary[]; periodStart: string }) {
+  const startDate = parseDateStr(periodStart);
+  const firstDayOfWeek = startDate.getDay();
+
   const today = new Date();
-  const isCurrentMonth = today.getFullYear() === y && today.getMonth() === m - 1;
-  const todayDate = today.getDate();
+  const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
 
   const weekDays = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
   const blanks = Array.from({ length: firstDayOfWeek }, (_, i) => i);
@@ -360,9 +393,9 @@ function CalendarGrid({ days, month }: { days: DaySummary[]; month: string }) {
             <div key={`blank-${b}`} className="h-4 w-4 sm:h-5 sm:w-5" />
           ))}
           {days.map((day) => {
-            const isPast = isCurrentMonth ? day.day <= todayDate : true;
-            const isFuture = isCurrentMonth && day.day > todayDate;
-            const isToday = isCurrentMonth && day.day === todayDate;
+            const isToday = day.date === todayStr;
+            const isPast = day.date <= todayStr;
+            const isFuture = day.date > todayStr;
             const hasSpending = day.spent > 0;
             const hasBudget = day.dailyLimit !== null;
 
@@ -376,13 +409,15 @@ function CalendarGrid({ days, month }: { days: DaySummary[]; month: string }) {
 
             const showCross = isPast && !isFuture && hasBudget && !hasSpending;
 
+            const dayDate = parseDateStr(day.date);
+            const dayNum = dayDate.getDate();
             const title = isFuture
-              ? `${day.day}`
-              : `${day.day}: ${hasSpending ? formatCurrency(day.spent) : 'No spending'}${day.dailyLimit ? ` / ${formatCurrency(day.dailyLimit)}` : ''}`;
+              ? `${dayNum}`
+              : `${dayNum}: ${hasSpending ? formatCurrency(day.spent) : 'No spending'}${day.dailyLimit ? ` / ${formatCurrency(day.dailyLimit)}` : ''}`;
 
             return (
               <div
-                key={day.day}
+                key={day.date}
                 title={title}
                 className={`relative h-4 w-4 rounded-sm sm:h-5 sm:w-5 ${bg} ${
                   isToday ? 'ring-1.5 ring-blue-500 ring-offset-1' : ''
@@ -442,10 +477,8 @@ function DetailedView({
   month: string;
   onBack: () => void;
 }) {
-  const [y, m] = month.split('-').map(Number);
   const today = new Date();
-  const isCurrentMonth = today.getFullYear() === y && today.getMonth() === m - 1;
-  const todayDate = today.getDate();
+  const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
 
   return (
     <div>
@@ -497,17 +530,17 @@ function DetailedView({
           </thead>
           <tbody className="divide-y divide-gray-100">
             {summary.days.map((day) => {
-              const date = new Date(y, m - 1, day.day);
+              const date = parseDateStr(day.date);
               const dayName = date.toLocaleDateString('en-IN', { weekday: 'short' });
               const dateStr = date.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
-              const isPast = isCurrentMonth ? day.day <= todayDate : true;
-              const isFuture = isCurrentMonth && day.day > todayDate;
+              const isPast = day.date <= todayStr;
+              const isFuture = day.date > todayStr;
               const diff = day.dailyLimit !== null ? day.dailyLimit - day.spent : null;
-              const isToday = isCurrentMonth && day.day === todayDate;
+              const isToday = day.date === todayStr;
 
               return (
                 <tr
-                  key={day.day}
+                  key={day.date}
                   className={`${isToday ? 'bg-blue-50' : isFuture ? 'bg-gray-50/50' : 'hover:bg-gray-50'}`}
                 >
                   <td className="whitespace-nowrap px-4 py-2.5 text-sm text-gray-700">

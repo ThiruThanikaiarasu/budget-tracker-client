@@ -9,6 +9,8 @@ const navItems = [
   { to: '/budget', label: 'Budget', icon: '🎯' },
   { to: '/friends', label: 'Friends', icon: '👥' },
   { to: '/investments', label: 'Investments', icon: '📈' },
+  { to: '/categories', label: 'Categories', icon: '🏷️' },
+  { to: '/personalization', label: 'Personalization', icon: '⚙️' },
 ];
 
 const mobileMainNav = navItems.slice(0, 4);

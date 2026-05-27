@@ -23,6 +23,7 @@ interface CategoryState {
   createCategory: (data: CategoryFormData) => Promise<void>;
   updateCategory: (id: string, data: CategoryFormData) => Promise<void>;
   deleteCategory: (id: string) => Promise<void>;
+  reorderCategories: (orderedIds: string[]) => Promise<void>;
 }
 
 const useCategoryStore = create<CategoryState>((set) => ({
@@ -70,10 +71,29 @@ const useCategoryStore = create<CategoryState>((set) => ({
       set((state) => ({
         categories: state.categories.filter((c) => c._id !== id),
       }));
-      toast.success('Category deleted');
+      toast.success('Category removed');
     } catch (error: any) {
-      toast.error(error.response?.data?.message || 'Failed to delete category');
+      toast.error(error.response?.data?.message || 'Failed to remove category');
       throw error;
+    }
+  },
+
+  reorderCategories: async (orderedIds) => {
+    // Update store immediately so navigation away/back keeps the order
+    set((state) => {
+      const orderMap = new Map(orderedIds.map((id, i) => [id, i]));
+      return {
+        categories: [...state.categories].sort((a, b) => {
+          const ai = orderMap.has(a._id) ? orderMap.get(a._id)! : 9999;
+          const bi = orderMap.has(b._id) ? orderMap.get(b._id)! : 9999;
+          return ai - bi;
+        }),
+      };
+    });
+    try {
+      await api.patch('/categories/reorder', { orderedIds });
+    } catch (error: any) {
+      toast.error(error.response?.data?.message || 'Failed to save order');
     }
   },
 }));

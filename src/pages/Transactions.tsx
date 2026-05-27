@@ -725,8 +725,8 @@ function TransactionModal({
       <div className="fixed inset-0 bg-black/50" />
       <div className="fixed inset-0 flex flex-col md:items-center md:justify-center">
         <DialogPanel
-          className="flex flex-col w-full md:max-w-md md:rounded-2xl md:max-h-[92vh] overflow-hidden"
-          style={{ background: 'var(--c-bg)', height: '100dvh', maxHeight: '100dvh' }}
+          className="flex flex-col w-full h-dvh md:h-auto md:max-w-md md:rounded-2xl md:max-h-[92vh] overflow-hidden"
+          style={{ background: 'var(--c-bg)' }}
         >
           {/* Top bar */}
           <div className="flex items-center justify-between px-4 py-3 flex-shrink-0" style={{ borderBottom: '1px solid var(--c-border)' }}>

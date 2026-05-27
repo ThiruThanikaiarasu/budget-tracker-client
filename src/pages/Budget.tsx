@@ -567,7 +567,7 @@ function SingleCategoryModal({
       <div className="fixed inset-0 flex items-end sm:items-center justify-center p-0 sm:p-4">
         <DialogPanel
           className="flex flex-col w-full sm:max-w-sm rounded-t-2xl sm:rounded-2xl shadow-2xl overflow-hidden"
-          style={{ background: 'var(--c-surface)' }}
+          style={{ background: 'var(--c-surface)', maxHeight: '90dvh' }}
         >
           {/* Header */}
           <div className="flex items-center justify-between px-5 pt-5 pb-4 flex-shrink-0" style={{ borderBottom: '1px solid var(--c-border)' }}>
@@ -584,7 +584,7 @@ function SingleCategoryModal({
           </div>
 
           {/* Body */}
-          <div className="px-5 py-5 space-y-4">
+          <div className="flex-1 overflow-y-auto px-5 py-5 space-y-4 min-h-0">
             <div>
               <label className="block text-xs font-semibold uppercase tracking-wider mb-1.5" style={{ color: 'var(--c-muted)' }}>
                 Budget Limit

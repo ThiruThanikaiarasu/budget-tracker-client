@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { Dialog, DialogPanel, DialogTitle } from '@headlessui/react';
 import useBudgetStore, { type DaySummary, type MonthlySummary } from '../store/budgetStore';
 import useCategoryStore from '../store/categoryStore';
 import useAuthStore from '../store/authStore';
@@ -154,11 +155,8 @@ function Budget() {
 
       {/* ── Action row ────────────────────────────────────────────── */}
       <div className="px-4 py-3 flex gap-2" style={{ borderBottom: '1px solid var(--c-border)' }}>
-        <button
-          onClick={() => setShowForm(!showForm)}
-          className="t-btn-outline flex-1 text-center"
-        >
-          {showForm ? '× Cancel' : budget ? 'Edit Budget' : '+ Set Budget'}
+        <button onClick={() => setShowForm(true)} className="t-btn-outline flex-1 text-center">
+          {budget ? 'Edit Budget' : '+ Set Budget'}
         </button>
         {monthlySummary && (
           <button onClick={() => setShowDetails(true)} className="t-btn-outline flex-1 text-center">
@@ -166,59 +164,6 @@ function Budget() {
           </button>
         )}
       </div>
-
-      {/* ── Edit Form ─────────────────────────────────────────────── */}
-      {showForm && (
-        <div className="px-4 py-4 space-y-4" style={{ borderBottom: '1px solid var(--c-border)' }}>
-          <p className="text-sm font-bold" style={{ color: 'var(--c-text)' }}>
-            Budget for {formatMonthLabel(selectedMonth)}
-          </p>
-
-          <div>
-            <label className="block text-xs font-medium mb-1" style={{ color: 'var(--c-muted)' }}>Overall Monthly Budget</label>
-            <input
-              type="number"
-              value={overallLimit}
-              onChange={e => setOverallLimit(e.target.value)}
-              onWheel={e => e.currentTarget.blur()}
-              className="t-input"
-              placeholder="e.g. 15000"
-            />
-          </div>
-
-          <div>
-            <div className="flex items-center justify-between mb-2">
-              <label className="text-xs font-medium" style={{ color: 'var(--c-muted)' }}>Category Budgets</label>
-              <button onClick={addCategoryBudget} className="text-xs font-semibold" style={{ color: 'var(--c-accent)' }}>+ Add</button>
-            </div>
-            <div className="space-y-2">
-              {categoryBudgets.map((cb, i) => (
-                <div key={i} className="flex flex-wrap items-center gap-2">
-                  <select value={cb.categoryId} onChange={e => updateCategoryBudget(i, 'categoryId', e.target.value)} className="t-select flex-1 min-w-0">
-                    <option value="">Select category</option>
-                    {expenseCategories.map(c => <option key={c._id} value={c._id}>{c.icon} {c.name}</option>)}
-                  </select>
-                  <input
-                    type="number"
-                    value={cb.limit}
-                    onChange={e => updateCategoryBudget(i, 'limit', e.target.value)}
-                    onWheel={e => e.currentTarget.blur()}
-                    className="t-input w-24"
-                    placeholder="Limit"
-                  />
-                  <select value={cb.frequency} onChange={e => updateCategoryBudget(i, 'frequency', e.target.value)} className="t-select w-24">
-                    <option value="daily">Daily</option>
-                    <option value="monthly">Monthly</option>
-                  </select>
-                  <button onClick={() => removeCategoryBudget(i)} className="text-lg font-bold" style={{ color: 'var(--c-expense)' }}>×</button>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          <button onClick={handleSave} className="t-btn-primary w-full">Save Budget</button>
-        </div>
-      )}
 
       {isLoading ? (
         <div className="flex justify-center py-16">
@@ -352,7 +297,7 @@ function Budget() {
           )}
 
           {/* Empty state */}
-          {!monthlySummary && !showForm && (
+          {!monthlySummary && (
             <div className="flex flex-col items-center py-16 gap-2 px-4 text-center">
               <span className="text-4xl opacity-30">🎯</span>
               <p className="text-sm font-medium" style={{ color: 'var(--c-text)' }}>No budget set for this month</p>
@@ -364,7 +309,178 @@ function Budget() {
           )}
         </>
       )}
+
+      {/* ── Budget modal ──────────────────────────────────────────── */}
+      <BudgetModal
+        open={showForm}
+        onClose={() => setShowForm(false)}
+        month={selectedMonth}
+        overallLimit={overallLimit}
+        setOverallLimit={setOverallLimit}
+        categoryBudgets={categoryBudgets}
+        expenseCategories={expenseCategories}
+        onAdd={addCategoryBudget}
+        onRemove={removeCategoryBudget}
+        onUpdate={updateCategoryBudget}
+        onSave={handleSave}
+      />
     </div>
+  );
+}
+
+// ── Budget modal ──────────────────────────────────────────────────────
+interface CatBudgetRow { categoryId: string; limit: string; frequency: 'daily' | 'monthly' }
+
+function BudgetModal({
+  open, onClose, month,
+  overallLimit, setOverallLimit,
+  categoryBudgets, expenseCategories,
+  onAdd, onRemove, onUpdate, onSave,
+}: {
+  open: boolean;
+  onClose: () => void;
+  month: string;
+  overallLimit: string;
+  setOverallLimit: (v: string) => void;
+  categoryBudgets: CatBudgetRow[];
+  expenseCategories: { _id: string; name: string; icon: string }[];
+  onAdd: () => void;
+  onRemove: (i: number) => void;
+  onUpdate: (i: number, field: 'categoryId' | 'limit' | 'frequency', v: string) => void;
+  onSave: () => Promise<void>;
+}) {
+  const [saving, setSaving] = useState(false);
+
+  const handleSave = async () => {
+    setSaving(true);
+    try { await onSave(); } finally { setSaving(false); }
+  };
+
+  return (
+    <Dialog open={open} onClose={onClose} className="relative z-50">
+      <div className="fixed inset-0 bg-black/60" />
+      <div className="fixed inset-0 flex items-end sm:items-center justify-center p-0 sm:p-4">
+        <DialogPanel
+          className="flex flex-col w-full sm:max-w-md rounded-t-2xl sm:rounded-2xl shadow-2xl overflow-hidden"
+          style={{ background: 'var(--c-surface)', maxHeight: '85dvh' }}
+        >
+          {/* Header */}
+          <div className="flex items-center justify-between px-5 pt-5 pb-3 flex-shrink-0" style={{ borderBottom: '1px solid var(--c-border)' }}>
+            <DialogTitle className="text-base font-bold" style={{ color: 'var(--c-text)' }}>
+              Budget · {formatMonthLabel(month)}
+            </DialogTitle>
+            <button
+              onClick={onClose}
+              className="p-1 rounded-lg"
+              style={{ color: 'var(--c-muted)' }}
+            >
+              <svg viewBox="0 0 24 24" className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2.5">
+                <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
+              </svg>
+            </button>
+          </div>
+
+          {/* Scrollable body */}
+          <div className="flex-1 overflow-y-auto px-5 py-4 space-y-5 min-h-0">
+            {/* Overall limit */}
+            <div>
+              <label className="block text-xs font-semibold uppercase tracking-wider mb-1.5" style={{ color: 'var(--c-muted)' }}>
+                Overall Monthly Budget
+              </label>
+              <input
+                type="number"
+                value={overallLimit}
+                onChange={e => setOverallLimit(e.target.value)}
+                onWheel={e => e.currentTarget.blur()}
+                className="t-input"
+                placeholder="e.g. 15000"
+              />
+            </div>
+
+            {/* Category budgets */}
+            <div>
+              <div className="flex items-center justify-between mb-3">
+                <label className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--c-muted)' }}>
+                  Category Budgets
+                </label>
+                <button
+                  onClick={onAdd}
+                  className="text-xs font-bold px-3 py-1 rounded-lg"
+                  style={{ background: 'var(--c-accent)', color: 'var(--c-accent-fg)' }}
+                >
+                  + Add
+                </button>
+              </div>
+
+              {categoryBudgets.length === 0 && (
+                <p className="text-xs text-center py-3" style={{ color: 'var(--c-muted)' }}>
+                  No category budgets added yet
+                </p>
+              )}
+
+              <div className="space-y-3">
+                {categoryBudgets.map((cb, i) => (
+                  <div
+                    key={i}
+                    className="rounded-xl p-3 space-y-2"
+                    style={{ background: 'var(--c-bg)', border: '1px solid var(--c-border)' }}
+                  >
+                    <div className="flex items-center gap-2">
+                      <select
+                        value={cb.categoryId}
+                        onChange={e => onUpdate(i, 'categoryId', e.target.value)}
+                        className="t-select flex-1"
+                      >
+                        <option value="">Select category</option>
+                        {expenseCategories.map(c => (
+                          <option key={c._id} value={c._id}>{c.icon} {c.name}</option>
+                        ))}
+                      </select>
+                      <button
+                        onClick={() => onRemove(i)}
+                        className="flex-shrink-0 w-7 h-7 flex items-center justify-center rounded-lg text-base font-bold"
+                        style={{ background: 'rgba(224,88,80,0.12)', color: 'var(--c-expense)' }}
+                      >
+                        ×
+                      </button>
+                    </div>
+                    <div className="flex gap-2">
+                      <input
+                        type="number"
+                        value={cb.limit}
+                        onChange={e => onUpdate(i, 'limit', e.target.value)}
+                        onWheel={e => e.currentTarget.blur()}
+                        className="t-input flex-1"
+                        placeholder="Limit"
+                      />
+                      <select
+                        value={cb.frequency}
+                        onChange={e => onUpdate(i, 'frequency', e.target.value)}
+                        className="t-select w-32"
+                      >
+                        <option value="monthly">Monthly</option>
+                        <option value="daily">Daily</option>
+                      </select>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          {/* Footer */}
+          <div className="flex-shrink-0 px-5 py-4" style={{ borderTop: '1px solid var(--c-border)' }}>
+            <button
+              onClick={handleSave}
+              disabled={saving}
+              className="t-btn-primary w-full"
+            >
+              {saving ? 'Saving…' : 'Save Budget'}
+            </button>
+          </div>
+        </DialogPanel>
+      </div>
+    </Dialog>
   );
 }
 

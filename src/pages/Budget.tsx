@@ -45,6 +45,7 @@ function Budget() {
   const [selectedMonth, setSelectedMonth] = useState(getCurrentFinancialMonth(startDay));
   const [showForm, setShowForm] = useState(false);
   const [showDetails, setShowDetails] = useState(false);
+  const [focusedCategoryId, setFocusedCategoryId] = useState<string | null>(null);
 
   const [overallLimit, setOverallLimit] = useState<string>('');
   const [categoryBudgets, setCategoryBudgets] = useState<{ categoryId: string; limit: string; frequency: 'daily' | 'monthly' }[]>([]);
@@ -89,9 +90,22 @@ function Budget() {
   };
 
   const handleSetBudgetForCategory = (categoryId: string) => {
-    if (!categoryBudgets.find(cb => cb.categoryId === categoryId))
-      setCategoryBudgets(p => [...p, { categoryId, limit: '', frequency: 'monthly' }]);
-    setShowForm(true);
+    setFocusedCategoryId(categoryId);
+  };
+
+  const handleSaveSingleCategory = async (categoryId: string, limit: string, frequency: 'daily' | 'monthly') => {
+    const updatedRows = categoryBudgets.some(cb => cb.categoryId === categoryId)
+      ? categoryBudgets.map(cb => cb.categoryId === categoryId ? { ...cb, limit, frequency } : cb)
+      : [...categoryBudgets, { categoryId, limit, frequency }];
+    const payload: any = { month: selectedMonth };
+    if (overallLimit) payload.overallLimit = parseFloat(overallLimit);
+    const valid = updatedRows.filter(cb => cb.categoryId && cb.limit);
+    if (valid.length > 0)
+      payload.categoryBudgets = valid.map(cb => ({ categoryId: cb.categoryId, limit: parseFloat(cb.limit), frequency: cb.frequency }));
+    await upsertBudget(payload);
+    await fetchMonthlySummary(selectedMonth);
+    setCategoryBudgets(updatedRows);
+    setFocusedCategoryId(null);
   };
 
   const periodLabel = monthlySummary && startDay > 1
@@ -310,7 +324,7 @@ function Budget() {
         </>
       )}
 
-      {/* ── Budget modal ──────────────────────────────────────────── */}
+      {/* ── Full budget modal ─────────────────────────────────────── */}
       <BudgetModal
         open={showForm}
         onClose={() => setShowForm(false)}
@@ -324,6 +338,23 @@ function Budget() {
         onUpdate={updateCategoryBudget}
         onSave={handleSave}
       />
+
+      {/* ── Single-category modal ─────────────────────────────────── */}
+      {focusedCategoryId && (() => {
+        const cat = expenseCategories.find(c => c._id === focusedCategoryId);
+        const existing = categoryBudgets.find(cb => cb.categoryId === focusedCategoryId);
+        if (!cat) return null;
+        return (
+          <SingleCategoryModal
+            open
+            category={cat}
+            initialLimit={existing?.limit ?? ''}
+            initialFrequency={existing?.frequency ?? 'monthly'}
+            onClose={() => setFocusedCategoryId(null)}
+            onSave={(limit, freq) => handleSaveSingleCategory(focusedCategoryId, limit, freq)}
+          />
+        );
+      })()}
     </div>
   );
 }
@@ -476,6 +507,108 @@ function BudgetModal({
               className="t-btn-primary w-full"
             >
               {saving ? 'Saving…' : 'Save Budget'}
+            </button>
+          </div>
+        </DialogPanel>
+      </div>
+    </Dialog>
+  );
+}
+
+// ── Single-category budget modal ──────────────────────────────────────
+function SingleCategoryModal({
+  open, category, initialLimit, initialFrequency, onClose, onSave,
+}: {
+  open: boolean;
+  category: { _id: string; name: string; icon: string };
+  initialLimit: string;
+  initialFrequency: 'daily' | 'monthly';
+  onClose: () => void;
+  onSave: (limit: string, frequency: 'daily' | 'monthly') => Promise<void>;
+}) {
+  const [limit, setLimit] = useState(initialLimit);
+  const [frequency, setFrequency] = useState<'daily' | 'monthly'>(initialFrequency);
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    if (open) { setLimit(initialLimit); setFrequency(initialFrequency); }
+  }, [open, initialLimit, initialFrequency]);
+
+  const handleSave = async () => {
+    if (!limit) return;
+    setSaving(true);
+    try { await onSave(limit, frequency); } finally { setSaving(false); }
+  };
+
+  return (
+    <Dialog open={open} onClose={onClose} className="relative z-50">
+      <div className="fixed inset-0 bg-black/60" />
+      <div className="fixed inset-0 flex items-end sm:items-center justify-center p-0 sm:p-4">
+        <DialogPanel
+          className="flex flex-col w-full sm:max-w-sm rounded-t-2xl sm:rounded-2xl shadow-2xl overflow-hidden"
+          style={{ background: 'var(--c-surface)' }}
+        >
+          {/* Header */}
+          <div className="flex items-center justify-between px-5 pt-5 pb-4 flex-shrink-0" style={{ borderBottom: '1px solid var(--c-border)' }}>
+            <div className="flex items-center gap-2">
+              <DialogTitle className="text-base font-bold" style={{ color: 'var(--c-text)' }}>
+                {category.icon || '💸'} {category.name}
+              </DialogTitle>
+            </div>
+            <button onClick={onClose} className="p-1" style={{ color: 'var(--c-muted)' }}>
+              <svg viewBox="0 0 24 24" className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2.5">
+                <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
+              </svg>
+            </button>
+          </div>
+
+          {/* Body */}
+          <div className="px-5 py-5 space-y-4">
+            <div>
+              <label className="block text-xs font-semibold uppercase tracking-wider mb-1.5" style={{ color: 'var(--c-muted)' }}>
+                Budget Limit
+              </label>
+              <input
+                type="number"
+                value={limit}
+                onChange={e => setLimit(e.target.value)}
+                onWheel={e => e.currentTarget.blur()}
+                className="t-input"
+                placeholder="e.g. 5000"
+                autoFocus
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-semibold uppercase tracking-wider mb-1.5" style={{ color: 'var(--c-muted)' }}>
+                Frequency
+              </label>
+              <div className="grid grid-cols-2 gap-2">
+                {(['monthly', 'daily'] as const).map(f => (
+                  <button
+                    key={f}
+                    onClick={() => setFrequency(f)}
+                    className="py-2.5 rounded-xl text-sm font-semibold capitalize transition-all"
+                    style={{
+                      background: frequency === f ? 'var(--c-accent)' : 'var(--c-bg)',
+                      color: frequency === f ? 'var(--c-accent-fg)' : 'var(--c-muted)',
+                      border: frequency === f ? 'none' : '1px solid var(--c-border)',
+                    }}
+                  >
+                    {f}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          {/* Footer */}
+          <div className="px-5 pb-6 pt-2">
+            <button
+              onClick={handleSave}
+              disabled={saving || !limit}
+              className="t-btn-primary w-full"
+            >
+              {saving ? 'Saving…' : 'Save'}
             </button>
           </div>
         </DialogPanel>

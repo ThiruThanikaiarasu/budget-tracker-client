@@ -453,14 +453,15 @@ function BudgetModal({
                 {categoryBudgets.map((cb, i) => (
                   <div
                     key={i}
-                    className="rounded-xl p-3 space-y-2"
+                    className="rounded-xl p-4 space-y-3"
                     style={{ background: 'var(--c-bg)', border: '1px solid var(--c-border)' }}
                   >
+                    {/* Category row */}
                     <div className="flex items-center gap-2">
                       <select
                         value={cb.categoryId}
                         onChange={e => onUpdate(i, 'categoryId', e.target.value)}
-                        className="t-select flex-1"
+                        className="t-select flex-1 font-medium"
                       >
                         <option value="">Select category</option>
                         {expenseCategories.map(c => (
@@ -469,29 +470,49 @@ function BudgetModal({
                       </select>
                       <button
                         onClick={() => onRemove(i)}
-                        className="flex-shrink-0 w-7 h-7 flex items-center justify-center rounded-lg text-base font-bold"
+                        className="flex-shrink-0 w-7 h-7 flex items-center justify-center rounded-lg font-bold text-base"
                         style={{ background: 'rgba(224,88,80,0.12)', color: 'var(--c-expense)' }}
                       >
                         ×
                       </button>
                     </div>
-                    <div className="flex gap-2">
+
+                    {/* Limit */}
+                    <div>
+                      <label className="block text-xs font-semibold uppercase tracking-wider mb-1" style={{ color: 'var(--c-muted)' }}>
+                        Budget Limit
+                      </label>
                       <input
                         type="number"
                         value={cb.limit}
                         onChange={e => onUpdate(i, 'limit', e.target.value)}
                         onWheel={e => e.currentTarget.blur()}
-                        className="t-input flex-1"
-                        placeholder="Limit"
+                        className="t-input"
+                        placeholder="e.g. 5000"
                       />
-                      <select
-                        value={cb.frequency}
-                        onChange={e => onUpdate(i, 'frequency', e.target.value)}
-                        className="t-select w-32"
-                      >
-                        <option value="monthly">Monthly</option>
-                        <option value="daily">Daily</option>
-                      </select>
+                    </div>
+
+                    {/* Frequency pills */}
+                    <div>
+                      <label className="block text-xs font-semibold uppercase tracking-wider mb-1" style={{ color: 'var(--c-muted)' }}>
+                        Frequency
+                      </label>
+                      <div className="grid grid-cols-2 gap-2">
+                        {(['monthly', 'daily'] as const).map(f => (
+                          <button
+                            key={f}
+                            onClick={() => onUpdate(i, 'frequency', f)}
+                            className="py-2 rounded-lg text-sm font-semibold capitalize transition-all"
+                            style={{
+                              background: cb.frequency === f ? 'var(--c-accent)' : 'var(--c-surface)',
+                              color: cb.frequency === f ? 'var(--c-accent-fg)' : 'var(--c-muted)',
+                              border: cb.frequency === f ? 'none' : '1px solid var(--c-border)',
+                            }}
+                          >
+                            {f}
+                          </button>
+                        ))}
+                      </div>
                     </div>
                   </div>
                 ))}

@@ -155,7 +155,7 @@ function Budget() {
           <div>
             <p className="text-[10px] uppercase tracking-wider font-semibold" style={{ color: 'var(--c-muted)' }}>Total Budget</p>
             <p className="text-sm font-bold mt-0.5" style={{ color: 'var(--c-text)' }}>
-              {monthlySummary?.overallLimit ? formatCurrency(monthlySummary.overallLimit) : '—'}
+              {monthlySummary?.totalBudget ? formatCurrency(monthlySummary.totalBudget) : '—'}
             </p>
           </div>
           <div>
@@ -721,7 +721,7 @@ function DetailedView({ summary, month, onBack }: { summary: MonthlySummary; mon
       {/* Summary stats */}
       <div className="grid grid-cols-3 gap-3 px-4 py-4" style={{ borderBottom: '1px solid var(--c-border)' }}>
         {[
-          ['Budget', summary.overallLimit ? formatCurrency(summary.overallLimit) : '—', 'var(--c-text)'],
+          ['Budget', summary.totalBudget ? formatCurrency(summary.totalBudget) : '—', 'var(--c-text)'],
           ['Spent', formatCurrency(summary.totalSpent), 'var(--c-expense)'],
           ['Daily', summary.dailyLimit ? formatCurrency(summary.dailyLimit) : '—', 'var(--c-text)'],
         ].map(([label, value, color]) => (

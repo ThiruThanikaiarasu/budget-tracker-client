@@ -36,6 +36,7 @@ export interface MonthlySummary {
   daysInPeriod: number;
   periodStart: string;
   overallLimit: number | null;
+  totalBudget: number | null;
   dailyLimit: number | null;
   totalSpent: number;
   days: DaySummary[];

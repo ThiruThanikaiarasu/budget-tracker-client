@@ -506,12 +506,10 @@ function Numpad({ value, onChange }: { value: string; onChange: (v: string) => v
   const [waitingNext, setWaitingNext] = useState(false);
 
   function handleDigit(d: string) {
-    onChange(prev => {
-      if (waitingNext) { setWaitingNext(false); return d === '.' ? '0.' : d; }
-      if (d === '.' && prev.includes('.')) return prev;
-      if (prev === '0' && d !== '.') return d;
-      return prev + d;
-    });
+    if (waitingNext) { setWaitingNext(false); onChange(d === '.' ? '0.' : d); return; }
+    if (d === '.' && value.includes('.')) return;
+    if (value === '0' && d !== '.') { onChange(d); return; }
+    onChange(value + d);
   }
 
   function handleOp(newOp: string) {
@@ -540,7 +538,7 @@ function Numpad({ value, onChange }: { value: string; onChange: (v: string) => v
   }
 
   function handleDel() {
-    onChange(prev => prev.length > 1 ? prev.slice(0, -1) : '0');
+    onChange(value.length > 1 ? value.slice(0, -1) : '0');
   }
 
   function compute(a: number, b: number, operator: string) {

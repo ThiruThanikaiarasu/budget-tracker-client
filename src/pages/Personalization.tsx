@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import useAuthStore from '../store/authStore';
+import useThemeStore, { THEMES } from '../store/themeStore';
 
 function getOrdinalSuffix(n: number): string {
   const s = ['th', 'st', 'nd', 'rd'];
@@ -15,6 +16,7 @@ function getFinancialMonthPreview(startDay: number): string {
 
 function Personalization() {
   const { user, updatePreferences } = useAuthStore();
+  const { theme, setTheme } = useThemeStore();
   const [startDay, setStartDay] = useState(user?.financialMonthStartDay ?? 1);
   const [isSaving, setIsSaving] = useState(false);
 
@@ -26,65 +28,87 @@ function Personalization() {
 
   const handleSave = async () => {
     setIsSaving(true);
-    try {
-      await updatePreferences({ financialMonthStartDay: startDay });
-    } catch {
-      // handled by store
-    }
+    try { await updatePreferences({ financialMonthStartDay: startDay }); } catch {}
     setIsSaving(false);
   };
 
   return (
-    <div>
-      <div>
-        <h1 className="text-2xl font-bold text-gray-900">Personalization</h1>
-        <p className="mt-1 text-sm text-gray-500">Customize how your finances are tracked</p>
+    <div style={{ background: 'var(--c-bg)', minHeight: '100vh' }}>
+      <div className="px-4 pt-6 pb-4" style={{ background: 'var(--c-header-bg)' }}>
+        <p className="text-lg font-bold" style={{ color: 'var(--c-text)' }}>Settings</p>
+        <p className="text-xs mt-0.5" style={{ color: 'var(--c-muted)' }}>Customize your experience</p>
       </div>
 
-      <div className="mt-6 max-w-lg rounded-lg bg-white p-6 shadow">
-        <h2 className="text-base font-semibold text-gray-900">Financial Month</h2>
-        <p className="mt-1 text-sm text-gray-500">
-          Set which day of the month your budget cycle starts. This is typically your salary date.
-        </p>
-
-        <div className="mt-4">
-          <label className="block text-sm font-medium text-gray-700 mb-2">Pick your start day</label>
-          <div className="grid grid-cols-7 gap-1.5">
-            {Array.from({ length: 31 }, (_, i) => i + 1).map((d) => (
+      <div className="px-4 py-4 space-y-6">
+        {/* ── Theme ──────────────────────────────────────────────── */}
+        <div className="rounded-xl p-4" style={{ background: 'var(--c-surface)' }}>
+          <p className="text-sm font-bold mb-1" style={{ color: 'var(--c-text)' }}>Theme</p>
+          <p className="text-xs mb-3" style={{ color: 'var(--c-muted)' }}>Choose your preferred colour scheme</p>
+          <div className="flex gap-2">
+            {THEMES.map(t => (
               <button
-                key={d}
-                type="button"
-                onClick={() => setStartDay(d)}
-                className={`flex h-9 w-full items-center justify-center rounded-lg text-sm font-medium transition-colors ${
-                  startDay === d
-                    ? 'bg-blue-600 text-white shadow-sm'
-                    : 'bg-gray-50 text-gray-700 hover:bg-blue-50 hover:text-blue-700'
-                }`}
+                key={t.id}
+                onClick={() => setTheme(t.id)}
+                className="flex-1 py-2.5 rounded-lg text-sm font-semibold transition-all"
+                style={{
+                  background: theme === t.id ? 'var(--c-accent)' : 'var(--c-surface2)',
+                  color: theme === t.id ? 'var(--c-accent-fg)' : 'var(--c-muted)',
+                  border: theme === t.id ? 'none' : '1px solid var(--c-border)',
+                }}
               >
-                {d}
+                {t.label}
               </button>
             ))}
           </div>
         </div>
 
-        <div className="mt-3 rounded-md bg-blue-50 p-3">
-          <p className="text-sm text-blue-700">{getFinancialMonthPreview(startDay)}</p>
-          {startDay !== 1 && (
-            <p className="mt-1 text-xs text-blue-600">
-              Example: "May 2026" budget covers {getOrdinalSuffix(startDay)} April to{' '}
-              {getOrdinalSuffix(startDay - 1)} May
-            </p>
-          )}
-        </div>
+        {/* ── Financial Month ────────────────────────────────────── */}
+        <div className="rounded-xl p-4" style={{ background: 'var(--c-surface)' }}>
+          <p className="text-sm font-bold mb-1" style={{ color: 'var(--c-text)' }}>Financial Month Start</p>
+          <p className="text-xs mb-3" style={{ color: 'var(--c-muted)' }}>
+            Set which day your budget cycle starts (typically your salary date).
+          </p>
 
-        <div className="mt-4 flex justify-end">
-          <button
-            onClick={handleSave}
-            disabled={!hasChanges || isSaving}
-            className="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
-          >
-            {isSaving ? 'Saving...' : 'Save'}
-          </button>
+          <div className="flex justify-center">
+            <div className="inline-grid grid-cols-7 gap-1">
+              {['S','M','T','W','T','F','S'].map((d, i) => (
+                <div key={i} className="flex h-7 w-7 items-center justify-center text-[9px] font-medium" style={{ color: 'var(--c-muted)' }}>{d}</div>
+              ))}
+              {Array.from({ length: 31 }, (_, i) => i + 1).map(d => (
+                <button
+                  key={d}
+                  type="button"
+                  onClick={() => setStartDay(d)}
+                  className="flex h-7 w-7 items-center justify-center rounded-sm text-xs font-medium transition-colors"
+                  style={{
+                    background: startDay === d ? 'var(--c-accent)' : 'var(--c-surface2)',
+                    color: startDay === d ? 'var(--c-accent-fg)' : 'var(--c-text)',
+                  }}
+                >
+                  {d}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="mt-3 rounded-lg p-3" style={{ background: 'rgba(201,167,47,0.10)' }}>
+            <p className="text-sm" style={{ color: 'var(--c-accent)' }}>{getFinancialMonthPreview(startDay)}</p>
+            {startDay !== 1 && (
+              <p className="mt-1 text-xs" style={{ color: 'var(--c-muted)' }}>
+                Example: "May 2026" budget covers {getOrdinalSuffix(startDay)} April to {getOrdinalSuffix(startDay - 1)} May
+              </p>
+            )}
+          </div>
+
+          <div className="mt-4 flex justify-end">
+            <button
+              onClick={handleSave}
+              disabled={!hasChanges || isSaving}
+              className="t-btn-primary px-6"
+            >
+              {isSaving ? 'Saving...' : 'Save'}
+            </button>
+          </div>
         </div>
       </div>
     </div>

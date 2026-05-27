@@ -72,7 +72,7 @@ function Friends() {
   }
 
   return (
-    <div>
+    <div className="p-6">
       {/* Header */}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
@@ -589,7 +589,7 @@ function FriendDetail({ friend, onBack }: { friend: Friend; onBack: () => void }
   }, [friend._id, fetchExpenses]);
 
   return (
-    <div>
+    <div className="p-6">
       {/* Header */}
       <div className="flex items-center gap-4">
         <button

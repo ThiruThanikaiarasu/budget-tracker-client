@@ -25,16 +25,8 @@ import useCategoryStore, { type Category } from '../store/categoryStore';
 import useDashboardStore from '../store/dashboardStore';
 import useAccountStore from '../store/accountStore';
 import { formatCurrency } from '../utils/format';
+import { CATEGORY_ICONS, renderCategoryIcon } from '../utils/categoryIcons';
 
-const CAT_COLORS = [
-  '#e05850','#e07830','#c9a030','#50a860','#4090c8',
-  '#8060c0','#d04080','#30a0a0','#805040','#4060a0',
-];
-function catColor(name: string): string {
-  let h = 0;
-  for (let i = 0; i < name.length; i++) h = name.charCodeAt(i) + ((h << 5) - h);
-  return CAT_COLORS[Math.abs(h) % CAT_COLORS.length];
-}
 
 function GripIcon() {
   return (
@@ -334,12 +326,7 @@ function CategoryRow({ category, openMenuId, setOpenMenuId, onEdit, onDelete, is
       </div>
 
       {/* Icon circle */}
-      <div
-        className="w-10 h-10 rounded-full flex items-center justify-center text-base flex-shrink-0"
-        style={{ backgroundColor: catColor(category.name) }}
-      >
-        {category.icon || (category.type === 'income' ? '💰' : '💸')}
-      </div>
+      {renderCategoryIcon(category.icon, category.name, 40)}
 
       {/* Name */}
       <p className="flex-1 text-sm font-medium truncate" style={{ color: 'var(--c-text)' }}>
@@ -405,13 +392,16 @@ function CategoryModal({ open, onClose, onSubmit, title, submitLabel, defaultVal
   title: string; submitLabel: string;
   defaultValues?: CategoryFormData;
 }) {
-  const { register, handleSubmit, reset, formState: { errors, isSubmitting } } = useForm<CategoryFormData>({
+  const { register, handleSubmit, reset, setValue, watch, formState: { errors, isSubmitting } } = useForm<CategoryFormData>({
     resolver: zodResolver(categorySchema),
     defaultValues: defaultValues || { name: '', type: 'expense', icon: '' },
   });
+  const selectedIcon = watch('icon');
+
   useEffect(() => { if (open) reset(defaultValues || { name: '', type: 'expense', icon: '' }); }, [open, reset, defaultValues]);
   const handleFormSubmit = async (data: CategoryFormData) => { try { await onSubmit(data); reset(); } catch {} };
   if (!open) return null;
+
   return (
     <ModalWrap title={title} onClose={onClose}>
       <form onSubmit={handleSubmit(handleFormSubmit)} className="space-y-4">
@@ -427,10 +417,54 @@ function CategoryModal({ open, onClose, onSubmit, title, submitLabel, defaultVal
             <option value="income">Income</option>
           </select>
         </div>
+
+        {/* ── Icon picker ──────────────────────────────────────────── */}
         <div>
-          <label className="block text-xs font-medium mb-1" style={{ color: 'var(--c-muted)' }}>Icon (emoji, optional)</label>
-          <input {...register('icon')} className="t-input" placeholder="e.g. 🛒" />
+          <label className="block text-xs font-medium mb-2" style={{ color: 'var(--c-muted)' }}>Icon</label>
+          <div
+            className="grid gap-2 rounded-xl p-3"
+            style={{
+              gridTemplateColumns: 'repeat(6, 1fr)',
+              background: 'var(--c-bg)',
+              border: '1px solid var(--c-border)',
+              maxHeight: '220px',
+              overflowY: 'auto',
+            }}
+          >
+            {CATEGORY_ICONS.map(icon => (
+              <button
+                key={icon.key}
+                type="button"
+                onClick={() => setValue('icon', selectedIcon === icon.key ? '' : icon.key)}
+                title={icon.label}
+                className="flex items-center justify-center rounded-xl transition-all"
+                style={{
+                  padding: '5px',
+                  outline: selectedIcon === icon.key ? `2.5px solid var(--c-accent)` : '2.5px solid transparent',
+                  outlineOffset: '1px',
+                  background: selectedIcon === icon.key ? 'var(--c-surface2)' : 'transparent',
+                }}
+              >
+                <div
+                  className="w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0"
+                  style={{ backgroundColor: icon.bg }}
+                >
+                  <svg viewBox="0 0 24 24" style={{ width: 20, height: 20 }} fill="white">
+                    {Array.isArray(icon.d)
+                      ? icon.d.map((d, i) => <path key={i} d={d} />)
+                      : <path d={icon.d} />}
+                  </svg>
+                </div>
+              </button>
+            ))}
+          </div>
+          {selectedIcon && CATEGORY_ICONS.find(i => i.key === selectedIcon) && (
+            <p className="text-xs mt-1.5" style={{ color: 'var(--c-muted)' }}>
+              Selected: {CATEGORY_ICONS.find(i => i.key === selectedIcon)?.label}
+            </p>
+          )}
         </div>
+
         <div className="flex gap-3 pt-2">
           <button type="button" onClick={onClose} className="t-btn-ghost flex-1">Cancel</button>
           <button type="submit" disabled={isSubmitting} className="t-btn-primary flex-1">{isSubmitting ? 'Saving...' : submitLabel}</button>

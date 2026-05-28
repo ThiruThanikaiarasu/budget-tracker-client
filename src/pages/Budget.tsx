@@ -4,16 +4,7 @@ import useBudgetStore, { type DaySummary, type MonthlySummary } from '../store/b
 import useCategoryStore from '../store/categoryStore';
 import useAuthStore from '../store/authStore';
 import { formatCurrency } from '../utils/format';
-
-const CAT_COLORS = [
-  '#e05850','#e07830','#c9a030','#50a860','#4090c8',
-  '#8060c0','#d04080','#30a0a0','#805040','#4060a0',
-];
-function catColor(name: string): string {
-  let h = 0;
-  for (let i = 0; i < name.length; i++) h = name.charCodeAt(i) + ((h << 5) - h);
-  return CAT_COLORS[Math.abs(h) % CAT_COLORS.length];
-}
+import { renderCategoryIcon } from '../utils/categoryIcons';
 
 function getCurrentFinancialMonth(startDay: number) {
   const now = new Date();
@@ -227,12 +218,7 @@ function Budget() {
                 return (
                   <div key={cat.categoryId._id} className="px-4 py-3" style={{ borderBottom: '1px solid var(--c-border)' }}>
                     <div className="flex items-center gap-3">
-                      <div
-                        className="w-10 h-10 rounded-full flex items-center justify-center text-base flex-shrink-0"
-                        style={{ backgroundColor: catColor(cat.categoryId.name) }}
-                      >
-                        {cat.categoryId.icon}
-                      </div>
+                      {renderCategoryIcon(cat.categoryId.icon, cat.categoryId.name, 40)}
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center justify-between mb-1">
                           <p className="text-sm font-medium" style={{ color: 'var(--c-text)' }}>{cat.categoryId.name}</p>
@@ -280,12 +266,7 @@ function Budget() {
                   className="flex items-center gap-3 px-4 py-3"
                   style={{ borderBottom: '1px solid var(--c-border)' }}
                 >
-                  <div
-                    className="w-10 h-10 rounded-full flex items-center justify-center text-base flex-shrink-0"
-                    style={{ backgroundColor: catColor(cat.name) }}
-                  >
-                    {cat.icon || '💰'}
-                  </div>
+                  {renderCategoryIcon(cat.icon, cat.name, 40)}
                   <p className="flex-1 text-sm font-medium" style={{ color: 'var(--c-text)' }}>{cat.name}</p>
                   <button
                     onClick={() => handleSetBudgetForCategory(cat._id)}
@@ -572,9 +553,12 @@ function SingleCategoryModal({
           {/* Header */}
           <div className="flex items-center justify-between px-5 pt-5 pb-4 flex-shrink-0" style={{ borderBottom: '1px solid var(--c-border)' }}>
             <div className="flex items-center gap-2">
-              <DialogTitle className="text-base font-bold" style={{ color: 'var(--c-text)' }}>
-                {category.icon || '💸'} {category.name}
-              </DialogTitle>
+              <div className="flex items-center gap-2">
+                {renderCategoryIcon(category.icon, category.name, 28)}
+                <DialogTitle className="text-base font-bold" style={{ color: 'var(--c-text)' }}>
+                  {category.name}
+                </DialogTitle>
+              </div>
             </div>
             <button onClick={onClose} className="p-1" style={{ color: 'var(--c-muted)' }}>
               <svg viewBox="0 0 24 24" className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2.5">

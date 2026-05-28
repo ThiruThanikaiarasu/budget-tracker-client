@@ -10,21 +10,11 @@ import useAccountStore from '../store/accountStore';
 import useFriendStore, { type Friend } from '../store/friendStore';
 import useBudgetStore from '../store/budgetStore';
 import { formatCurrency } from '../utils/format';
+import { renderCategoryIcon } from '../utils/categoryIcons';
 
 // ── Constants ────────────────────────────────────────────────────────
 const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
 const DAYS = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
-
-const CAT_COLORS = [
-  '#e05850','#e07830','#c9a030','#50a860','#4090c8',
-  '#8060c0','#d04080','#30a0a0','#805040','#4060a0',
-];
-
-function catColor(name: string): string {
-  let h = 0;
-  for (let i = 0; i < name.length; i++) h = name.charCodeAt(i) + ((h << 5) - h);
-  return CAT_COLORS[Math.abs(h) % CAT_COLORS.length];
-}
 
 function groupDate(dateStr: string): string {
   const [y, m, d] = dateStr.split('-').map(Number);
@@ -59,14 +49,7 @@ type TransactionFormData = z.infer<typeof transactionSchema>;
 
 // ── Category Icon ────────────────────────────────────────────────────
 function CatIcon({ icon, name, size = 40 }: { icon?: string; name: string; size?: number }) {
-  return (
-    <div
-      className="flex items-center justify-center rounded-full flex-shrink-0"
-      style={{ width: size, height: size, backgroundColor: catColor(name) }}
-    >
-      <span style={{ fontSize: size * 0.45 }}>{icon || '💰'}</span>
-    </div>
-  );
+  return renderCategoryIcon(icon, name, size);
 }
 
 // ── Main page ─────────────────────────────────────────────────────────

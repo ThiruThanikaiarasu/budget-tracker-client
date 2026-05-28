@@ -422,12 +422,13 @@ function CategoryModal({ open, onClose, onSubmit, title, submitLabel, defaultVal
         <div>
           <label className="block text-xs font-medium mb-2" style={{ color: 'var(--c-muted)' }}>Icon</label>
           <div
-            className="grid gap-2 rounded-xl p-3"
+            className="grid rounded-xl p-3"
             style={{
-              gridTemplateColumns: 'repeat(6, 1fr)',
+              gridTemplateColumns: 'repeat(5, 1fr)',
+              gap: '12px',
               background: 'var(--c-bg)',
               border: '1px solid var(--c-border)',
-              maxHeight: '220px',
+              maxHeight: '260px',
               overflowY: 'auto',
             }}
           >
@@ -437,24 +438,27 @@ function CategoryModal({ open, onClose, onSubmit, title, submitLabel, defaultVal
                 type="button"
                 onClick={() => setValue('icon', selectedIcon === icon.key ? '' : icon.key)}
                 title={icon.label}
-                className="flex items-center justify-center rounded-xl transition-all"
+                className="flex flex-col items-center gap-1 rounded-xl transition-all"
                 style={{
-                  padding: '5px',
+                  padding: '8px 4px',
                   outline: selectedIcon === icon.key ? `2.5px solid var(--c-accent)` : '2.5px solid transparent',
                   outlineOffset: '1px',
                   background: selectedIcon === icon.key ? 'var(--c-surface2)' : 'transparent',
                 }}
               >
                 <div
-                  className="w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0"
+                  className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0"
                   style={{ backgroundColor: icon.bg }}
                 >
-                  <svg viewBox="0 0 24 24" style={{ width: 20, height: 20 }} fill="white">
+                  <svg viewBox="0 0 24 24" style={{ width: 22, height: 22 }} fill="white">
                     {Array.isArray(icon.d)
                       ? icon.d.map((d, i) => <path key={i} d={d} />)
                       : <path d={icon.d} />}
                   </svg>
                 </div>
+                <span className="text-[9px] leading-tight text-center truncate w-full" style={{ color: 'var(--c-muted)' }}>
+                  {icon.label}
+                </span>
               </button>
             ))}
           </div>

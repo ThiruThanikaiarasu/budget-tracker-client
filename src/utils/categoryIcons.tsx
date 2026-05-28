@@ -1,3 +1,5 @@
+import type { JSX } from 'react';
+
 // Category icon registry — SVG icons with per-icon background colours.
 // The `key` is what gets stored in the DB as the category's `icon` field.
 // Legacy categories that stored an emoji string still render correctly

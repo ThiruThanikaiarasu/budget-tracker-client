@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { NavLink, Outlet, useNavigate, useLocation } from 'react-router-dom';
 import useAuthStore from '../store/authStore';
 
@@ -67,6 +68,25 @@ const Icons = {
       <line x1="21" y1="12" x2="9" y2="12" />
     </svg>
   ),
+  hamburger: (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" className="w-5 h-5">
+      <line x1="3" y1="6" x2="21" y2="6" />
+      <line x1="3" y1="12" x2="21" y2="12" />
+      <line x1="3" y1="18" x2="21" y2="18" />
+    </svg>
+  ),
+  search: (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5">
+      <circle cx="11" cy="11" r="8" />
+      <line x1="21" y1="21" x2="16.65" y2="16.65" />
+    </svg>
+  ),
+  close: (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" className="w-5 h-5">
+      <line x1="18" y1="6" x2="6" y2="18" />
+      <line x1="6" y1="6" x2="18" y2="18" />
+    </svg>
+  ),
 };
 
 // ── Bottom nav (mobile): exactly 5 tabs ───────────────────────────────
@@ -90,10 +110,14 @@ const SIDEBAR_NAV = [
   { to: '/personalization', label: 'Settings', icon: Icons.settings },
 ];
 
+// ── Drawer nav: all pages (shown in mobile drawer) ────────────────────
+const DRAWER_NAV = SIDEBAR_NAV;
+
 function MainLayout() {
   const { user, logout } = useAuthStore();
   const navigate = useNavigate();
   const location = useLocation();
+  const [drawerOpen, setDrawerOpen] = useState(false);
 
   const handleLogout = () => {
     logout();
@@ -161,6 +185,33 @@ function MainLayout() {
 
       {/* ── Main content ─────────────────────────────────────────────── */}
       <div className="flex flex-1 flex-col min-h-0 min-w-0">
+
+        {/* ── Mobile top header ──────────────────────────────────────── */}
+        <header
+          className="md:hidden flex items-center justify-between px-4 h-14 flex-shrink-0 z-10"
+          style={{ background: 'var(--c-header-bg)', borderBottom: '1px solid var(--c-border)' }}
+        >
+          <button
+            onClick={() => setDrawerOpen(true)}
+            className="p-1.5 -ml-1.5 rounded-lg"
+            style={{ color: 'var(--c-text)' }}
+          >
+            {Icons.hamburger}
+          </button>
+
+          <span className="text-base font-bold" style={{ color: 'var(--c-accent)' }}>
+            Budget Tracker
+          </span>
+
+          <button
+            onClick={() => navigate('/transactions')}
+            className="p-1.5 -mr-1.5 rounded-lg"
+            style={{ color: 'var(--c-text)' }}
+          >
+            {Icons.search}
+          </button>
+        </header>
+
         <main
           className="flex-1 overflow-y-auto min-h-0"
           style={{ paddingBottom: 'calc(64px + env(safe-area-inset-bottom))' }}
@@ -188,9 +239,7 @@ function MainLayout() {
                 style={{ color: isActive ? 'var(--c-active)' : 'var(--c-muted)' }}
               >
                 {item.icon}
-                <span
-                  className="text-[9px] font-medium leading-tight truncate w-full text-center"
-                >
+                <span className="text-[9px] font-medium leading-tight truncate w-full text-center">
                   {item.label}
                 </span>
               </NavLink>
@@ -198,6 +247,83 @@ function MainLayout() {
           })}
         </nav>
       </div>
+
+      {/* ── Mobile drawer ────────────────────────────────────────────── */}
+      {drawerOpen && (
+        <>
+          {/* Backdrop */}
+          <div
+            className="fixed inset-0 z-30 md:hidden"
+            style={{ background: 'rgba(0,0,0,0.5)' }}
+            onClick={() => setDrawerOpen(false)}
+          />
+
+          {/* Drawer panel */}
+          <div
+            className="fixed top-0 left-0 bottom-0 z-40 flex flex-col w-72 md:hidden"
+            style={{ background: 'var(--c-nav-bg)' }}
+          >
+            {/* Drawer header */}
+            <div
+              className="flex items-center justify-between px-5 h-14 flex-shrink-0"
+              style={{ borderBottom: '1px solid var(--c-border)' }}
+            >
+              <div>
+                <p className="text-base font-bold" style={{ color: 'var(--c-accent)' }}>
+                  Budget Tracker
+                </p>
+                {user && (
+                  <p className="text-xs truncate" style={{ color: 'var(--c-muted)' }}>
+                    {user.name}
+                  </p>
+                )}
+              </div>
+              <button
+                onClick={() => setDrawerOpen(false)}
+                className="p-1.5 rounded-lg"
+                style={{ color: 'var(--c-muted)' }}
+              >
+                {Icons.close}
+              </button>
+            </div>
+
+            {/* Drawer nav links */}
+            <nav className="flex-1 overflow-y-auto px-3 py-3 space-y-0.5">
+              {DRAWER_NAV.map((item) => {
+                const isActive = location.pathname === item.to ||
+                  (item.to === '/transactions' && location.pathname === '/');
+                return (
+                  <NavLink
+                    key={item.to}
+                    to={item.to}
+                    onClick={() => setDrawerOpen(false)}
+                    className="flex items-center gap-3 px-3 py-3 rounded-lg text-sm font-medium"
+                    style={{
+                      color: isActive ? 'var(--c-accent)' : 'var(--c-muted)',
+                      backgroundColor: isActive ? 'var(--c-surface)' : 'transparent',
+                    }}
+                  >
+                    {item.icon}
+                    <span>{item.label}</span>
+                  </NavLink>
+                );
+              })}
+            </nav>
+
+            {/* Logout */}
+            <div className="p-3" style={{ borderTop: '1px solid var(--c-border)', paddingBottom: 'calc(12px + env(safe-area-inset-bottom))' }}>
+              <button
+                onClick={() => { setDrawerOpen(false); handleLogout(); }}
+                className="flex w-full items-center gap-3 px-3 py-3 rounded-lg text-sm font-medium"
+                style={{ color: 'var(--c-muted)' }}
+              >
+                {Icons.logout}
+                <span>Logout</span>
+              </button>
+            </div>
+          </div>
+        </>
+      )}
     </div>
   );
 }

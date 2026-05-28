@@ -200,7 +200,7 @@ function Budget() {
                   style={{
                     width: `${Math.min((monthlySummary.totalSpent / monthlySummary.overallLimit) * 100, 100)}%`,
                     background: monthlySummary.totalSpent > monthlySummary.overallLimit ? 'var(--c-expense)' :
-                                monthlySummary.totalSpent > monthlySummary.overallLimit * 0.8 ? 'var(--c-accent)' : 'var(--c-income)',
+                                monthlySummary.totalSpent > monthlySummary.overallLimit * 0.8 ? 'var(--c-warning)' : 'var(--c-income)',
                   }}
                 />
               </div>
@@ -245,7 +245,7 @@ function Budget() {
                             className="h-full rounded-full"
                             style={{
                               width: `${pct}%`,
-                              background: over ? 'var(--c-expense)' : pct > 80 ? 'var(--c-accent)' : 'var(--c-income)',
+                              background: over ? 'var(--c-expense)' : pct > 80 ? 'var(--c-warning)' : 'var(--c-income)',
                             }}
                           />
                         </div>

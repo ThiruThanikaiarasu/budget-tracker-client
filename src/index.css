@@ -16,6 +16,7 @@
   --c-nav-border: #e5e7eb;
   --c-active: #2563eb;
   --c-header-bg: #ffffff;
+  --c-warning: #d97706;
 }
 
 /* ── Dark Olive theme ───────────────────────────────────────────────── */
@@ -34,6 +35,7 @@
   --c-nav-border: rgba(255, 255, 255, 0.07);
   --c-active: #c9a72f;
   --c-header-bg: #252419;
+  --c-warning: #e0922a;
 }
 
 /* ── Global resets ──────────────────────────────────────────────────── */

@@ -64,6 +64,7 @@ interface BudgetState {
   monthlySummary: MonthlySummary | null;
   todaySummary: TodaySummary | null;
   isLoading: boolean;
+  activeMonth: string | null;
   fetchBudget: (month: string) => Promise<void>;
   upsertBudget: (data: {
     month: string;
@@ -72,16 +73,18 @@ interface BudgetState {
   }) => Promise<void>;
   fetchMonthlySummary: (month: string) => Promise<void>;
   fetchTodaySummary: () => Promise<void>;
+  refreshActive: () => Promise<void>;
 }
 
-const useBudgetStore = create<BudgetState>((set) => ({
+const useBudgetStore = create<BudgetState>((set, get) => ({
   budget: null,
   monthlySummary: null,
   todaySummary: null,
   isLoading: false,
+  activeMonth: null,
 
   fetchBudget: async (month) => {
-    set({ isLoading: true });
+    set({ isLoading: true, activeMonth: month });
     try {
       const { data } = await api.get(`/budgets/${month}`);
       set({ budget: data.budget, isLoading: false });
@@ -105,7 +108,7 @@ const useBudgetStore = create<BudgetState>((set) => ({
   },
 
   fetchMonthlySummary: async (month) => {
-    set({ isLoading: true });
+    set({ isLoading: true, activeMonth: month });
     try {
       const { data } = await api.get(`/budgets/${month}/summary`);
       set({ monthlySummary: data.summary, isLoading: false });
@@ -124,6 +127,16 @@ const useBudgetStore = create<BudgetState>((set) => ({
     } catch {
       set({ todaySummary: null });
     }
+  },
+
+  refreshActive: async () => {
+    const month = get().activeMonth;
+    const tasks: Promise<void>[] = [get().fetchTodaySummary()];
+    if (month) {
+      tasks.push(get().fetchBudget(month));
+      tasks.push(get().fetchMonthlySummary(month));
+    }
+    await Promise.all(tasks);
   },
 }));
 

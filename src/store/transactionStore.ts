@@ -91,7 +91,7 @@ const useTransactionStore = create<TransactionState>((set) => ({
         pagination: { ...state.pagination, total: state.pagination.total + 1 },
       }));
       toast.success('Transaction created');
-      useBudgetStore.getState().fetchTodaySummary();
+      useBudgetStore.getState().refreshActive();
     } catch (error: any) {
       toast.error(error.response?.data?.message || 'Failed to create transaction');
       throw error;
@@ -107,7 +107,7 @@ const useTransactionStore = create<TransactionState>((set) => ({
         ),
       }));
       toast.success('Transaction updated');
-      useBudgetStore.getState().fetchTodaySummary();
+      useBudgetStore.getState().refreshActive();
     } catch (error: any) {
       toast.error(error.response?.data?.message || 'Failed to update transaction');
       throw error;
@@ -122,7 +122,7 @@ const useTransactionStore = create<TransactionState>((set) => ({
         pagination: { ...state.pagination, total: state.pagination.total - 1 },
       }));
       toast.success('Transaction deleted');
-      useBudgetStore.getState().fetchTodaySummary();
+      useBudgetStore.getState().refreshActive();
     } catch (error: any) {
       toast.error(error.response?.data?.message || 'Failed to delete transaction');
     }

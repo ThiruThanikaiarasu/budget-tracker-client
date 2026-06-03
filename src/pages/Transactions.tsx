@@ -301,6 +301,7 @@ function Transactions() {
                           style={{ background: 'var(--c-surface2)', color: 'var(--c-muted)' }}
                         >
                           {tx.accountId.name}
+                          {tx.type === 'transfer' && tx.toAccountId ? ` → ${tx.toAccountId.name}` : ''}
                         </span>
                       ) : (
                         <span
@@ -447,13 +448,27 @@ function Transactions() {
               <div className="p-4 space-y-3" style={{ background: 'var(--c-surface)' }}>
                 {detailTx.accountId && (
                   <div className="flex items-center justify-between">
-                    <span className="text-sm" style={{ color: 'var(--c-muted)' }}>Account</span>
+                    <span className="text-sm" style={{ color: 'var(--c-muted)' }}>
+                      {detailTx.type === 'transfer' ? 'From' : 'Account'}
+                    </span>
                     <span
                       className="flex items-center gap-2 rounded-lg px-3 py-1.5"
                       style={{ background: 'var(--c-surface2)', color: 'var(--c-text)' }}
                     >
                       <span className="text-sm">💳</span>
                       <span className="text-sm font-medium">{detailTx.accountId.name}</span>
+                    </span>
+                  </div>
+                )}
+                {detailTx.type === 'transfer' && detailTx.toAccountId && (
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm" style={{ color: 'var(--c-muted)' }}>To</span>
+                    <span
+                      className="flex items-center gap-2 rounded-lg px-3 py-1.5"
+                      style={{ background: 'var(--c-surface2)', color: 'var(--c-text)' }}
+                    >
+                      <span className="text-sm">💳</span>
+                      <span className="text-sm font-medium">{detailTx.toAccountId.name}</span>
                     </span>
                   </div>
                 )}
@@ -467,6 +482,32 @@ function Transactions() {
                       <span className="text-sm">{detailTx.categoryId.icon}</span>
                       <span className="text-sm font-medium">{detailTx.categoryId.name}</span>
                     </span>
+                  </div>
+                )}
+                {detailTx.split && detailTx.split.splits.length > 0 && (
+                  <div className="pt-1">
+                    <p className="text-xs font-semibold mb-1" style={{ color: 'var(--c-muted)' }}>Split details</p>
+                    <div className="space-y-1">
+                      <div className="flex items-center justify-between text-sm">
+                        <span style={{ color: 'var(--c-text)' }}>
+                          You{detailTx.split.paidBy === 'user' ? ' (paid)' : ''}
+                        </span>
+                        <span style={{ color: 'var(--c-text)' }}>
+                          {formatCurrency(detailTx.amount - detailTx.split.splits.reduce((s, x) => s + x.amount, 0))}
+                        </span>
+                      </div>
+                      {detailTx.split.splits.map((s, i) => {
+                        const name = typeof s.friendId === 'string' ? s.friendId : s.friendId.name;
+                        const fid = typeof s.friendId === 'string' ? s.friendId : s.friendId._id;
+                        const paid = detailTx.split!.paidBy === fid;
+                        return (
+                          <div key={i} className="flex items-center justify-between text-sm">
+                            <span style={{ color: 'var(--c-muted)' }}>{name}{paid ? ' (paid)' : ''}</span>
+                            <span style={{ color: 'var(--c-muted)' }}>{formatCurrency(s.amount)}</span>
+                          </div>
+                        );
+                      })}
+                    </div>
                   </div>
                 )}
                 {detailTx.note && (
@@ -688,6 +729,24 @@ function TransactionModal({
   const [isSplit, setIsSplit] = useState(false);
   const [selectedFriends, setSelectedFriends] = useState<string[]>([]);
   const [splitAmounts, setSplitAmounts] = useState<Record<string, number>>({});
+
+  // Prefill split state when editing a transaction that was split.
+  useEffect(() => {
+    if (!open) return;
+    const split = transaction?.split;
+    if (split && split.splits.length > 0) {
+      const idOf = (f: { _id: string } | string) => typeof f === 'string' ? f : f._id;
+      setIsSplit(true);
+      setWhoPaid(split.paidBy ?? 'user');
+      setSelectedFriends(split.splits.map(s => idOf(s.friendId)));
+      setSplitAmounts(Object.fromEntries(split.splits.map(s => [idOf(s.friendId), s.amount])));
+    } else {
+      setIsSplit(false);
+      setWhoPaid('user');
+      setSelectedFriends([]);
+      setSplitAmounts({});
+    }
+  }, [transaction, open]);
 
   const hasFriends = friends.length > 0;
   const showFriendFlow = hasFriends && selectedType === 'expense';

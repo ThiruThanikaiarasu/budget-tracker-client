@@ -17,6 +17,11 @@ export interface Transaction {
   date: string;
   createdAt: string;
   updatedAt: string;
+  /** Present when the transaction was split with friends. */
+  split?: {
+    paidBy: 'user' | string;
+    splits: { friendId: { _id: string; name: string } | string; amount: number }[];
+  } | null;
 }
 
 interface Pagination {

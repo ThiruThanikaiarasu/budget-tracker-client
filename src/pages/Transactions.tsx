@@ -266,7 +266,9 @@ function Transactions() {
                 <div className="flex-1 h-px" style={{ background: 'var(--c-border)' }} />
               </div>
               {/* Rows */}
-              {grouped[dateKey].map((tx, idx) => (
+              {grouped[dateKey].map((tx, idx) => {
+                const isSplit = tx.personalShare != null && tx.personalShare !== tx.amount;
+                return (
                 <button
                   key={tx._id}
                   onClick={() => setDetailTx(tx)}
@@ -308,6 +310,14 @@ function Transactions() {
                           Debt
                         </span>
                       )}
+                      {isSplit && (
+                        <span
+                          className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] font-medium"
+                          style={{ background: 'rgba(80,128,192,0.18)', color: '#5080c0' }}
+                        >
+                          ✂ Split
+                        </span>
+                      )}
                       {tx.note && (
                         <span className="text-[10px] truncate" style={{ color: 'var(--c-muted)' }}>
                           · {tx.note}
@@ -316,19 +326,27 @@ function Transactions() {
                     </div>
                   </div>
                   {/* Amount */}
-                  <span
-                    className="text-sm font-bold flex-shrink-0"
-                    style={{
-                      color: tx.type === 'income' ? 'var(--c-income)'
-                           : tx.type === 'expense' ? 'var(--c-expense)'
-                           : 'var(--c-muted)',
-                    }}
-                  >
-                    {tx.type === 'expense' ? '-' : tx.type === 'income' ? '+' : ''}
-                    {formatCurrency(tx.amount)}
-                  </span>
+                  <div className="flex flex-col items-end flex-shrink-0">
+                    <span
+                      className="text-sm font-bold"
+                      style={{
+                        color: tx.type === 'income' ? 'var(--c-income)'
+                             : tx.type === 'expense' ? 'var(--c-expense)'
+                             : 'var(--c-muted)',
+                      }}
+                    >
+                      {tx.type === 'expense' ? '-' : tx.type === 'income' ? '+' : ''}
+                      {formatCurrency(isSplit ? tx.personalShare! : tx.amount)}
+                    </span>
+                    {isSplit && (
+                      <span className="text-[10px]" style={{ color: 'var(--c-muted)' }}>
+                        your share · of {formatCurrency(tx.amount)}
+                      </span>
+                    )}
+                  </div>
                 </button>
-              ))}
+                );
+              })}
             </div>
           ))
         )}
@@ -411,8 +429,17 @@ function Transactions() {
                   </p>
                   <p className="text-4xl font-bold text-white mt-1">
                     {detailTx.type === 'expense' ? '-' : detailTx.type === 'income' ? '+' : ''}
-                    {formatCurrency(detailTx.amount)}
+                    {formatCurrency(
+                      detailTx.personalShare != null && detailTx.personalShare !== detailTx.amount
+                        ? detailTx.personalShare
+                        : detailTx.amount
+                    )}
                   </p>
+                  {detailTx.personalShare != null && detailTx.personalShare !== detailTx.amount && (
+                    <p className="text-xs text-white/80 mt-1">
+                      ✂ your share · total {formatCurrency(detailTx.amount)}
+                    </p>
+                  )}
                   <p className="text-xs text-white/70 mt-2">{fmtDateTime(detailTx.date)}</p>
                 </div>
               </div>

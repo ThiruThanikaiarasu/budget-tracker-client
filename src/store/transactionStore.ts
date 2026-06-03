@@ -8,6 +8,8 @@ export interface Transaction {
   userId: string;
   type: 'income' | 'expense' | 'transfer';
   amount: number;
+  /** User's own share of `amount` when split with friends; absent for non-split. */
+  personalShare?: number;
   categoryId?: { _id: string; name: string; icon: string };
   accountId?: { _id: string; name: string };
   toAccountId?: { _id: string; name: string };

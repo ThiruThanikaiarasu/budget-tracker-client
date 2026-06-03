@@ -695,18 +695,26 @@ function TransactionModal({
   const participantCount = selectedFriends.length + 1;
   const equalShare = participantCount > 0 ? (totalAmount || 0) / participantCount : 0;
 
+  // Only the user's own share counts toward the budget when the expense is split.
+  const myShare = (showFriendFlow && isSplit && selectedFriends.length > 0)
+    ? totalAmount - selectedFriends.reduce((s, id) => s + (splitAmounts[id] ?? equalShare), 0)
+    : totalAmount;
+
   const budgetWarning = (() => {
-    if (!todaySummary || selectedType !== 'expense' || !totalAmount || totalAmount <= 0) return null;
+    // When editing, the saved transaction is already counted in todaySummary,
+    // so projecting the form amount on top of it would double-count.
+    if (isEdit) return null;
+    if (!todaySummary || selectedType !== 'expense' || !myShare || myShare <= 0) return null;
     const warnings: string[] = [];
     if (todaySummary.dailyLimit !== null) {
-      const projected = todaySummary.spent + totalAmount;
+      const projected = todaySummary.spent + myShare;
       if (projected > todaySummary.dailyLimit)
         warnings.push(`Today's total: ${formatCurrency(projected)} (limit: ${formatCurrency(todaySummary.dailyLimit)})`);
     }
     if (selectedCategoryId) {
       const cat = todaySummary.categoryStatus?.find((c: any) => c.categoryId._id === selectedCategoryId);
       if (cat) {
-        const projected = cat.spent + totalAmount;
+        const projected = cat.spent + myShare;
         if (projected > cat.effectiveLimit)
           warnings.push(`${cat.categoryId.icon} ${cat.categoryId.name}: ${formatCurrency(projected)} (limit: ${formatCurrency(cat.effectiveLimit)})`);
       }

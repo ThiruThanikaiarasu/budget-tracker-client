@@ -1,9 +1,10 @@
 import { useEffect, useState, useCallback, useMemo } from 'react';
+import type { ChangeEvent } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { Dialog, DialogPanel } from '@headlessui/react';
+import { Dialog, DialogPanel, Listbox, ListboxButton, ListboxOption, ListboxOptions } from '@headlessui/react';
 import useTransactionStore, { type Transaction } from '../store/transactionStore';
 import useCategoryStore from '../store/categoryStore';
 import useAccountStore from '../store/accountStore';
@@ -52,6 +53,103 @@ function CatIcon({ icon, name, size = 40 }: { icon?: string; name: string; size?
   return renderCategoryIcon(icon, name, size);
 }
 
+// ── Calculator-style amount input ───────────────────────────────────────
+// Right-aligned, no native number-input quirks (no stray leading zeros),
+// and places the cursor at the end on focus so typing always appends.
+function CalcAmountInput({
+  value, onChange, className,
+}: {
+  value: number;
+  onChange: (n: number) => void;
+  className?: string;
+}) {
+  const fmt = (n: number) => (n ? String(Math.round(n * 100) / 100) : '0');
+  const [text, setText] = useState(() => fmt(value));
+  const [focused, setFocused] = useState(false);
+
+  useEffect(() => {
+    if (!focused) setText(fmt(value));
+  }, [value, focused]);
+
+  const handleChange = (e: ChangeEvent<HTMLInputElement>) => {
+    let v = e.target.value.replace(/[^0-9.]/g, '');
+    const dot = v.indexOf('.');
+    if (dot !== -1) v = v.slice(0, dot + 1) + v.slice(dot + 1).replace(/\./g, '');
+    if (v.length > 1 && v[0] === '0' && v[1] !== '.') v = v.replace(/^0+/, '');
+    if (v === '') v = '0';
+    setText(v);
+    onChange(parseFloat(v) || 0);
+  };
+
+  return (
+    <input
+      type="text"
+      inputMode="decimal"
+      value={text}
+      onChange={handleChange}
+      onFocus={(e) => {
+        setFocused(true);
+        const end = e.target.value.length;
+        requestAnimationFrame(() => e.target.setSelectionRange(end, end));
+      }}
+      onBlur={() => setFocused(false)}
+      className={className}
+    />
+  );
+}
+
+// ── Category select with icons ──────────────────────────────────────────
+function CategorySelect({
+  categories, value, onChange,
+}: {
+  categories: { _id: string; name: string; icon: string }[];
+  value: string;
+  onChange: (id: string) => void;
+}) {
+  const selected = categories.find(c => c._id === value);
+  return (
+    <Listbox value={value} onChange={onChange}>
+      <div className="relative">
+        <ListboxButton
+          className="t-select w-full"
+          style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.5rem' }}
+        >
+          {selected ? (
+            <span className="flex items-center gap-2 truncate">
+              {renderCategoryIcon(selected.icon, selected.name, 22)}
+              <span className="truncate">{selected.name}</span>
+            </span>
+          ) : (
+            <span style={{ color: 'var(--c-muted)' }}>Select</span>
+          )}
+          <svg viewBox="0 0 24 24" className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" strokeWidth="2">
+            <polyline points="6 9 12 15 18 9" />
+          </svg>
+        </ListboxButton>
+        <ListboxOptions
+          anchor="bottom start"
+          className="z-50 mt-1 w-[var(--button-width)] rounded-lg p-1 max-h-60 overflow-auto"
+          style={{ background: 'var(--c-surface2)', border: '1px solid var(--c-border)' }}
+        >
+          {categories.map(c => (
+            <ListboxOption key={c._id} value={c._id}>
+              {({ focus, selected }) => (
+                <div
+                  className="flex items-center gap-2 px-2 py-1.5 rounded-md text-sm cursor-pointer"
+                  style={{ background: focus ? 'var(--c-surface)' : 'transparent', color: 'var(--c-text)', fontWeight: selected ? 600 : 400 }}
+                >
+                  {renderCategoryIcon(c.icon, c.name, 22)}
+                  <span className="truncate">{c.name}</span>
+                </div>
+              )}
+            </ListboxOption>
+          ))}
+        </ListboxOptions>
+      </div>
+    </Listbox>
+  );
+}
+
 // ── Main page ─────────────────────────────────────────────────────────
 function Transactions() {
   const {
@@ -61,7 +159,7 @@ function Transactions() {
   const { categories, fetchCategories } = useCategoryStore();
   const { accounts, fetchAccounts } = useAccountStore();
   const { friends, fetchFriends } = useFriendStore();
-  const { todaySummary, fetchTodaySummary } = useBudgetStore();
+  const { fetchTodaySummary } = useBudgetStore();
 
   const location = useLocation();
   const navigate = useNavigate();
@@ -530,7 +628,6 @@ function Transactions() {
         accounts={activeAccounts}
         friends={friends}
         initialType={createInitialType}
-        todaySummary={todaySummary}
       />
 
       {/* ── Edit modal ────────────────────────────────────────────── */}
@@ -543,7 +640,6 @@ function Transactions() {
           accounts={activeAccounts}
           friends={friends}
           transaction={editingTx}
-          todaySummary={todaySummary}
         />
       )}
     </div>
@@ -664,7 +760,7 @@ function Numpad({ value, onChange }: { value: string; onChange: (v: string) => v
 }
 
 function TransactionModal({
-  open, onClose, onSubmit, categories, accounts, friends, transaction, initialType, todaySummary,
+  open, onClose, onSubmit, categories, accounts, friends, transaction, initialType,
 }: {
   open: boolean;
   onClose: () => void;
@@ -674,7 +770,6 @@ function TransactionModal({
   friends: Friend[];
   transaction?: Transaction;
   initialType?: 'income' | 'expense';
-  todaySummary?: any;
 }) {
   const isEdit = !!transaction;
   const [amountStr, setAmountStr] = useState('0');
@@ -758,6 +853,15 @@ function TransactionModal({
   const myShare = (showFriendFlow && isSplit && selectedFriends.length > 0)
     ? totalAmount - selectedFriends.reduce((s, id) => s + (splitAmounts[id] ?? equalShare), 0)
     : totalAmount;
+
+  // Editing "You" redistributes the remainder across the selected friends
+  // (evenly if there are several), keeping the total in sync either way.
+  const handleUserShareChange = (v: number) => {
+    if (selectedFriends.length === 0) return;
+    const remainder = (totalAmount || 0) - v;
+    const each = remainder / selectedFriends.length;
+    setSplitAmounts(Object.fromEntries(selectedFriends.map(id => [id, each])));
+  };
 
   const [budgetWarning, setBudgetWarning] = useState<string[] | null>(null);
 
@@ -852,10 +956,11 @@ function TransactionModal({
               </div>
               <div>
                 <label className="block text-[10px] uppercase tracking-wider mb-1" style={{ color: 'var(--c-muted)' }}>Category</label>
-                <select {...register('categoryId')} className="t-select">
-                  <option value="">Select</option>
-                  {filteredCategories.map(c => <option key={c._id} value={c._id}>{c.icon} {c.name}</option>)}
-                </select>
+                <CategorySelect
+                  categories={filteredCategories}
+                  value={selectedCategoryId}
+                  onChange={(id) => setValue('categoryId', id, { shouldValidate: true })}
+                />
                 {errors.categoryId && <p className="text-xs mt-1" style={{ color: 'var(--c-expense)' }}>{errors.categoryId.message}</p>}
               </div>
             </div>
@@ -917,16 +1022,24 @@ function TransactionModal({
                     ))}
                     {selectedFriends.length > 0 && (totalAmount || 0) > 0 && (
                       <div className="mt-2 pt-2 space-y-1" style={{ borderTop: '1px solid var(--c-border)' }}>
-                        <div className="flex justify-between text-xs"><span style={{ color: 'var(--c-muted)' }}>You</span><span style={{ color: 'var(--c-text)' }}>{formatCurrency(totalAmount - selectedFriends.reduce((s, id) => s + (splitAmounts[id] ?? equalShare), 0))}</span></div>
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="text-xs" style={{ color: 'var(--c-muted)' }}>You</span>
+                          <CalcAmountInput
+                            value={totalAmount - selectedFriends.reduce((s, id) => s + (splitAmounts[id] ?? equalShare), 0)}
+                            onChange={handleUserShareChange}
+                            className="t-input w-24 text-right text-xs py-1"
+                          />
+                        </div>
                         {selectedFriends.map(id => {
                           const f = friends.find(x => x._id === id);
                           return (
                             <div key={id} className="flex items-center justify-between gap-2">
                               <span className="text-xs" style={{ color: 'var(--c-muted)' }}>{f?.name}</span>
-                              <input type="number" step="any" value={splitAmounts[id] ?? Math.round(equalShare * 100) / 100}
-                                onChange={e => setSplitAmounts(p => ({ ...p, [id]: parseFloat(e.target.value) || 0 }))}
-                                onWheel={e => e.currentTarget.blur()}
-                                className="t-input w-24 text-right text-xs py-1" />
+                              <CalcAmountInput
+                                value={splitAmounts[id] ?? Math.round(equalShare * 100) / 100}
+                                onChange={(v) => setSplitAmounts(p => ({ ...p, [id]: v }))}
+                                className="t-input w-24 text-right text-xs py-1"
+                              />
                             </div>
                           );
                         })}

@@ -6,6 +6,7 @@ export interface CategoryBudget {
   categoryId: { _id: string; name: string; icon: string } | string;
   limit: number;
   frequency: 'daily' | 'monthly';
+  carryForward?: boolean;
 }
 
 export interface Budget {
@@ -27,7 +28,10 @@ export interface CategorySummaryItem {
   categoryId: { _id: string; name: string; icon: string };
   limit: number;
   frequency: 'daily' | 'monthly';
+  carryForward: boolean;
   dailyLimit: number | null;
+  adaptiveDaily: number | null;
+  pot: number | null;
   totalSpent: number;
 }
 
@@ -38,6 +42,7 @@ export interface MonthlySummary {
   overallLimit: number | null;
   totalBudget: number | null;
   dailyLimit: number | null;
+  adaptiveOverallDaily: number | null;
   totalSpent: number;
   days: DaySummary[];
   categorySummary: CategorySummaryItem[];
@@ -46,8 +51,10 @@ export interface MonthlySummary {
 export interface TodayCategoryStatus {
   categoryId: { _id: string; name: string; icon: string };
   frequency: 'daily' | 'monthly';
+  carryForward: boolean;
   limit: number;
   effectiveLimit: number;
+  pot: number | null;
   spent: number;
   isOver: boolean;
 }
@@ -69,7 +76,7 @@ interface BudgetState {
   upsertBudget: (data: {
     month: string;
     overallLimit?: number;
-    categoryBudgets?: { categoryId: string; limit: number; frequency: 'daily' | 'monthly' }[];
+    categoryBudgets?: { categoryId: string; limit: number; frequency: 'daily' | 'monthly'; carryForward?: boolean }[];
   }) => Promise<void>;
   fetchMonthlySummary: (month: string) => Promise<void>;
   fetchTodaySummary: () => Promise<void>;
@@ -141,3 +148,18 @@ const useBudgetStore = create<BudgetState>((set, get) => ({
 }));
 
 export default useBudgetStore;
+
+/** Calls the server precheck and returns an array of warning strings (empty = no warnings). */
+export async function precheckBudget(
+  categoryId: string | undefined,
+  amount: number,
+  date: string
+): Promise<string[]> {
+  if (!amount || amount <= 0) return [];
+  try {
+    const { data } = await api.post('/budgets/precheck', { categoryId, amount, date });
+    return data.warnings ?? [];
+  } catch {
+    return [];
+  }
+}

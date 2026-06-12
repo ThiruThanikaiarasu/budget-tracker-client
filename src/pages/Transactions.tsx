@@ -8,7 +8,7 @@ import useTransactionStore, { type Transaction } from '../store/transactionStore
 import useCategoryStore from '../store/categoryStore';
 import useAccountStore from '../store/accountStore';
 import useFriendStore, { type Friend } from '../store/friendStore';
-import useBudgetStore from '../store/budgetStore';
+import useBudgetStore, { precheckBudget } from '../store/budgetStore';
 import { formatCurrency } from '../utils/format';
 import { renderCategoryIcon } from '../utils/categoryIcons';
 
@@ -759,27 +759,21 @@ function TransactionModal({
     ? totalAmount - selectedFriends.reduce((s, id) => s + (splitAmounts[id] ?? equalShare), 0)
     : totalAmount;
 
-  const budgetWarning = (() => {
-    // When editing, the saved transaction is already counted in todaySummary,
-    // so projecting the form amount on top of it would double-count.
-    if (isEdit) return null;
-    if (!todaySummary || selectedType !== 'expense' || !myShare || myShare <= 0) return null;
-    const warnings: string[] = [];
-    if (todaySummary.dailyLimit !== null) {
-      const projected = todaySummary.spent + myShare;
-      if (projected > todaySummary.dailyLimit)
-        warnings.push(`Today's total: ${formatCurrency(projected)} (limit: ${formatCurrency(todaySummary.dailyLimit)})`);
+  const [budgetWarning, setBudgetWarning] = useState<string[] | null>(null);
+
+  // Server-side budget precheck — debounced, runs when amount / category / date changes.
+  const selectedDate = watch('date');
+  useEffect(() => {
+    if (isEdit || selectedType !== 'expense' || !myShare || myShare <= 0) {
+      setBudgetWarning(null);
+      return;
     }
-    if (selectedCategoryId) {
-      const cat = todaySummary.categoryStatus?.find((c: any) => c.categoryId._id === selectedCategoryId);
-      if (cat) {
-        const projected = cat.spent + myShare;
-        if (projected > cat.effectiveLimit)
-          warnings.push(`${cat.categoryId.icon} ${cat.categoryId.name}: ${formatCurrency(projected)} (limit: ${formatCurrency(cat.effectiveLimit)})`);
-      }
-    }
-    return warnings.length > 0 ? warnings : null;
-  })();
+    const timer = setTimeout(async () => {
+      const warnings = await precheckBudget(selectedCategoryId || undefined, myShare, selectedDate);
+      setBudgetWarning(warnings.length > 0 ? warnings : null);
+    }, 400);
+    return () => clearTimeout(timer);
+  }, [isEdit, selectedType, myShare, selectedCategoryId, selectedDate]);
 
   const toggleFriend = (id: string) =>
     setSelectedFriends(p => p.includes(id) ? p.filter(x => x !== id) : [...p, id]);

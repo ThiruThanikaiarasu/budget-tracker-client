@@ -39,7 +39,7 @@ function Budget() {
   const [focusedCategoryId, setFocusedCategoryId] = useState<string | null>(null);
 
   const [overallLimit, setOverallLimit] = useState<string>('');
-  const [categoryBudgets, setCategoryBudgets] = useState<{ categoryId: string; limit: string; frequency: 'daily' | 'monthly' }[]>([]);
+  const [categoryBudgets, setCategoryBudgets] = useState<{ categoryId: string; limit: string; frequency: 'daily' | 'monthly'; carryForward: boolean }[]>([]);
 
   const expenseCategories = categories.filter(c => c.type === 'expense');
 
@@ -53,6 +53,7 @@ function Budget() {
         categoryId: typeof cb.categoryId === 'string' ? cb.categoryId : cb.categoryId._id,
         limit: cb.limit.toString(),
         frequency: cb.frequency,
+        carryForward: cb.carryForward ?? false,
       })));
     } else {
       setOverallLimit('');
@@ -66,17 +67,19 @@ function Budget() {
     setSelectedMonth(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`);
   };
 
-  const addCategoryBudget = () => setCategoryBudgets(p => [...p, { categoryId: '', limit: '', frequency: 'monthly' as const }]);
+  const addCategoryBudget = () => setCategoryBudgets(p => [...p, { categoryId: '', limit: '', frequency: 'monthly' as const, carryForward: false }]);
   const removeCategoryBudget = (i: number) => setCategoryBudgets(p => p.filter((_, idx) => idx !== i));
   const updateCategoryBudget = (i: number, field: 'categoryId' | 'limit' | 'frequency', v: string) =>
     setCategoryBudgets(p => p.map((cb, idx) => idx === i ? { ...cb, [field]: v } : cb));
+  const toggleCategoryCarryForward = (i: number) =>
+    setCategoryBudgets(p => p.map((cb, idx) => idx === i ? { ...cb, carryForward: !cb.carryForward } : cb));
 
   const handleSave = async () => {
     const payload: any = { month: selectedMonth };
     if (overallLimit) payload.overallLimit = parseFloat(overallLimit);
     const valid = categoryBudgets.filter(cb => cb.categoryId && cb.limit);
     if (valid.length > 0)
-      payload.categoryBudgets = valid.map(cb => ({ categoryId: cb.categoryId, limit: parseFloat(cb.limit), frequency: cb.frequency }));
+      payload.categoryBudgets = valid.map(cb => ({ categoryId: cb.categoryId, limit: parseFloat(cb.limit), frequency: cb.frequency, carryForward: cb.carryForward }));
     try { await upsertBudget(payload); await fetchMonthlySummary(selectedMonth); setShowForm(false); } catch {}
   };
 
@@ -84,15 +87,15 @@ function Budget() {
     setFocusedCategoryId(categoryId);
   };
 
-  const handleSaveSingleCategory = async (categoryId: string, limit: string, frequency: 'daily' | 'monthly') => {
+  const handleSaveSingleCategory = async (categoryId: string, limit: string, frequency: 'daily' | 'monthly', carryForward: boolean) => {
     const updatedRows = categoryBudgets.some(cb => cb.categoryId === categoryId)
-      ? categoryBudgets.map(cb => cb.categoryId === categoryId ? { ...cb, limit, frequency } : cb)
-      : [...categoryBudgets, { categoryId, limit, frequency }];
+      ? categoryBudgets.map(cb => cb.categoryId === categoryId ? { ...cb, limit, frequency, carryForward } : cb)
+      : [...categoryBudgets, { categoryId, limit, frequency, carryForward }];
     const payload: any = { month: selectedMonth };
     if (overallLimit) payload.overallLimit = parseFloat(overallLimit);
     const valid = updatedRows.filter(cb => cb.categoryId && cb.limit);
     if (valid.length > 0)
-      payload.categoryBudgets = valid.map(cb => ({ categoryId: cb.categoryId, limit: parseFloat(cb.limit), frequency: cb.frequency }));
+      payload.categoryBudgets = valid.map(cb => ({ categoryId: cb.categoryId, limit: parseFloat(cb.limit), frequency: cb.frequency, carryForward: cb.carryForward }));
     await upsertBudget(payload);
     await fetchMonthlySummary(selectedMonth);
     setCategoryBudgets(updatedRows);
@@ -213,15 +216,29 @@ function Budget() {
                 <div className="mt-1 h-px" style={{ background: 'var(--c-border)' }} />
               </div>
               {budgetedCategories.map(cat => {
-                const pct = cat.limit > 0 ? Math.min((cat.totalSpent / cat.limit) * 100, 100) : 0;
-                const over = cat.totalSpent > cat.limit;
+                const isCarryForward = cat.carryForward;
+                const pot = cat.pot;
+
+                // For carry-forward: show pot vs limit; for others: spent vs limit
+                const displayDenom = isCarryForward ? Math.max(cat.limit, Math.abs(pot ?? 0)) : cat.limit;
+                const displayNumer = isCarryForward ? cat.totalSpent : cat.totalSpent;
+                const pct = displayDenom > 0 ? Math.min((displayNumer / displayDenom) * 100, 100) : 0;
+                const over = isCarryForward ? (pot !== null && pot < 0) : cat.totalSpent > cat.limit;
+
                 return (
                   <div key={cat.categoryId._id} className="px-4 py-3" style={{ borderBottom: '1px solid var(--c-border)' }}>
                     <div className="flex items-center gap-3">
                       {renderCategoryIcon(cat.categoryId.icon, cat.categoryId.name, 40)}
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center justify-between mb-1">
-                          <p className="text-sm font-medium" style={{ color: 'var(--c-text)' }}>{cat.categoryId.name}</p>
+                          <div className="flex items-center gap-1.5">
+                            <p className="text-sm font-medium" style={{ color: 'var(--c-text)' }}>{cat.categoryId.name}</p>
+                            {isCarryForward && (
+                              <span className="text-[9px] font-bold uppercase tracking-wider px-1 py-0.5 rounded" style={{ background: 'rgba(201,167,47,0.15)', color: 'var(--c-accent)' }}>
+                                Saving
+                              </span>
+                            )}
+                          </div>
                           <p className="text-xs" style={{ color: over ? 'var(--c-expense)' : 'var(--c-muted)' }}>
                             {formatCurrency(cat.totalSpent)} / {formatCurrency(cat.limit)}
                           </p>
@@ -235,9 +252,21 @@ function Budget() {
                             }}
                           />
                         </div>
-                        <p className="text-[10px] mt-0.5" style={{ color: 'var(--c-muted)' }}>
-                          {cat.frequency === 'daily' ? 'Daily' : 'Monthly'} budget
-                        </p>
+                        {isCarryForward && pot !== null ? (
+                          <p className="text-[10px] mt-0.5 font-semibold" style={{ color: over ? 'var(--c-expense)' : 'var(--c-income)' }}>
+                            {over
+                              ? `Pot overdrawn by ${formatCurrency(Math.abs(pot))}`
+                              : `Saved up: ${formatCurrency(pot)} available`}
+                          </p>
+                        ) : cat.frequency === 'daily' && cat.adaptiveDaily !== null ? (
+                          <p className="text-[10px] mt-0.5" style={{ color: 'var(--c-muted)' }}>
+                            Today's pace: {formatCurrency(cat.adaptiveDaily)} / day
+                          </p>
+                        ) : (
+                          <p className="text-[10px] mt-0.5" style={{ color: 'var(--c-muted)' }}>
+                            Monthly budget
+                          </p>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -317,6 +346,7 @@ function Budget() {
         onAdd={addCategoryBudget}
         onRemove={removeCategoryBudget}
         onUpdate={updateCategoryBudget}
+        onToggleCarryForward={toggleCategoryCarryForward}
         onSave={handleSave}
       />
 
@@ -331,8 +361,9 @@ function Budget() {
             category={cat}
             initialLimit={existing?.limit ?? ''}
             initialFrequency={existing?.frequency ?? 'monthly'}
+            initialCarryForward={existing?.carryForward ?? false}
             onClose={() => setFocusedCategoryId(null)}
-            onSave={(limit, freq) => handleSaveSingleCategory(focusedCategoryId, limit, freq)}
+            onSave={(limit, freq, cf) => handleSaveSingleCategory(focusedCategoryId, limit, freq, cf)}
           />
         );
       })()}
@@ -341,13 +372,13 @@ function Budget() {
 }
 
 // ── Budget modal ──────────────────────────────────────────────────────
-interface CatBudgetRow { categoryId: string; limit: string; frequency: 'daily' | 'monthly' }
+interface CatBudgetRow { categoryId: string; limit: string; frequency: 'daily' | 'monthly'; carryForward: boolean }
 
 function BudgetModal({
   open, onClose, month,
   overallLimit, setOverallLimit,
   categoryBudgets, expenseCategories,
-  onAdd, onRemove, onUpdate, onSave,
+  onAdd, onRemove, onUpdate, onToggleCarryForward, onSave,
 }: {
   open: boolean;
   onClose: () => void;
@@ -359,6 +390,7 @@ function BudgetModal({
   onAdd: () => void;
   onRemove: (i: number) => void;
   onUpdate: (i: number, field: 'categoryId' | 'limit' | 'frequency', v: string) => void;
+  onToggleCarryForward: (i: number) => void;
   onSave: () => Promise<void>;
 }) {
   const [saving, setSaving] = useState(false);
@@ -495,6 +527,39 @@ function BudgetModal({
                         ))}
                       </div>
                     </div>
+
+                    {/* Carry-forward toggle (monthly only) */}
+                    {cb.frequency === 'monthly' && (
+                      <button
+                        onClick={() => onToggleCarryForward(i)}
+                        className="flex items-center justify-between w-full py-2 px-3 rounded-lg transition-all"
+                        style={{
+                          background: cb.carryForward ? 'rgba(201,167,47,0.12)' : 'var(--c-bg)',
+                          border: `1px solid ${cb.carryForward ? 'rgba(201,167,47,0.4)' : 'var(--c-border)'}`,
+                        }}
+                      >
+                        <div className="text-left">
+                          <p className="text-xs font-semibold" style={{ color: cb.carryForward ? 'var(--c-accent)' : 'var(--c-muted)' }}>
+                            Save &amp; carry forward
+                          </p>
+                          <p className="text-[10px] mt-0.5" style={{ color: 'var(--c-muted)' }}>
+                            Unspent budget rolls over each month
+                          </p>
+                        </div>
+                        <div
+                          className="w-9 h-5 rounded-full flex-shrink-0 transition-all relative"
+                          style={{ background: cb.carryForward ? 'var(--c-accent)' : 'var(--c-surface2)' }}
+                        >
+                          <div
+                            className="absolute top-0.5 w-4 h-4 rounded-full transition-all"
+                            style={{
+                              background: 'white',
+                              left: cb.carryForward ? '18px' : '2px',
+                            }}
+                          />
+                        </div>
+                      </button>
+                    )}
                   </div>
                 ))}
               </div>
@@ -519,27 +584,29 @@ function BudgetModal({
 
 // ── Single-category budget modal ──────────────────────────────────────
 function SingleCategoryModal({
-  open, category, initialLimit, initialFrequency, onClose, onSave,
+  open, category, initialLimit, initialFrequency, initialCarryForward, onClose, onSave,
 }: {
   open: boolean;
   category: { _id: string; name: string; icon: string };
   initialLimit: string;
   initialFrequency: 'daily' | 'monthly';
+  initialCarryForward: boolean;
   onClose: () => void;
-  onSave: (limit: string, frequency: 'daily' | 'monthly') => Promise<void>;
+  onSave: (limit: string, frequency: 'daily' | 'monthly', carryForward: boolean) => Promise<void>;
 }) {
   const [limit, setLimit] = useState(initialLimit);
   const [frequency, setFrequency] = useState<'daily' | 'monthly'>(initialFrequency);
+  const [carryForward, setCarryForward] = useState(initialCarryForward);
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    if (open) { setLimit(initialLimit); setFrequency(initialFrequency); }
-  }, [open, initialLimit, initialFrequency]);
+    if (open) { setLimit(initialLimit); setFrequency(initialFrequency); setCarryForward(initialCarryForward); }
+  }, [open, initialLimit, initialFrequency, initialCarryForward]);
 
   const handleSave = async () => {
     if (!limit) return;
     setSaving(true);
-    try { await onSave(limit, frequency); } finally { setSaving(false); }
+    try { await onSave(limit, frequency, carryForward); } finally { setSaving(false); }
   };
 
   return (
@@ -604,6 +671,36 @@ function SingleCategoryModal({
                 ))}
               </div>
             </div>
+
+            {/* Carry-forward toggle (monthly only) */}
+            {frequency === 'monthly' && (
+              <button
+                onClick={() => setCarryForward(v => !v)}
+                className="flex items-center justify-between w-full py-3 px-3 rounded-xl transition-all"
+                style={{
+                  background: carryForward ? 'rgba(201,167,47,0.12)' : 'var(--c-bg)',
+                  border: `1px solid ${carryForward ? 'rgba(201,167,47,0.4)' : 'var(--c-border)'}`,
+                }}
+              >
+                <div className="text-left">
+                  <p className="text-sm font-semibold" style={{ color: carryForward ? 'var(--c-accent)' : 'var(--c-text)' }}>
+                    Save &amp; carry forward
+                  </p>
+                  <p className="text-xs mt-0.5" style={{ color: 'var(--c-muted)' }}>
+                    Unspent budget rolls over — builds up for big purchases
+                  </p>
+                </div>
+                <div
+                  className="w-10 h-5 rounded-full flex-shrink-0 ml-3 relative transition-all"
+                  style={{ background: carryForward ? 'var(--c-accent)' : 'var(--c-surface2)' }}
+                >
+                  <div
+                    className="absolute top-0.5 w-4 h-4 rounded-full transition-all"
+                    style={{ background: 'white', left: carryForward ? '22px' : '2px' }}
+                  />
+                </div>
+              </button>
+            )}
           </div>
 
           {/* Footer */}

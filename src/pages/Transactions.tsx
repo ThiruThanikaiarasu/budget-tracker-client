@@ -7,11 +7,12 @@ import { z } from 'zod';
 import { Dialog, DialogPanel, Listbox, ListboxButton, ListboxOption, ListboxOptions } from '@headlessui/react';
 import useTransactionStore, { type Transaction } from '../store/transactionStore';
 import useCategoryStore from '../store/categoryStore';
-import useAccountStore from '../store/accountStore';
+import useAccountStore, { type Account } from '../store/accountStore';
 import useFriendStore, { type Friend } from '../store/friendStore';
 import useBudgetStore, { precheckBudget } from '../store/budgetStore';
 import { formatCurrency } from '../utils/format';
 import { renderCategoryIcon } from '../utils/categoryIcons';
+import { renderAccountIcon } from '../utils/accountIcons';
 
 // ── Constants ────────────────────────────────────────────────────────
 const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
@@ -168,11 +169,11 @@ function CategorySelect({
   );
 }
 
-// ── Account select (plain list, same dropdown panel as category) ───────
+// ── Account select (with type icon, same dropdown panel as category) ───
 function AccountSelect({
   accounts, value, onChange,
 }: {
-  accounts: { _id: string; name: string }[];
+  accounts: { _id: string; name: string; type: Account['type']; color?: string }[];
   value: string;
   onChange: (id: string) => void;
 }) {
@@ -184,9 +185,14 @@ function AccountSelect({
           className="t-select w-full"
           style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.5rem' }}
         >
-          <span className="truncate" style={!selected ? { color: 'var(--c-muted)' } : undefined}>
-            {selected ? selected.name : 'Select'}
-          </span>
+          {selected ? (
+            <span className="flex items-center gap-2 truncate">
+              {renderAccountIcon(selected.type, selected.color, 22)}
+              <span className="truncate">{selected.name}</span>
+            </span>
+          ) : (
+            <span style={{ color: 'var(--c-muted)' }}>Select</span>
+          )}
           <svg viewBox="0 0 24 24" className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" strokeWidth="2">
             <polyline points="6 9 12 15 18 9" />
           </svg>
@@ -196,10 +202,11 @@ function AccountSelect({
             <ListboxOption key={a._id} value={a._id}>
               {({ focus, selected }) => (
                 <div
-                  className="px-3 py-2 rounded-lg text-sm cursor-pointer truncate"
+                  className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm cursor-pointer"
                   style={{ background: focus ? 'var(--c-surface)' : 'transparent', color: 'var(--c-text)', fontWeight: selected ? 600 : 400 }}
                 >
-                  {a.name}
+                  {renderAccountIcon(a.type, a.color, 22)}
+                  <span className="truncate">{a.name}</span>
                 </div>
               )}
             </ListboxOption>
@@ -826,7 +833,7 @@ function TransactionModal({
   onClose: () => void;
   onSubmit: (data: any) => Promise<void>;
   categories: { _id: string; name: string; type: string; icon: string }[];
-  accounts: { _id: string; name: string }[];
+  accounts: { _id: string; name: string; type: Account['type']; color?: string }[];
   friends: Friend[];
   transaction?: Transaction;
   initialType?: 'income' | 'expense';

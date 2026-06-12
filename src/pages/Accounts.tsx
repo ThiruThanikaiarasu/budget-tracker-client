@@ -6,6 +6,7 @@ import { Dialog, DialogPanel, DialogTitle } from '@headlessui/react';
 import useAccountStore, { type Account } from '../store/accountStore';
 import useDashboardStore from '../store/dashboardStore';
 import { formatCurrency } from '../utils/format';
+import { renderAccountIcon } from '../utils/accountIcons';
 
 const ACCOUNT_TYPES = [
   { value: 'cash', label: 'Cash' },
@@ -14,14 +15,6 @@ const ACCOUNT_TYPES = [
   { value: 'upi_wallet', label: 'UPI Wallet' },
   { value: 'other', label: 'Other' },
 ] as const;
-
-const TYPE_ICONS: Record<Account['type'], string> = {
-  cash: '💵',
-  bank_account: '🏦',
-  credit_card: '💳',
-  upi_wallet: '📱',
-  other: '💼',
-};
 
 const COLORS = ['#3B82F6','#10B981','#F59E0B','#EF4444','#8B5CF6','#EC4899','#06B6D4','#F97316'];
 
@@ -129,12 +122,7 @@ function Accounts() {
               }}
             >
               {/* Icon circle */}
-              <div
-                className="w-12 h-12 rounded-full flex items-center justify-center text-xl flex-shrink-0"
-                style={{ backgroundColor: account.color || 'var(--c-surface2)' }}
-              >
-                {TYPE_ICONS[account.type]}
-              </div>
+              {renderAccountIcon(account.type, account.color, 48)}
 
               {/* Name + balance */}
               <div className="flex-1 min-w-0">

@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback, useMemo } from 'react';
-import type { ChangeEvent } from 'react';
+import type { ChangeEvent, ReactNode } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -98,6 +98,28 @@ function CalcAmountInput({
   );
 }
 
+// ── Shared dropdown options panel ───────────────────────────────────────
+// White-themed, anchored below the trigger with a small margin, rounded
+// corners + shadow, and a capped height so long lists scroll within the
+// panel instead of stretching to the bottom of the viewport. The cap is
+// applied via --anchor-max-height, which Headless UI's floating-ui sizing
+// reads (it otherwise forces maxHeight to the full available viewport space).
+function SelectOptions({ children }: { children: ReactNode }) {
+  return (
+    <ListboxOptions
+      anchor="bottom start"
+      className="z-50 mt-2 w-[var(--button-width)] rounded-xl p-1.5 space-y-0.5 shadow-lg"
+      style={{
+        background: 'var(--c-surface2)',
+        border: '1px solid var(--c-border)',
+        '--anchor-max-height': '16rem',
+      } as React.CSSProperties}
+    >
+      {children}
+    </ListboxOptions>
+  );
+}
+
 // ── Category select with icons ──────────────────────────────────────────
 function CategorySelect({
   categories, value, onChange,
@@ -126,16 +148,12 @@ function CategorySelect({
             <polyline points="6 9 12 15 18 9" />
           </svg>
         </ListboxButton>
-        <ListboxOptions
-          anchor="bottom start"
-          className="z-50 mt-1 w-[var(--button-width)] rounded-lg p-1 max-h-60 overflow-auto"
-          style={{ background: 'var(--c-surface2)', border: '1px solid var(--c-border)' }}
-        >
+        <SelectOptions>
           {categories.map(c => (
             <ListboxOption key={c._id} value={c._id}>
               {({ focus, selected }) => (
                 <div
-                  className="flex items-center gap-2 px-2 py-1.5 rounded-md text-sm cursor-pointer"
+                  className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm cursor-pointer"
                   style={{ background: focus ? 'var(--c-surface)' : 'transparent', color: 'var(--c-text)', fontWeight: selected ? 600 : 400 }}
                 >
                   {renderCategoryIcon(c.icon, c.name, 22)}
@@ -144,7 +162,49 @@ function CategorySelect({
               )}
             </ListboxOption>
           ))}
-        </ListboxOptions>
+        </SelectOptions>
+      </div>
+    </Listbox>
+  );
+}
+
+// ── Account select (plain list, same dropdown panel as category) ───────
+function AccountSelect({
+  accounts, value, onChange,
+}: {
+  accounts: { _id: string; name: string }[];
+  value: string;
+  onChange: (id: string) => void;
+}) {
+  const selected = accounts.find(a => a._id === value);
+  return (
+    <Listbox value={value} onChange={onChange}>
+      <div className="relative">
+        <ListboxButton
+          className="t-select w-full"
+          style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.5rem' }}
+        >
+          <span className="truncate" style={!selected ? { color: 'var(--c-muted)' } : undefined}>
+            {selected ? selected.name : 'Select'}
+          </span>
+          <svg viewBox="0 0 24 24" className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" strokeWidth="2">
+            <polyline points="6 9 12 15 18 9" />
+          </svg>
+        </ListboxButton>
+        <SelectOptions>
+          {accounts.map(a => (
+            <ListboxOption key={a._id} value={a._id}>
+              {({ focus, selected }) => (
+                <div
+                  className="px-3 py-2 rounded-lg text-sm cursor-pointer truncate"
+                  style={{ background: focus ? 'var(--c-surface)' : 'transparent', color: 'var(--c-text)', fontWeight: selected ? 600 : 400 }}
+                >
+                  {a.name}
+                </div>
+              )}
+            </ListboxOption>
+          ))}
+        </SelectOptions>
       </div>
     </Listbox>
   );
@@ -798,6 +858,7 @@ function TransactionModal({
 
   const selectedType = watch('type');
   const selectedCategoryId = watch('categoryId');
+  const selectedAccountId = watch('accountId');
   const totalAmount = watch('amount');
   const filteredCategories = categories.filter(c => c.type === selectedType);
 
@@ -947,9 +1008,11 @@ function TransactionModal({
               <div>
                 <label className="block text-[10px] uppercase tracking-wider mb-1" style={{ color: 'var(--c-muted)' }}>Account</label>
                 {!friendPaid ? (
-                  <select {...register('accountId')} className="t-select">
-                    {accounts.map(a => <option key={a._id} value={a._id}>{a.name}</option>)}
-                  </select>
+                  <AccountSelect
+                    accounts={accounts}
+                    value={selectedAccountId || ''}
+                    onChange={(id) => setValue('accountId', id, { shouldValidate: true })}
+                  />
                 ) : (
                   <div className="t-input opacity-50">Friend paid</div>
                 )}

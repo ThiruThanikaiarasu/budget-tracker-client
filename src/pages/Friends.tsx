@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -578,6 +578,24 @@ function FriendDetail({ friend, onBack }: { friend: Friend; onBack: () => void }
   const [showSettle, setShowSettle] = useState(false);
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
 
+  const breakdown = useMemo(() => {
+    let lent = 0;
+    let borrowed = 0;
+    for (const expense of expenses) {
+      if (expense.isSettlement) continue;
+      if (expense.paidBy === 'user') {
+        const friendSplit = expense.splits.find(
+          (s) => (typeof s.friendId === 'object' ? s.friendId._id : s.friendId) === friend._id
+        );
+        if (friendSplit) lent += friendSplit.amount;
+      } else if (expense.paidBy === friend._id) {
+        const totalSplits = expense.splits.reduce((sum, s) => sum + s.amount, 0);
+        borrowed += expense.totalAmount - totalSplits;
+      }
+    }
+    return { lent, borrowed };
+  }, [expenses, friend._id]);
+
   useEffect(() => {
     const close = () => setOpenMenuId(null);
     document.addEventListener('click', close);
@@ -630,6 +648,21 @@ function FriendDetail({ friend, onBack }: { friend: Friend; onBack: () => void }
       {/* Expense History */}
       <div className="mt-6">
         <h2 className="text-lg font-semibold text-gray-900">History</h2>
+
+        {/* Debt breakdown summary */}
+        {!isLoading && expenses.some((e) => !e.isSettlement) && (
+          <div className="mt-3 grid grid-cols-2 gap-3 rounded-lg bg-gray-50 p-3">
+            <div className="text-center">
+              <p className="text-xs text-gray-500">You lent</p>
+              <p className="mt-0.5 text-base font-bold text-green-600">{formatCurrency(breakdown.lent)}</p>
+            </div>
+            <div className="text-center">
+              <p className="text-xs text-gray-500">You borrowed</p>
+              <p className="mt-0.5 text-base font-bold text-red-600">{formatCurrency(breakdown.borrowed)}</p>
+            </div>
+          </div>
+        )}
+
         {isLoading ? (
           <div className="mt-4 flex justify-center">
             <div className="h-8 w-8 animate-spin rounded-full border-4 border-blue-600 border-t-transparent" />
@@ -663,9 +696,34 @@ function FriendDetail({ friend, onBack }: { friend: Friend; onBack: () => void }
                   </p>
                 </div>
                 <div className="flex items-center gap-3">
-                  <p className="text-sm font-semibold text-gray-900">
-                    {formatCurrency(expense.totalAmount)}
-                  </p>
+                  <div className="text-right">
+                    <p className="text-sm font-semibold text-gray-900">
+                      {formatCurrency(expense.totalAmount)}
+                    </p>
+                    {!expense.isSettlement && (() => {
+                      if (expense.paidBy === 'user') {
+                        const friendSplit = expense.splits.find(
+                          (s) => (typeof s.friendId === 'object' ? s.friendId._id : s.friendId) === friend._id
+                        );
+                        if (!friendSplit) return null;
+                        return (
+                          <p className="text-xs font-medium text-green-600">
+                            {friend.name} owes +{formatCurrency(friendSplit.amount)}
+                          </p>
+                        );
+                      }
+                      if (expense.paidBy === friend._id) {
+                        const totalSplits = expense.splits.reduce((sum, s) => sum + s.amount, 0);
+                        const userShare = expense.totalAmount - totalSplits;
+                        return (
+                          <p className="text-xs font-medium text-red-600">
+                            you owe -{formatCurrency(userShare)}
+                          </p>
+                        );
+                      }
+                      return null;
+                    })()}
+                  </div>
                   <div className="relative">
                     <button
                       onClick={(e) => {

@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback, useMemo } from 'react';
+import { useEffect, useRef, useState, useCallback, useMemo } from 'react';
 import type { ChangeEvent, ReactNode } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
@@ -121,7 +121,7 @@ function SelectOptions({ children }: { children: ReactNode }) {
   );
 }
 
-// ── Category select with icons ──────────────────────────────────────────
+// ── Category select with search ──────────────────────────────────────────
 function CategorySelect({
   categories, value, onChange,
 }: {
@@ -129,43 +129,94 @@ function CategorySelect({
   value: string;
   onChange: (id: string) => void;
 }) {
+  const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState('');
+  const containerRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
   const selected = categories.find(c => c._id === value);
+
+  const filtered = query === ''
+    ? categories
+    : categories.filter(c => c.name.toLowerCase().includes(query.toLowerCase()));
+
+  useEffect(() => {
+    if (!open) return;
+    const handler = (e: MouseEvent) => {
+      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+        setOpen(false);
+        setQuery('');
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [open]);
+
+  useEffect(() => {
+    if (open) {
+      const t = setTimeout(() => inputRef.current?.focus(), 10);
+      return () => clearTimeout(t);
+    }
+  }, [open]);
+
   return (
-    <Listbox value={value} onChange={onChange}>
-      <div className="relative">
-        <ListboxButton
-          className="t-select w-full"
-          style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.5rem' }}
+    <div ref={containerRef} className="relative">
+      <button
+        type="button"
+        onClick={() => setOpen(v => !v)}
+        className="t-select w-full"
+        style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.5rem' }}
+      >
+        {selected ? (
+          <span className="flex items-center gap-2 truncate">
+            {renderCategoryIcon(selected.icon, selected.name, 22)}
+            <span className="truncate">{selected.name}</span>
+          </span>
+        ) : (
+          <span style={{ color: 'var(--c-muted)' }}>Select</span>
+        )}
+        <svg viewBox="0 0 24 24" className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" strokeWidth="2">
+          <polyline points="6 9 12 15 18 9" />
+        </svg>
+      </button>
+      {open && (
+        <div
+          className="absolute z-50 mt-2 w-full rounded-xl shadow-lg"
+          style={{ background: 'var(--c-surface2)', border: '1px solid var(--c-border)', top: '100%', left: 0 }}
         >
-          {selected ? (
-            <span className="flex items-center gap-2 truncate">
-              {renderCategoryIcon(selected.icon, selected.name, 22)}
-              <span className="truncate">{selected.name}</span>
-            </span>
-          ) : (
-            <span style={{ color: 'var(--c-muted)' }}>Select</span>
-          )}
-          <svg viewBox="0 0 24 24" className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" strokeWidth="2">
-            <polyline points="6 9 12 15 18 9" />
-          </svg>
-        </ListboxButton>
-        <SelectOptions>
-          {categories.map(c => (
-            <ListboxOption key={c._id} value={c._id}>
-              {({ focus, selected }) => (
-                <div
-                  className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm cursor-pointer"
-                  style={{ background: focus ? 'var(--c-surface)' : 'transparent', color: 'var(--c-text)', fontWeight: selected ? 600 : 400 }}
-                >
-                  {renderCategoryIcon(c.icon, c.name, 22)}
-                  <span className="truncate">{c.name}</span>
-                </div>
-              )}
-            </ListboxOption>
-          ))}
-        </SelectOptions>
-      </div>
-    </Listbox>
+          <div className="p-2" style={{ borderBottom: '1px solid var(--c-border)' }}>
+            <input
+              ref={inputRef}
+              type="text"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Search category..."
+              className="w-full rounded-lg px-3 py-1.5 text-sm outline-none"
+              style={{ background: 'var(--c-surface)', color: 'var(--c-text)', border: '1px solid var(--c-border)' }}
+            />
+          </div>
+          <div className="p-1.5 space-y-0.5 overflow-y-auto" style={{ maxHeight: '14rem' }}>
+            {filtered.length === 0 ? (
+              <p className="px-3 py-2 text-sm" style={{ color: 'var(--c-muted)' }}>No results</p>
+            ) : filtered.map(c => (
+              <button
+                key={c._id}
+                type="button"
+                onClick={() => { onChange(c._id); setOpen(false); setQuery(''); }}
+                className="flex w-full items-center gap-2 px-3 py-2 rounded-lg text-sm cursor-pointer text-left"
+                style={{
+                  background: c._id === value ? 'var(--c-surface)' : 'transparent',
+                  color: 'var(--c-text)',
+                  fontWeight: c._id === value ? 600 : 400,
+                }}
+              >
+                {renderCategoryIcon(c.icon, c.name, 22)}
+                <span className="truncate">{c.name}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -220,9 +271,10 @@ function AccountSelect({
 // ── Main page ─────────────────────────────────────────────────────────
 function Transactions() {
   const {
-    transactions, pagination, isLoading,
+    transactions, pagination, isLoading, isLoadingMore,
     fetchTransactions, createTransaction, updateTransaction, deleteTransaction,
   } = useTransactionStore();
+  const sentinelRef = useRef<HTMLDivElement>(null);
   const { categories, fetchCategories } = useCategoryStore();
   const { accounts, fetchAccounts } = useAccountStore();
   const { friends, fetchFriends } = useFriendStore();
@@ -268,20 +320,47 @@ function Transactions() {
   const dateTo = `${viewYear}-${String(viewMonth + 1).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`;
 
   const load = useCallback(
-    (page?: number) => {
+    () => {
       fetchTransactions({
         dateFrom,
         dateTo,
         type: typeFilter || undefined,
         categoryId: categoryFilter || undefined,
         accountId: accountFilter || undefined,
-        page,
       });
     },
     [fetchTransactions, dateFrom, dateTo, typeFilter, categoryFilter, accountFilter]
   );
 
-  useEffect(() => { load(1); }, [load]);
+  // Infinite scroll — load the next page when the sentinel enters the viewport.
+  // The observer is only active when NOT already loading and there are more pages.
+  useEffect(() => {
+    if (isLoadingMore || pagination.page >= pagination.pages) return;
+    const el = sentinelRef.current;
+    if (!el) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting) {
+          fetchTransactions({
+            dateFrom,
+            dateTo,
+            type: typeFilter || undefined,
+            categoryId: categoryFilter || undefined,
+            accountId: accountFilter || undefined,
+            page: pagination.page + 1,
+            append: true,
+          });
+        }
+      },
+      { threshold: 0 }
+    );
+
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [isLoadingMore, pagination.page, pagination.pages, fetchTransactions, dateFrom, dateTo, typeFilter, categoryFilter, accountFilter]);
+
+  useEffect(() => { load(); }, [load]);
 
   const prevMonth = () => {
     if (viewMonth === 0) { setViewYear(y => y - 1); setViewMonth(11); }
@@ -473,7 +552,9 @@ function Transactions() {
                           className="inline-flex items-center rounded px-1.5 py-0.5 text-[10px]"
                           style={{ background: 'var(--c-surface2)', color: 'var(--c-muted)' }}
                         >
-                          Debt
+                          {tx.paidByFriendId
+                            ? `Debt · ${tx.paidByFriendId.name}`
+                            : 'Debt'}
                         </span>
                       )}
                       {isSplit && (
@@ -517,28 +598,14 @@ function Transactions() {
           ))
         )}
 
-        {/* Pagination (load more) */}
-        {pagination.pages > 1 && (
-          <div className="flex items-center justify-center gap-3 py-4">
-            <button
-              onClick={() => load(pagination.page - 1)}
-              disabled={pagination.page <= 1}
-              className="t-btn-outline disabled:opacity-40"
-            >
-              ← Prev
-            </button>
-            <span className="text-xs" style={{ color: 'var(--c-muted)' }}>
-              {pagination.page} / {pagination.pages}
-            </span>
-            <button
-              onClick={() => load(pagination.page + 1)}
-              disabled={pagination.page >= pagination.pages}
-              className="t-btn-outline disabled:opacity-40"
-            >
-              Next →
-            </button>
+        {/* Infinite scroll sentinel */}
+        <div ref={sentinelRef} className="h-1" />
+        {isLoadingMore && (
+          <div className="flex justify-center py-4">
+            <div className="h-5 w-5 animate-spin rounded-full border-2 border-current border-t-transparent" style={{ color: 'var(--c-muted)' }} />
           </div>
         )}
+
       </div>
 
       {/* ── FAB ───────────────────────────────────────────────────── */}
@@ -611,7 +678,7 @@ function Transactions() {
               </div>
               {/* Details */}
               <div className="p-4 space-y-3" style={{ background: 'var(--c-surface)' }}>
-                {detailTx.accountId && (
+                {detailTx.accountId ? (
                   <div className="flex items-center justify-between">
                     <span className="text-sm" style={{ color: 'var(--c-muted)' }}>
                       {detailTx.type === 'transfer' ? 'From' : 'Account'}
@@ -624,7 +691,18 @@ function Transactions() {
                       <span className="text-sm font-medium">{detailTx.accountId.name}</span>
                     </span>
                   </div>
-                )}
+                ) : detailTx.paidByFriendId ? (
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm" style={{ color: 'var(--c-muted)' }}>Paid by</span>
+                    <span
+                      className="flex items-center gap-2 rounded-lg px-3 py-1.5"
+                      style={{ background: 'var(--c-surface2)', color: 'var(--c-text)' }}
+                    >
+                      <span className="text-sm">👤</span>
+                      <span className="text-sm font-medium">{detailTx.paidByFriendId.name}</span>
+                    </span>
+                  </div>
+                ) : null}
                 {detailTx.type === 'transfer' && detailTx.toAccountId && (
                   <div className="flex items-center justify-between">
                     <span className="text-sm" style={{ color: 'var(--c-muted)' }}>To</span>
@@ -896,16 +974,19 @@ function TransactionModal({
   // Prefill split state when editing a transaction that was split.
   useEffect(() => {
     if (!open) return;
+    // paidByFriendId on the transaction is the primary source of truth.
+    // split.paidBy is a fallback for records created before paidByFriendId was added.
+    const friendPayer = transaction?.paidByFriendId?._id ?? transaction?.split?.paidBy;
+    setWhoPaid((friendPayer && friendPayer !== 'user') ? friendPayer : 'user');
+
     const split = transaction?.split;
     if (split && split.splits.length > 0) {
       const idOf = (f: { _id: string } | string) => typeof f === 'string' ? f : f._id;
       setIsSplit(true);
-      setWhoPaid(split.paidBy ?? 'user');
       setSelectedFriends(split.splits.map(s => idOf(s.friendId)));
       setSplitAmounts(Object.fromEntries(split.splits.map(s => [idOf(s.friendId), s.amount])));
     } else {
       setIsSplit(false);
-      setWhoPaid('user');
       setSelectedFriends([]);
       setSplitAmounts({});
     }
@@ -922,14 +1003,6 @@ function TransactionModal({
     ? totalAmount - selectedFriends.reduce((s, id) => s + (splitAmounts[id] ?? equalShare), 0)
     : totalAmount;
 
-  // Editing "You" redistributes the remainder across the selected friends
-  // (evenly if there are several), keeping the total in sync either way.
-  const handleUserShareChange = (v: number) => {
-    if (selectedFriends.length === 0) return;
-    const remainder = (totalAmount || 0) - v;
-    const each = remainder / selectedFriends.length;
-    setSplitAmounts(Object.fromEntries(selectedFriends.map(id => [id, each])));
-  };
 
   const [budgetWarning, setBudgetWarning] = useState<string[] | null>(null);
 
@@ -947,8 +1020,14 @@ function TransactionModal({
     return () => clearTimeout(timer);
   }, [isEdit, selectedType, myShare, selectedCategoryId, selectedDate]);
 
-  const toggleFriend = (id: string) =>
-    setSelectedFriends(p => p.includes(id) ? p.filter(x => x !== id) : [...p, id]);
+  const toggleFriend = (id: string) => {
+    if (selectedFriends.includes(id)) {
+      setSelectedFriends(p => p.filter(x => x !== id));
+      setSplitAmounts(prev => { const { [id]: _, ...rest } = prev; return rest; });
+    } else {
+      setSelectedFriends(p => [...p, id]);
+    }
+  };
 
   const handleFormSubmit = async (data: TransactionFormData) => {
     try {
@@ -1074,7 +1153,7 @@ function TransactionModal({
                   <label className="block text-[10px] uppercase tracking-wider mb-1" style={{ color: 'var(--c-muted)' }}>Split?</label>
                   <div className="flex gap-2">
                     {[false, true].map(v => (
-                      <button key={String(v)} type="button" onClick={() => { setIsSplit(v); if (v && friends.length === 1 && selectedFriends.length === 0) setSelectedFriends([friends[0]._id]); }}
+                      <button key={String(v)} type="button" onClick={() => { setIsSplit(v); if (!v) { setSplitAmounts({}); } if (v && friends.length === 1 && selectedFriends.length === 0) setSelectedFriends([friends[0]._id]); }}
                         className="flex-1 rounded-lg py-2 text-xs font-semibold"
                         style={{ background: isSplit === v ? 'var(--c-accent)' : 'var(--c-surface2)', color: isSplit === v ? 'var(--c-accent-fg)' : 'var(--c-muted)' }}>
                         {v ? 'Yes' : 'No'}
@@ -1094,11 +1173,9 @@ function TransactionModal({
                       <div className="mt-2 pt-2 space-y-1" style={{ borderTop: '1px solid var(--c-border)' }}>
                         <div className="flex items-center justify-between gap-2">
                           <span className="text-xs" style={{ color: 'var(--c-muted)' }}>You</span>
-                          <CalcAmountInput
-                            value={totalAmount - selectedFriends.reduce((s, id) => s + (splitAmounts[id] ?? equalShare), 0)}
-                            onChange={handleUserShareChange}
-                            className="t-input w-24 text-right text-xs py-1"
-                          />
+                          <span className="t-input w-24 text-right text-xs py-1 select-none" style={{ color: 'var(--c-muted)' }}>
+                            {Math.round((totalAmount - selectedFriends.reduce((s, id) => s + (splitAmounts[id] ?? equalShare), 0)) * 100) / 100}
+                          </span>
                         </div>
                         {selectedFriends.map(id => {
                           const f = friends.find(x => x._id === id);

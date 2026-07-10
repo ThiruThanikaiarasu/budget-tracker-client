@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import toast from 'react-hot-toast';
 import api from '../api/axios';
 import useBudgetStore from './budgetStore';
+import useFriendStore from './friendStore';
 
 export interface Transaction {
   _id: string;
@@ -13,6 +14,8 @@ export interface Transaction {
   categoryId?: { _id: string; name: string; icon: string };
   accountId?: { _id: string; name: string };
   toAccountId?: { _id: string; name: string };
+  /** Populated when a friend paid on behalf of the user. */
+  paidByFriendId?: { _id: string; name: string };
   note?: string;
   date: string;
   createdAt: string;
@@ -31,13 +34,14 @@ interface Pagination {
   pages: number;
 }
 
-interface TransactionFilters {
+export interface TransactionFilters {
   dateFrom?: string;
   dateTo?: string;
   type?: string;
   categoryId?: string;
   accountId?: string;
   page?: number;
+  append?: boolean;
 }
 
 interface CreateTransactionData {
@@ -56,6 +60,7 @@ interface TransactionState {
   transactions: Transaction[];
   pagination: Pagination;
   isLoading: boolean;
+  isLoadingMore: boolean;
   fetchTransactions: (filters?: TransactionFilters) => Promise<void>;
   createTransaction: (data: CreateTransactionData) => Promise<void>;
   updateTransaction: (id: string, data: CreateTransactionData) => Promise<void>;
@@ -66,9 +71,11 @@ const useTransactionStore = create<TransactionState>((set) => ({
   transactions: [],
   pagination: { page: 1, limit: 20, total: 0, pages: 0 },
   isLoading: false,
+  isLoadingMore: false,
 
   fetchTransactions: async (filters) => {
-    set({ isLoading: true });
+    const append = filters?.append ?? false;
+    set(append ? { isLoadingMore: true } : { isLoading: true });
     try {
       const params = new URLSearchParams();
       if (filters?.dateFrom) params.set('dateFrom', filters.dateFrom);
@@ -79,13 +86,22 @@ const useTransactionStore = create<TransactionState>((set) => ({
       if (filters?.page) params.set('page', String(filters.page));
 
       const { data } = await api.get(`/transactions?${params.toString()}`);
-      set({
-        transactions: data.transactions,
-        pagination: data.pagination,
-        isLoading: false,
-      });
+
+      if (append) {
+        set((state) => ({
+          transactions: [...state.transactions, ...data.transactions],
+          pagination: data.pagination,
+          isLoadingMore: false,
+        }));
+      } else {
+        set({
+          transactions: data.transactions,
+          pagination: data.pagination,
+          isLoading: false,
+        });
+      }
     } catch (error: any) {
-      set({ isLoading: false });
+      set({ isLoading: false, isLoadingMore: false });
       toast.error(error.response?.data?.message || 'Failed to fetch transactions');
     }
   },
@@ -99,6 +115,7 @@ const useTransactionStore = create<TransactionState>((set) => ({
       }));
       toast.success('Transaction created');
       useBudgetStore.getState().refreshActive();
+      useFriendStore.getState().fetchFriends();
     } catch (error: any) {
       toast.error(error.response?.data?.message || 'Failed to create transaction');
       throw error;
@@ -115,6 +132,7 @@ const useTransactionStore = create<TransactionState>((set) => ({
       }));
       toast.success('Transaction updated');
       useBudgetStore.getState().refreshActive();
+      useFriendStore.getState().fetchFriends();
     } catch (error: any) {
       toast.error(error.response?.data?.message || 'Failed to update transaction');
       throw error;
@@ -130,6 +148,7 @@ const useTransactionStore = create<TransactionState>((set) => ({
       }));
       toast.success('Transaction deleted');
       useBudgetStore.getState().refreshActive();
+      useFriendStore.getState().fetchFriends();
     } catch (error: any) {
       toast.error(error.response?.data?.message || 'Failed to delete transaction');
     }

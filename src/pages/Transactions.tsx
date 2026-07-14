@@ -58,11 +58,12 @@ function CatIcon({ icon, name, size = 40 }: { icon?: string; name: string; size?
 // Right-aligned, no native number-input quirks (no stray leading zeros),
 // and places the cursor at the end on focus so typing always appends.
 function CalcAmountInput({
-  value, onChange, className,
+  value, onChange, className, onFocusChange,
 }: {
   value: number;
   onChange: (n: number) => void;
   className?: string;
+  onFocusChange?: (focused: boolean) => void;
 }) {
   const fmt = (n: number) => (n ? String(Math.round(n * 100) / 100) : '0');
   const [text, setText] = useState(() => fmt(value));
@@ -90,10 +91,11 @@ function CalcAmountInput({
       onChange={handleChange}
       onFocus={(e) => {
         setFocused(true);
+        onFocusChange?.(true);
         const end = e.target.value.length;
         requestAnimationFrame(() => e.target.setSelectionRange(end, end));
       }}
-      onBlur={() => setFocused(false)}
+      onBlur={() => { setFocused(false); onFocusChange?.(false); }}
       className={className}
     />
   );
@@ -123,11 +125,12 @@ function SelectOptions({ children }: { children: ReactNode }) {
 
 // ── Category select with search ──────────────────────────────────────────
 function CategorySelect({
-  categories, value, onChange,
+  categories, value, onChange, onSearchFocusChange,
 }: {
   categories: { _id: string; name: string; icon: string }[];
   value: string;
   onChange: (id: string) => void;
+  onSearchFocusChange?: (focused: boolean) => void;
 }) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
@@ -156,7 +159,10 @@ function CategorySelect({
       const t = setTimeout(() => inputRef.current?.focus(), 10);
       return () => clearTimeout(t);
     }
-  }, [open]);
+    // The search input is only ever focused while the panel is open, so
+    // closing the panel is equivalent to the search field losing focus.
+    onSearchFocusChange?.(false);
+  }, [open, onSearchFocusChange]);
 
   return (
     <div ref={containerRef} className="relative">
@@ -189,6 +195,7 @@ function CategorySelect({
               type="text"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
+              onFocus={() => onSearchFocusChange?.(true)}
               placeholder="Search category..."
               className="w-full rounded-lg px-3 py-1.5 text-sm outline-none"
               style={{ background: 'var(--c-surface)', color: 'var(--c-text)', border: '1px solid var(--c-border)' }}
@@ -920,25 +927,14 @@ function TransactionModal({
 }) {
   const isEdit = !!transaction;
   const [amountStr, setAmountStr] = useState('0');
-  const [keyboardOpen, setKeyboardOpen] = useState(false);
 
-  // Detect the system keyboard (any focused text input in this modal) so the
-  // Numpad grid can get out of the way — on mobile it otherwise eats the
-  // entire space between the keyboard and whatever field is being typed into.
-  useEffect(() => {
-    if (!open) return;
-    const vv = window.visualViewport;
-    if (!vv) return;
-    const handleResize = () => {
-      // Layout viewport (window.innerHeight) stays fixed while the keyboard
-      // is open; only the visual viewport shrinks. 150px comfortably clears
-      // browser-chrome-only changes (address bar show/hide) which are smaller.
-      setKeyboardOpen(window.innerHeight - vv.height > 150);
-    };
-    vv.addEventListener('resize', handleResize);
-    handleResize();
-    return () => vv.removeEventListener('resize', handleResize);
-  }, [open]);
+  // Any field that opens the system keyboard (Notes, category search, a
+  // split-amount input) collapses the Numpad grid so the field being typed
+  // into isn't squeezed off-screen between the keyboard and the grid.
+  const [notesFocused, setNotesFocused] = useState(false);
+  const [categorySearchFocused, setCategorySearchFocused] = useState(false);
+  const [splitFieldFocused, setSplitFieldFocused] = useState(false);
+  const keyboardOpen = notesFocused || categorySearchFocused || splitFieldFocused;
 
   const { register, handleSubmit, reset, watch, setValue, formState: { errors, isSubmitting } } =
     useForm<TransactionFormData>({
@@ -1130,6 +1126,7 @@ function TransactionModal({
                   categories={filteredCategories}
                   value={selectedCategoryId}
                   onChange={(id) => setValue('categoryId', id, { shouldValidate: true })}
+                  onSearchFocusChange={setCategorySearchFocused}
                 />
                 {errors.categoryId && <p className="text-xs mt-1" style={{ color: 'var(--c-expense)' }}>{errors.categoryId.message}</p>}
               </div>
@@ -1145,10 +1142,11 @@ function TransactionModal({
             <div>
               <label className="block text-[10px] uppercase tracking-wider mb-1" style={{ color: 'var(--c-muted)' }}>Notes</label>
               <textarea
-                {...register('note')}
+                {...register('note', { onBlur: () => setNotesFocused(false) })}
                 rows={2}
                 placeholder="Add a note..."
                 className="t-input resize-none"
+                onFocus={() => setNotesFocused(true)}
               />
             </div>
 
@@ -1207,6 +1205,7 @@ function TransactionModal({
                                 value={splitAmounts[id] ?? Math.round(equalShare * 100) / 100}
                                 onChange={(v) => setSplitAmounts(p => ({ ...p, [id]: v }))}
                                 className="t-input w-24 text-right text-xs py-1"
+                                onFocusChange={setSplitFieldFocused}
                               />
                             </div>
                           );

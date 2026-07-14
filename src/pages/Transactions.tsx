@@ -792,7 +792,7 @@ function Transactions() {
 }
 
 // ── Transaction modal ─────────────────────────────────────────────────
-function Numpad({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+function Numpad({ value, onChange, collapsed }: { value: string; onChange: (v: string) => void; collapsed?: boolean }) {
   const [op, setOp] = useState<string | null>(null);
   const [prev, setPrev] = useState(0);
   const [waitingNext, setWaitingNext] = useState(false);
@@ -886,20 +886,22 @@ function Numpad({ value, onChange }: { value: string; onChange: (v: string) => v
         </button>
       </div>
 
-      {/* Grid: operators left, digits right */}
-      <div className="grid grid-cols-4 gap-1.5">
-        {opBtn('+')}  {digitBtn('7')} {digitBtn('8')} {digitBtn('9')}
-        {opBtn('-')}  {digitBtn('4')} {digitBtn('5')} {digitBtn('6')}
-        {opBtn('×')}  {digitBtn('1')} {digitBtn('2')} {digitBtn('3')}
-        {opBtn('÷')}  {digitBtn('0')} {digitBtn('.')}
-        <button
-          onClick={handleEqual}
-          className="rounded-lg flex items-center justify-center text-base font-bold h-12"
-          style={{ background: 'var(--c-accent)', color: 'var(--c-accent-fg)' }}
-        >
-          =
-        </button>
-      </div>
+      {/* Grid: operators left, digits right — hidden while the system keyboard is open */}
+      {!collapsed && (
+        <div className="grid grid-cols-4 gap-1.5">
+          {opBtn('+')}  {digitBtn('7')} {digitBtn('8')} {digitBtn('9')}
+          {opBtn('-')}  {digitBtn('4')} {digitBtn('5')} {digitBtn('6')}
+          {opBtn('×')}  {digitBtn('1')} {digitBtn('2')} {digitBtn('3')}
+          {opBtn('÷')}  {digitBtn('0')} {digitBtn('.')}
+          <button
+            onClick={handleEqual}
+            className="rounded-lg flex items-center justify-center text-base font-bold h-12"
+            style={{ background: 'var(--c-accent)', color: 'var(--c-accent-fg)' }}
+          >
+            =
+          </button>
+        </div>
+      )}
     </div>
   );
 }
@@ -918,6 +920,25 @@ function TransactionModal({
 }) {
   const isEdit = !!transaction;
   const [amountStr, setAmountStr] = useState('0');
+  const [keyboardOpen, setKeyboardOpen] = useState(false);
+
+  // Detect the system keyboard (any focused text input in this modal) so the
+  // Numpad grid can get out of the way — on mobile it otherwise eats the
+  // entire space between the keyboard and whatever field is being typed into.
+  useEffect(() => {
+    if (!open) return;
+    const vv = window.visualViewport;
+    if (!vv) return;
+    const handleResize = () => {
+      // Layout viewport (window.innerHeight) stays fixed while the keyboard
+      // is open; only the visual viewport shrinks. 150px comfortably clears
+      // browser-chrome-only changes (address bar show/hide) which are smaller.
+      setKeyboardOpen(window.innerHeight - vv.height > 150);
+    };
+    vv.addEventListener('resize', handleResize);
+    handleResize();
+    return () => vv.removeEventListener('resize', handleResize);
+  }, [open]);
 
   const { register, handleSubmit, reset, watch, setValue, formState: { errors, isSubmitting } } =
     useForm<TransactionFormData>({
@@ -1202,7 +1223,7 @@ function TransactionModal({
           {/* Numpad — pinned to bottom */}
           <div className="flex-shrink-0 px-4 pb-4 pt-2" style={{ borderTop: '1px solid var(--c-border)', background: 'var(--c-bg)' }}>
             {errors.amount && <p className="text-xs text-center mb-1" style={{ color: 'var(--c-expense)' }}>{errors.amount.message}</p>}
-            <Numpad value={amountStr} onChange={setAmountStr} />
+            <Numpad value={amountStr} onChange={setAmountStr} collapsed={keyboardOpen} />
           </div>
         </DialogPanel>
       </div>

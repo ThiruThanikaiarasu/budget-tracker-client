@@ -1,10 +1,12 @@
 import { useEffect, useState } from 'react';
 import { Dialog, DialogPanel, DialogTitle } from '@headlessui/react';
+import toast from 'react-hot-toast';
 import useBudgetStore, { type DaySummary, type MonthlySummary } from '../store/budgetStore';
 import useCategoryStore from '../store/categoryStore';
 import useAuthStore from '../store/authStore';
 import { formatCurrency } from '../utils/format';
 import { renderCategoryIcon } from '../utils/categoryIcons';
+import api from '../api/axios';
 
 function getCurrentFinancialMonth(startDay: number) {
   const now = new Date();
@@ -100,6 +102,29 @@ function Budget() {
     await fetchMonthlySummary(selectedMonth);
     setCategoryBudgets(updatedRows);
     setFocusedCategoryId(null);
+  };
+
+  const handleSetFromPreviousMonth = async () => {
+    const [y, m] = selectedMonth.split('-').map(Number);
+    const prevDate = new Date(y, m - 2, 1);
+    const prevMonth = `${prevDate.getFullYear()}-${String(prevDate.getMonth() + 1).padStart(2, '0')}`;
+    try {
+      const { data } = await api.get(`/budgets/${prevMonth}`);
+      if (!data.budget) {
+        toast.error('No budget found for previous month');
+        return;
+      }
+      setOverallLimit(data.budget.overallLimit?.toString() || '');
+      setCategoryBudgets(data.budget.categoryBudgets.map((cb: any) => ({
+        categoryId: typeof cb.categoryId === 'string' ? cb.categoryId : cb.categoryId._id,
+        limit: cb.limit.toString(),
+        frequency: cb.frequency,
+        carryForward: cb.carryForward ?? false,
+      })));
+      setShowForm(true);
+    } catch {
+      toast.error('No budget found for previous month');
+    }
   };
 
   const periodLabel = monthlySummary && startDay > 1
@@ -309,12 +334,12 @@ function Budget() {
               {/* Set from past months */}
               <div className="px-4 py-4">
                 <button
-                  onClick={() => setShowForm(true)}
+                  onClick={handleSetFromPreviousMonth}
                   className="w-full py-3 rounded-xl text-sm font-bold uppercase tracking-wider flex items-center justify-center gap-2"
                   style={{ border: '1px solid var(--c-border)', color: 'var(--c-muted)' }}
                 >
                   <span className="text-base leading-none">⊕</span>
-                  Set from past months
+                  Set from previous month
                 </button>
               </div>
             </div>

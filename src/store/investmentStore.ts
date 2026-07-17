@@ -2,10 +2,32 @@ import { create } from 'zustand';
 import toast from 'react-hot-toast';
 import api from '../api/axios';
 
+export type InvestmentType =
+  | 'stocks'
+  | 'index_fund'
+  | 'mutual_fund'
+  | 'us_stock'
+  | 'bond'
+  | 'fd'
+  | 'ppf'
+  | 'gold'
+  | 'real_estate'
+  | 'crypto'
+  | 'other';
+
+export type Exchange = 'NSE' | 'BSE' | 'NASDAQ' | 'NYSE' | 'other';
+
 export interface Investment {
   _id: string;
   name: string;
-  type: 'mutual_fund' | 'stocks' | 'fd' | 'ppf' | 'gold' | 'real_estate' | 'crypto' | 'other';
+  type: InvestmentType;
+  symbol?: string;
+  exchange?: Exchange;
+  sector?: string;
+  quantity?: number;
+  avgBuyPrice?: number;
+  currentPrice?: number;
+  currency?: string;
   amountInvested: number;
   currentValue: number;
   dateInvested: string;
@@ -15,11 +37,18 @@ export interface Investment {
   updatedAt: string;
 }
 
-interface CreateInvestmentData {
+export interface CreateInvestmentData {
   name: string;
-  type: Investment['type'];
-  amountInvested: number;
-  currentValue: number;
+  type: InvestmentType;
+  symbol?: string;
+  exchange?: Exchange;
+  sector?: string;
+  quantity?: number;
+  avgBuyPrice?: number;
+  currentPrice?: number;
+  currency?: string;
+  amountInvested?: number;
+  currentValue?: number;
   dateInvested: string;
   note?: string;
 }

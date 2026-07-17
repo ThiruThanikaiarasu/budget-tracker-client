@@ -7,7 +7,9 @@ import Dashboard from './pages/Dashboard';
 import Accounts from './pages/Accounts';
 import Transactions from './pages/Transactions';
 import Friends from './pages/Friends';
-import Investments from './pages/Investments';
+import PortfolioOverview from './pages/investments/PortfolioOverview';
+import AssetClassesPage from './pages/investments/AssetClassesPage';
+import StocksPage from './pages/investments/StocksPage';
 import Categories from './pages/Categories';
 import Personalization from './pages/Personalization';
 import Budget from './pages/Budget';
@@ -37,7 +39,9 @@ function App() {
             <Route path="/accounts" element={<Accounts />} />
             <Route path="/transactions" element={<Transactions />} />
             <Route path="/friends" element={<Friends />} />
-            <Route path="/investments" element={<Investments />} />
+            <Route path="/investments" element={<PortfolioOverview />} />
+            <Route path="/investments/assets" element={<AssetClassesPage />} />
+            <Route path="/investments/stocks" element={<StocksPage />} />
             <Route path="/budget" element={<Budget />} />
             <Route path="/categories" element={<Categories />} />
             <Route path="/personalization" element={<Personalization />} />

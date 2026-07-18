@@ -55,6 +55,12 @@ const Icons = {
       <polyline points="16 7 22 7 22 13" />
     </svg>
   ),
+  watchlist: (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5">
+      <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7z" />
+      <circle cx="12" cy="12" r="3" />
+    </svg>
+  ),
   settings: (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5">
       <circle cx="12" cy="12" r="3" />
@@ -107,6 +113,7 @@ const SIDEBAR_NAV = [
   { to: '/categories', label: 'Categories', icon: Icons.categories },
   { to: '/friends', label: 'Friends', icon: Icons.friends },
   { to: '/investments', label: 'Investments', icon: Icons.investments },
+  { to: '/watchlist', label: 'Watchlist', icon: Icons.watchlist },
   { to: '/personalization', label: 'Settings', icon: Icons.settings },
 ];
 

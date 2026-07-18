@@ -10,6 +10,8 @@ import Friends from './pages/Friends';
 import PortfolioOverview from './pages/investments/PortfolioOverview';
 import AssetClassesPage from './pages/investments/AssetClassesPage';
 import StocksPage from './pages/investments/StocksPage';
+import WatchlistPage from './pages/watchlist/WatchlistPage';
+import StockDetailPage from './pages/stocks/StockDetailPage';
 import Categories from './pages/Categories';
 import Personalization from './pages/Personalization';
 import Budget from './pages/Budget';
@@ -42,6 +44,8 @@ function App() {
             <Route path="/investments" element={<PortfolioOverview />} />
             <Route path="/investments/assets" element={<AssetClassesPage />} />
             <Route path="/investments/stocks" element={<StocksPage />} />
+            <Route path="/watchlist" element={<WatchlistPage />} />
+            <Route path="/stocks/:symbol" element={<StockDetailPage />} />
             <Route path="/budget" element={<Budget />} />
             <Route path="/categories" element={<Categories />} />
             <Route path="/personalization" element={<Personalization />} />

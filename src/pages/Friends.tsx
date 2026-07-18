@@ -5,7 +5,9 @@ import { z } from 'zod';
 import { Dialog, DialogPanel, DialogTitle } from '@headlessui/react';
 import useFriendStore, { type Friend } from '../store/friendStore';
 import useSplitStore, { type SharedExpense } from '../store/splitStore';
+import useAccountStore from '../store/accountStore';
 import { formatCurrency } from '../utils/format';
+import { sortByFrecency } from '../utils/frecency';
 
 // --- Schemas ---
 
@@ -22,18 +24,44 @@ const expenseSchema = z.object({
   date: z.string().min(1, 'Date is required'),
 });
 
-const settleSchema = z.object({
-  amount: z.number().positive('Amount must be positive'),
-});
-
 type FriendFormData = z.infer<typeof friendSchema>;
 type ExpenseFormData = z.infer<typeof expenseSchema>;
-type SettleFormData = z.infer<typeof settleSchema>;
+
+// --- Balance helpers (mirror the server's split balance rules) ---
+
+function splitFriendId(split: SharedExpense['splits'][number]): string {
+  return typeof split.friendId === 'object' ? split.friendId._id : split.friendId;
+}
+
+// Signed outstanding share of a single (non-settlement) expense for a friend:
+// positive => friend owes you, negative => you owe the friend.
+function signedShare(expense: SharedExpense, friendId: string): number {
+  const friendSplit = expense.splits.find((s) => splitFriendId(s) === friendId);
+  if (expense.paidBy === 'user') {
+    return friendSplit ? friendSplit.amount : 0;
+  }
+  if (expense.paidBy === friendId) {
+    const totalSplits = expense.splits.reduce((sum, s) => sum + s.amount, 0);
+    return -(expense.totalAmount - totalSplits);
+  }
+  return 0;
+}
+
+// A single expense's contribution to the running net balance, including
+// settlements (which cancel debt in the opposite direction).
+function balanceContribution(expense: SharedExpense, friendId: string): number {
+  if (!expense.isSettlement) return signedShare(expense, friendId);
+  const friendSplit = expense.splits.find((s) => splitFriendId(s) === friendId);
+  if (!friendSplit) return 0;
+  if (expense.paidBy === 'user') return -friendSplit.amount;
+  if (expense.paidBy === friendId) return friendSplit.amount;
+  return 0;
+}
 
 // --- Main Page ---
 
 function Friends() {
-  const { friends, isLoading, fetchFriends } = useFriendStore();
+  const { friends, isLoading, fetchFriends, recordInteraction } = useFriendStore();
   const [showAddFriend, setShowAddFriend] = useState(false);
   const [editingFriend, setEditingFriend] = useState<Friend | null>(null);
   const [selectedFriend, setSelectedFriend] = useState<Friend | null>(null);
@@ -119,10 +147,10 @@ function Friends() {
         </div>
       ) : (
         <div className="mt-6 space-y-3">
-          {friends.map((friend) => (
+          {sortByFrecency(friends).map((friend) => (
             <div
               key={friend._id}
-              onClick={() => setSelectedFriend(friend)}
+              onClick={() => { recordInteraction(friend._id); setSelectedFriend(friend); }}
               className="flex cursor-pointer items-center justify-between rounded-lg bg-white p-4 shadow transition-colors hover:bg-gray-50"
             >
               <div className="flex items-center gap-3">
@@ -575,26 +603,84 @@ function AddExpenseModal({
 
 function FriendDetail({ friend, onBack }: { friend: Friend; onBack: () => void }) {
   const { expenses, isLoading, fetchExpenses, deleteExpense } = useSplitStore();
-  const [showSettle, setShowSettle] = useState(false);
+  const { fetchFriends } = useFriendStore();
+  const [settleTarget, setSettleTarget] = useState<{
+    amount: number;
+    friendOwes: boolean;
+    coveredExpenseIds: string[];
+  } | null>(null);
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
+  const [selectionMode, setSelectionMode] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [showHistory, setShowHistory] = useState(false);
+
+  // Expenses cleared by a settlement move out of the outstanding list.
+  const coveredIds = useMemo(() => {
+    const ids = new Set<string>();
+    for (const e of expenses) {
+      if (e.isSettlement && e.coveredExpenseIds) {
+        for (const id of e.coveredExpenseIds) ids.add(id);
+      }
+    }
+    return ids;
+  }, [expenses]);
+
+  const openExpenses = useMemo(
+    () => expenses.filter((e) => !e.isSettlement && !coveredIds.has(e._id)),
+    [expenses, coveredIds]
+  );
+  const settlements = useMemo(
+    () => expenses.filter((e) => e.isSettlement),
+    [expenses]
+  );
+  const hasHistory = settlements.length > 0;
+
+  // Live net balance from the fetched expenses, so the page stays correct after
+  // a partial settle without waiting on the parent to refresh the friend prop.
+  const netBalance = useMemo(
+    () => expenses.reduce((sum, e) => sum + balanceContribution(e, friend._id), 0),
+    [expenses, friend._id]
+  );
 
   const breakdown = useMemo(() => {
     let lent = 0;
     let borrowed = 0;
-    for (const expense of expenses) {
-      if (expense.isSettlement) continue;
-      if (expense.paidBy === 'user') {
-        const friendSplit = expense.splits.find(
-          (s) => (typeof s.friendId === 'object' ? s.friendId._id : s.friendId) === friend._id
-        );
-        if (friendSplit) lent += friendSplit.amount;
-      } else if (expense.paidBy === friend._id) {
-        const totalSplits = expense.splits.reduce((sum, s) => sum + s.amount, 0);
-        borrowed += expense.totalAmount - totalSplits;
-      }
+    for (const expense of openExpenses) {
+      const share = signedShare(expense, friend._id);
+      if (share > 0) lent += share;
+      else borrowed += -share;
     }
     return { lent, borrowed };
-  }, [expenses, friend._id]);
+  }, [openExpenses, friend._id]);
+
+  const selectedTotal = useMemo(() => {
+    let total = 0;
+    for (const e of openExpenses) {
+      if (selectedIds.has(e._id)) total += signedShare(e, friend._id);
+    }
+    return total;
+  }, [openExpenses, selectedIds, friend._id]);
+
+  const exitSelection = () => {
+    setSelectionMode(false);
+    setSelectedIds(new Set());
+  };
+
+  const toggleSelect = (id: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const afterSettle = () => {
+    setSettleTarget(null);
+    exitSelection();
+    fetchExpenses(friend._id);
+    fetchFriends();
+  };
 
   useEffect(() => {
     const close = () => setOpenMenuId(null);
@@ -606,51 +692,84 @@ function FriendDetail({ friend, onBack }: { friend: Friend; onBack: () => void }
     fetchExpenses(friend._id);
   }, [friend._id, fetchExpenses]);
 
+  if (showHistory) {
+    return (
+      <SettlementHistory
+        friend={friend}
+        settlements={settlements}
+        onBack={() => setShowHistory(false)}
+      />
+    );
+  }
+
   return (
-    <div className="p-6">
+    <div className="p-6 pb-24">
       {/* Header */}
-      <div className="flex items-center gap-4">
+      <div>
         <button
           onClick={onBack}
-          className="rounded-md px-3 py-1 text-sm font-medium text-gray-600 hover:bg-gray-100"
+          className="-ml-2 flex items-center gap-1 rounded-md px-2 py-1 text-sm font-medium text-gray-600 hover:bg-gray-100"
         >
           &larr; Back
         </button>
-        <div className="flex items-center gap-3">
-          <div className="flex h-12 w-12 items-center justify-center rounded-full bg-blue-100 text-lg font-bold text-blue-700">
+
+        <div className="mt-3 flex flex-col items-center text-center">
+          <div className="flex h-16 w-16 items-center justify-center rounded-full bg-blue-100 text-2xl font-bold text-blue-700">
             {friend.name.charAt(0).toUpperCase()}
           </div>
-          <div>
-            <h1 className="text-2xl font-bold text-gray-900">{friend.name}</h1>
-            {friend.netBalance === 0 ? (
-              <p className="text-sm text-gray-500">All settled up</p>
-            ) : friend.netBalance > 0 ? (
-              <p className="text-sm font-semibold text-green-600">
-                owes you {formatCurrency(friend.netBalance)}
-              </p>
-            ) : (
-              <p className="text-sm font-semibold text-red-600">
-                you owe {formatCurrency(Math.abs(friend.netBalance))}
-              </p>
-            )}
-          </div>
+          <h1 className="mt-2 text-xl font-bold text-gray-900">{friend.name}</h1>
+          {netBalance === 0 ? (
+            <p className="mt-0.5 text-sm text-gray-500">All settled up</p>
+          ) : netBalance > 0 ? (
+            <p className="mt-0.5 text-sm font-semibold text-green-600">
+              owes you {formatCurrency(netBalance)}
+            </p>
+          ) : (
+            <p className="mt-0.5 text-sm font-semibold text-red-600">
+              you owe {formatCurrency(Math.abs(netBalance))}
+            </p>
+          )}
+          {netBalance !== 0 && (
+            <button
+              onClick={() =>
+                setSettleTarget({
+                  amount: Math.abs(netBalance),
+                  friendOwes: netBalance > 0,
+                  coveredExpenseIds: openExpenses.map((e) => e._id),
+                })
+              }
+              className="mt-3 rounded-lg bg-green-600 px-6 py-2 text-sm font-medium text-white hover:bg-green-700"
+            >
+              Settle up
+            </button>
+          )}
         </div>
-        {friend.netBalance !== 0 && (
-          <button
-            onClick={() => setShowSettle(true)}
-            className="ml-auto rounded-lg bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700"
-          >
-            Settle Up
-          </button>
-        )}
       </div>
 
-      {/* Expense History */}
+      {/* Outstanding items */}
       <div className="mt-6">
-        <h2 className="text-lg font-semibold text-gray-900">History</h2>
+        <div className="flex items-center justify-between">
+          <h2 className="text-lg font-semibold text-gray-900">Outstanding</h2>
+          {openExpenses.length > 0 &&
+            (selectionMode ? (
+              <button
+                onClick={exitSelection}
+                className="text-sm font-medium text-gray-500 hover:text-gray-700"
+              >
+                Cancel
+              </button>
+            ) : (
+              <button
+                onClick={() => setSelectionMode(true)}
+                className="text-sm font-medium text-blue-600 hover:text-blue-700"
+              >
+                Select
+              </button>
+            ))}
+        </div>
 
         {/* Debt breakdown summary */}
-        {!isLoading && expenses.some((e) => !e.isSettlement) && (
+        {!isLoading && openExpenses.length > 0 && (
           <div className="mt-3 grid grid-cols-2 gap-3 rounded-lg bg-gray-50 p-3">
             <div className="text-center">
               <p className="text-xs text-gray-500">You lent</p>
@@ -667,105 +786,144 @@ function FriendDetail({ friend, onBack }: { friend: Friend; onBack: () => void }
           <div className="mt-4 flex justify-center">
             <div className="h-8 w-8 animate-spin rounded-full border-4 border-blue-600 border-t-transparent" />
           </div>
-        ) : expenses.length === 0 ? (
-          <p className="mt-4 text-sm text-gray-500">No shared expenses yet.</p>
+        ) : openExpenses.length === 0 ? (
+          <p className="mt-4 text-sm text-gray-500">
+            {hasHistory ? 'All settled up. Nothing outstanding.' : 'No shared expenses yet.'}
+          </p>
         ) : (
           <div className="mt-4 space-y-3">
-            {expenses.map((expense) => (
-              <div
-                key={expense._id}
-                className="flex items-center justify-between rounded-lg bg-white p-4 shadow"
-              >
-                <div>
-                  <div className="flex items-center gap-2">
-                    {expense.isSettlement && (
-                      <span className="rounded bg-green-100 px-2 py-0.5 text-xs font-medium text-green-700">
-                        Settlement
-                      </span>
+            {openExpenses.map((expense) => {
+              const selected = selectedIds.has(expense._id);
+              const share = signedShare(expense, friend._id);
+              return (
+                <div
+                  key={expense._id}
+                  onClick={selectionMode ? () => toggleSelect(expense._id) : undefined}
+                  className={`flex items-center justify-between rounded-lg bg-white p-4 shadow ${
+                    selectionMode ? 'cursor-pointer' : ''
+                  } ${selected ? 'ring-2 ring-blue-500' : ''}`}
+                >
+                  <div className="flex items-center gap-3">
+                    {selectionMode && (
+                      <input
+                        type="checkbox"
+                        checked={selected}
+                        readOnly
+                        className="h-4 w-4 rounded border-gray-300 text-blue-600"
+                      />
                     )}
-                    <h3 className="font-medium text-gray-900">{expense.description}</h3>
+                    <div>
+                      <h3 className="font-medium text-gray-900">{expense.description}</h3>
+                      <p className="mt-1 text-xs text-gray-500">
+                        {new Date(expense.date).toLocaleDateString('en-IN', {
+                          day: 'numeric',
+                          month: 'short',
+                          year: 'numeric',
+                        })}
+                        {' \u00B7 '}
+                        Paid by {expense.paidBy === 'user' ? 'you' : getFriendName(expense, friend)}
+                      </p>
+                    </div>
                   </div>
-                  <p className="mt-1 text-xs text-gray-500">
-                    {new Date(expense.date).toLocaleDateString('en-IN', {
-                      day: 'numeric',
-                      month: 'short',
-                      year: 'numeric',
-                    })}
-                    {' \u00B7 '}
-                    Paid by {expense.paidBy === 'user' ? 'you' : getFriendName(expense, friend)}
-                  </p>
-                </div>
-                <div className="flex items-center gap-3">
-                  <div className="text-right">
-                    <p className="text-sm font-semibold text-gray-900">
-                      {formatCurrency(expense.totalAmount)}
-                    </p>
-                    {!expense.isSettlement && (() => {
-                      if (expense.paidBy === 'user') {
-                        const friendSplit = expense.splits.find(
-                          (s) => (typeof s.friendId === 'object' ? s.friendId._id : s.friendId) === friend._id
-                        );
-                        if (!friendSplit) return null;
-                        return (
-                          <p className="text-xs font-medium text-green-600">
-                            {friend.name} owes +{formatCurrency(friendSplit.amount)}
-                          </p>
-                        );
-                      }
-                      if (expense.paidBy === friend._id) {
-                        const totalSplits = expense.splits.reduce((sum, s) => sum + s.amount, 0);
-                        const userShare = expense.totalAmount - totalSplits;
-                        return (
-                          <p className="text-xs font-medium text-red-600">
-                            you owe -{formatCurrency(userShare)}
-                          </p>
-                        );
-                      }
-                      return null;
-                    })()}
-                  </div>
-                  <div className="relative">
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setOpenMenuId(openMenuId === expense._id ? null : expense._id);
-                      }}
-                      className="rounded-md p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
-                    >
-                      <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
-                        <path d="M10 6a2 2 0 110-4 2 2 0 010 4zM10 12a2 2 0 110-4 2 2 0 010 4zM10 18a2 2 0 110-4 2 2 0 010 4z" />
-                      </svg>
-                    </button>
-                    {openMenuId === expense._id && (
-                      <div
-                        onClick={(e) => e.stopPropagation()}
-                        className="absolute right-0 z-10 mt-1 w-32 rounded-md bg-white py-1 shadow-lg ring-1 ring-black ring-opacity-5"
-                      >
+                  <div className="flex items-center gap-3">
+                    <div className="text-right">
+                      <p className="text-sm font-semibold text-gray-900">
+                        {formatCurrency(expense.totalAmount)}
+                      </p>
+                      {share > 0 ? (
+                        <p className="text-xs font-medium text-green-600">
+                          {friend.name} owes +{formatCurrency(share)}
+                        </p>
+                      ) : share < 0 ? (
+                        <p className="text-xs font-medium text-red-600">
+                          you owe -{formatCurrency(-share)}
+                        </p>
+                      ) : null}
+                    </div>
+                    {!selectionMode && (
+                      <div className="relative">
                         <button
-                          onClick={() => { deleteExpense(expense._id); setOpenMenuId(null); }}
-                          className="block w-full px-4 py-2 text-left text-sm text-red-600 hover:bg-red-50"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setOpenMenuId(openMenuId === expense._id ? null : expense._id);
+                          }}
+                          className="rounded-md p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
                         >
-                          Delete
+                          <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                            <path d="M10 6a2 2 0 110-4 2 2 0 010 4zM10 12a2 2 0 110-4 2 2 0 010 4zM10 18a2 2 0 110-4 2 2 0 010 4z" />
+                          </svg>
                         </button>
+                        {openMenuId === expense._id && (
+                          <div
+                            onClick={(e) => e.stopPropagation()}
+                            className="absolute right-0 z-10 mt-1 w-32 rounded-md bg-white py-1 shadow-lg ring-1 ring-black ring-opacity-5"
+                          >
+                            <button
+                              onClick={() => { deleteExpense(expense._id); setOpenMenuId(null); }}
+                              className="block w-full px-4 py-2 text-left text-sm text-red-600 hover:bg-red-50"
+                            >
+                              Delete
+                            </button>
+                          </div>
+                        )}
                       </div>
                     )}
                   </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
+        )}
+
+        {/* Previously settled -> history */}
+        {hasHistory && (
+          <button
+            onClick={() => setShowHistory(true)}
+            className="mt-4 flex w-full items-center justify-between rounded-lg bg-white p-4 text-left shadow hover:bg-gray-50"
+          >
+            <span className="text-sm font-medium text-gray-700">
+              Previously settled
+              <span className="ml-1 text-gray-400">\u00B7 {settlements.length}</span>
+            </span>
+            <span className="text-gray-400">&rarr;</span>
+          </button>
         )}
       </div>
 
+      {/* Sticky selection action bar */}
+      {selectionMode && selectedIds.size > 0 && (
+        <div className="fixed inset-x-0 bottom-0 z-40 border-t border-gray-200 bg-white p-4 shadow-lg">
+          <div className="mx-auto flex max-w-3xl items-center justify-between">
+            <div className="text-sm text-gray-700">
+              <span className="font-semibold">{selectedIds.size} selected</span>
+              <span className="ml-2 text-gray-500">{formatCurrency(Math.abs(selectedTotal))}</span>
+            </div>
+            <button
+              onClick={() =>
+                setSettleTarget({
+                  amount: Math.abs(selectedTotal),
+                  friendOwes: selectedTotal >= 0,
+                  coveredExpenseIds: [...selectedIds],
+                })
+              }
+              disabled={selectedTotal === 0}
+              className="rounded-lg bg-green-600 px-5 py-2 text-sm font-medium text-white hover:bg-green-700 disabled:opacity-50"
+            >
+              Settle selected
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Settle Modal */}
-      {showSettle && (
+      {settleTarget && (
         <SettleModal
           friend={friend}
-          onClose={() => {
-            setShowSettle(false);
-            fetchExpenses(friend._id);
-            onBack();
-          }}
+          amount={settleTarget.amount}
+          friendOwes={settleTarget.friendOwes}
+          coveredExpenseIds={settleTarget.coveredExpenseIds}
+          onClose={() => setSettleTarget(null)}
+          onDone={afterSettle}
         />
       )}
     </div>
@@ -785,24 +943,54 @@ function getFriendName(expense: SharedExpense, currentFriend: Friend): string {
 
 // --- Settle Modal ---
 
-function SettleModal({ friend, onClose }: { friend: Friend; onClose: () => void }) {
+function SettleModal({
+  friend,
+  amount,
+  friendOwes,
+  coveredExpenseIds,
+  onClose,
+  onDone,
+}: {
+  friend: Friend;
+  amount: number;
+  friendOwes: boolean;
+  coveredExpenseIds: string[];
+  onClose: () => void;
+  onDone: () => void;
+}) {
   const { settleUp } = useSplitStore();
+  const { accounts, fetchAccounts } = useAccountStore();
+  const [step, setStep] = useState<'method' | 'account'>('method');
+  const [method, setMethod] = useState<'received' | 'paid'>(
+    friendOwes ? 'received' : 'paid'
+  );
+  const [accountId, setAccountId] = useState('');
+  const [submitting, setSubmitting] = useState(false);
 
-  const {
-    register,
-    handleSubmit,
-    formState: { errors, isSubmitting },
-  } = useForm<SettleFormData>({
-    resolver: zodResolver(settleSchema),
-    defaultValues: { amount: Math.abs(friend.netBalance) },
-  });
+  useEffect(() => {
+    if (accounts.length === 0) fetchAccounts();
+  }, [accounts.length, fetchAccounts]);
 
-  const onSubmit = async (data: SettleFormData) => {
+  useEffect(() => {
+    if (!accountId && accounts.length > 0) setAccountId(accounts[0]._id);
+  }, [accounts, accountId]);
+
+  const submit = async (m: 'received' | 'paid' | 'waived') => {
+    setSubmitting(true);
     try {
-      await settleUp(friend._id, data.amount);
-      onClose();
+      await settleUp({
+        friendId: friend._id,
+        amount,
+        method: m,
+        friendOwes,
+        accountId: m === 'waived' ? undefined : accountId,
+        coveredExpenseIds,
+      });
+      onDone();
     } catch {
       // handled by store
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -816,46 +1004,160 @@ function SettleModal({ friend, onClose }: { friend: Friend; onClose: () => void 
           </DialogTitle>
 
           <p className="mt-2 text-sm text-gray-500">
-            {friend.netBalance > 0
-              ? `${friend.name} owes you ${formatCurrency(friend.netBalance)}`
-              : `You owe ${friend.name} ${formatCurrency(Math.abs(friend.netBalance))}`}
+            {friendOwes
+              ? `${friend.name} owes you ${formatCurrency(amount)}`
+              : `You owe ${friend.name} ${formatCurrency(amount)}`}
           </p>
 
-          <form onSubmit={handleSubmit(onSubmit)} className="mt-4 space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700">Settlement Amount</label>
-              <input
-                type="number"
-                step="any"
-                {...register('amount', { valueAsNumber: true })}
-                onWheel={(e) => e.currentTarget.blur()}
-                className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
-              />
-              {errors.amount && (
-                <p className="mt-1 text-sm text-red-600">{errors.amount.message}</p>
-              )}
-            </div>
+          {step === 'method' ? (
+            <div className="mt-4 space-y-2">
+              <button
+                onClick={() => { setMethod(friendOwes ? 'received' : 'paid'); setStep('account'); }}
+                className="flex w-full flex-col rounded-lg border border-gray-200 p-3 text-left hover:border-green-500 hover:bg-green-50"
+              >
+                <span className="text-sm font-medium text-gray-900">
+                  {friendOwes ? 'They paid me' : 'I paid them'}
+                </span>
+                <span className="text-xs text-gray-500">
+                  {friendOwes
+                    ? 'Money lands in one of your accounts'
+                    : 'Money leaves one of your accounts'}
+                </span>
+              </button>
+              <button
+                onClick={() => submit('waived')}
+                disabled={submitting}
+                className="flex w-full flex-col rounded-lg border border-gray-200 p-3 text-left hover:border-amber-500 hover:bg-amber-50 disabled:opacity-50"
+              >
+                <span className="text-sm font-medium text-gray-900">
+                  {friendOwes ? 'Waive it off (on me)' : 'They waived it'}
+                </span>
+                <span className="text-xs text-gray-500">
+                  {friendOwes
+                    ? 'Forgive the debt — counts as your expense'
+                    : 'Debt forgiven — just clears the balance'}
+                </span>
+              </button>
 
-            <div className="flex justify-end gap-3 pt-2">
-              <button
-                type="button"
-                onClick={onClose}
-                className="rounded-md px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100"
-              >
-                Cancel
-              </button>
-              <button
-                type="submit"
-                disabled={isSubmitting}
-                className="rounded-md bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700 disabled:opacity-50"
-              >
-                {isSubmitting ? 'Settling...' : 'Settle'}
-              </button>
+              <div className="flex justify-end pt-2">
+                <button
+                  onClick={onClose}
+                  className="rounded-md px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100"
+                >
+                  Cancel
+                </button>
+              </div>
             </div>
-          </form>
+          ) : (
+            <div className="mt-4 space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700">
+                  {method === 'received' ? 'Deposit to account' : 'Pay from account'}
+                </label>
+                <select
+                  value={accountId}
+                  onChange={(e) => setAccountId(e.target.value)}
+                  className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                >
+                  {accounts.map((a) => (
+                    <option key={a._id} value={a._id}>
+                      {a.name} ({formatCurrency(a.balance)})
+                    </option>
+                  ))}
+                </select>
+                {accounts.length === 0 && (
+                  <p className="mt-1 text-sm text-red-600">No accounts found. Add an account first.</p>
+                )}
+              </div>
+
+              <div className="flex justify-between gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setStep('method')}
+                  className="rounded-md px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100"
+                >
+                  Back
+                </button>
+                <button
+                  type="button"
+                  onClick={() => submit(method)}
+                  disabled={submitting || !accountId}
+                  className="rounded-md bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700 disabled:opacity-50"
+                >
+                  {submitting ? 'Settling...' : `Settle ${formatCurrency(amount)}`}
+                </button>
+              </div>
+            </div>
+          )}
         </DialogPanel>
       </div>
     </Dialog>
+  );
+}
+
+// --- Settlement History ---
+
+function SettlementHistory({
+  friend,
+  settlements,
+  onBack,
+}: {
+  friend: Friend;
+  settlements: SharedExpense[];
+  onBack: () => void;
+}) {
+  const methodLabel = (m?: string) =>
+    m === 'received' ? 'Received' : m === 'paid' ? 'Paid' : m === 'waived' ? 'Waived' : 'Settled';
+
+  return (
+    <div className="p-6">
+      <button
+        onClick={onBack}
+        className="-ml-2 flex items-center gap-1 rounded-md px-2 py-1 text-sm font-medium text-gray-600 hover:bg-gray-100"
+      >
+        &larr; Back
+      </button>
+      <h1 className="mt-3 text-xl font-bold text-gray-900">Settlement history</h1>
+      <p className="mt-0.5 text-sm text-gray-500">with {friend.name}</p>
+
+      {settlements.length === 0 ? (
+        <p className="mt-6 text-sm text-gray-500">No settlements yet.</p>
+      ) : (
+        <div className="mt-4 space-y-3">
+          {settlements.map((s) => (
+            <div key={s._id} className="rounded-lg bg-white p-4 shadow">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <span
+                    className={`rounded px-2 py-0.5 text-xs font-medium ${
+                      s.settlementMethod === 'waived'
+                        ? 'bg-amber-100 text-amber-700'
+                        : 'bg-green-100 text-green-700'
+                    }`}
+                  >
+                    {methodLabel(s.settlementMethod)}
+                  </span>
+                  <span className="text-xs text-gray-500">
+                    {new Date(s.date).toLocaleDateString('en-IN', {
+                      day: 'numeric',
+                      month: 'short',
+                      year: 'numeric',
+                    })}
+                  </span>
+                </div>
+                <p className="text-sm font-semibold text-gray-900">{formatCurrency(s.totalAmount)}</p>
+              </div>
+              {s.coveredExpenseIds && s.coveredExpenseIds.length > 0 && (
+                <p className="mt-2 text-xs text-gray-500">
+                  Cleared {s.coveredExpenseIds.length} item
+                  {s.coveredExpenseIds.length > 1 ? 's' : ''}
+                </p>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
   );
 }
 

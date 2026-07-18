@@ -15,7 +15,18 @@ export interface SharedExpense {
   date: string;
   splits: Split[];
   isSettlement: boolean;
+  coveredExpenseIds?: string[];
+  settlementMethod?: 'received' | 'paid' | 'waived';
   createdAt: string;
+}
+
+export interface SettlePayload {
+  friendId: string;
+  amount: number;
+  method: 'received' | 'paid' | 'waived';
+  friendOwes: boolean;
+  accountId?: string;
+  coveredExpenseIds?: string[];
 }
 
 interface CreateExpenseData {
@@ -31,7 +42,7 @@ interface SplitState {
   isLoading: boolean;
   fetchExpenses: (friendId?: string) => Promise<void>;
   createExpense: (data: CreateExpenseData) => Promise<void>;
-  settleUp: (friendId: string, amount: number) => Promise<void>;
+  settleUp: (payload: SettlePayload) => Promise<void>;
   deleteExpense: (id: string) => Promise<void>;
 }
 
@@ -61,9 +72,9 @@ const useSplitStore = create<SplitState>((set) => ({
     }
   },
 
-  settleUp: async (friendId, amount) => {
+  settleUp: async (payload) => {
     try {
-      await api.post('/splits/settle', { friendId, amount });
+      await api.post('/splits/settle', payload);
       toast.success('Settlement recorded');
     } catch (error: any) {
       toast.error(error.response?.data?.message || 'Settlement failed');

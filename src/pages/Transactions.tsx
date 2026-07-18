@@ -101,6 +101,128 @@ function CalcAmountInput({
   );
 }
 
+// ── Split helpers (Google-Pay-style avatars + amount splitting) ──────────
+const USER_KEY = 'user';
+const AVATAR_COLORS = ['#ef4444', '#f59e0b', '#10b981', '#3b82f6', '#8b5cf6', '#ec4899', '#14b8a6', '#f97316'];
+
+const round2 = (n: number) => Math.round(n * 100) / 100;
+
+/** Deterministic avatar colour from a name/id. */
+function avatarColor(seed: string): string {
+  let h = 0;
+  for (let i = 0; i < seed.length; i++) h = (h * 31 + seed.charCodeAt(i)) >>> 0;
+  return AVATAR_COLORS[h % AVATAR_COLORS.length];
+}
+
+/** First letter of each friend's name; two chars when first letters collide. */
+function computeInitials(friends: { _id: string; name: string }[]): Record<string, string> {
+  const firstCounts: Record<string, number> = {};
+  friends.forEach((f) => {
+    const c = (f.name.trim()[0] ?? '?').toUpperCase();
+    firstCounts[c] = (firstCounts[c] ?? 0) + 1;
+  });
+  const map: Record<string, string> = {};
+  friends.forEach((f) => {
+    const name = f.name.trim();
+    const c = (name[0] ?? '?').toUpperCase();
+    map[f._id] = firstCounts[c] > 1 ? name.slice(0, 2).toUpperCase() : c;
+  });
+  return map;
+}
+
+/**
+ * Split `total` across `keys`. Keys present in `locked` keep their (manual)
+ * amount; the rest share the remainder equally, with the last unlocked person
+ * absorbing the rounding paisa so the amounts always sum to `total`.
+ * Invalid only when everything is locked (or over-locked) and it doesn't add up.
+ */
+function computeSplit(total: number, keys: string[], locked: Record<string, number>) {
+  const lockedKeys = keys.filter((k) => locked[k] !== undefined);
+  const unlockedKeys = keys.filter((k) => locked[k] === undefined);
+  const lockedSum = lockedKeys.reduce((s, k) => s + (locked[k] || 0), 0);
+  const remaining = round2(total - lockedSum);
+
+  const shares: Record<string, number> = {};
+  lockedKeys.forEach((k) => { shares[k] = round2(locked[k] || 0); });
+
+  if (unlockedKeys.length > 0 && remaining >= 0) {
+    const each = Math.floor((remaining / unlockedKeys.length) * 100) / 100;
+    let acc = 0;
+    unlockedKeys.forEach((k, i) => {
+      if (i === unlockedKeys.length - 1) shares[k] = round2(remaining - acc);
+      else { shares[k] = each; acc = round2(acc + each); }
+    });
+    return { shares, valid: true, unassigned: 0 };
+  }
+
+  unlockedKeys.forEach((k) => { shares[k] = 0; });
+  const unassigned = round2(total - keys.reduce((s, k) => s + (shares[k] || 0), 0));
+  return { shares, valid: Math.abs(unassigned) < 0.01, unassigned };
+}
+
+function AvatarCircle({ label, color, isUser, size = 44 }: { label?: string; color?: string; isUser?: boolean; size?: number }) {
+  return (
+    <span
+      className="flex items-center justify-center rounded-full font-semibold flex-shrink-0"
+      style={{
+        width: size, height: size, fontSize: size * 0.36,
+        background: isUser ? 'var(--c-accent)' : color,
+        color: isUser ? 'var(--c-accent-fg)' : '#fff',
+      }}
+    >
+      {isUser ? (
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ width: size * 0.5, height: size * 0.5 }}>
+          <path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2" /><circle cx="12" cy="7" r="4" />
+        </svg>
+      ) : label}
+    </span>
+  );
+}
+
+/**
+ * Click-and-drag horizontal scrolling for a strip (mouse). Two-finger
+ * trackpad swipe already works natively via overflow-x. `dragged()` reports
+ * whether the last pointer gesture moved, so clicks can be ignored after a drag.
+ */
+function useDragScroll() {
+  const moved = useRef(false);
+  const cleanup = useRef<(() => void) | null>(null);
+  // Callback ref: attach native listeners when the strip mounts (it renders
+  // conditionally), detach on unmount. Mouse-only, so touch keeps native scroll.
+  const ref = useCallback((el: HTMLDivElement | null) => {
+    cleanup.current?.();
+    cleanup.current = null;
+    if (!el) return;
+    let down = false, startX = 0, startLeft = 0;
+    const onDown = (e: globalThis.MouseEvent) => {
+      down = true; moved.current = false; startX = e.clientX; startLeft = el.scrollLeft;
+    };
+    const onMove = (e: globalThis.MouseEvent) => {
+      if (!down) return;
+      const dx = e.clientX - startX;
+      if (Math.abs(dx) > 4) moved.current = true;
+      el.scrollLeft = startLeft - dx;
+    };
+    const onUp = () => { down = false; };
+    // Capture-phase: if the pointer moved (a drag), swallow the click so it
+    // doesn't select an avatar. Reset happens on the next mousedown.
+    const onClickCapture = (e: globalThis.MouseEvent) => {
+      if (moved.current) { e.stopPropagation(); e.preventDefault(); }
+    };
+    el.addEventListener('mousedown', onDown);
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onUp);
+    el.addEventListener('click', onClickCapture, true);
+    cleanup.current = () => {
+      el.removeEventListener('mousedown', onDown);
+      window.removeEventListener('mousemove', onMove);
+      window.removeEventListener('mouseup', onUp);
+      el.removeEventListener('click', onClickCapture, true);
+    };
+  }, []);
+  return { ref };
+}
+
 // ── Shared dropdown options panel ───────────────────────────────────────
 // White-themed, anchored below the trigger with a small margin, rounded
 // corners + shadow, and a capped height so long lists scroll within the
@@ -1012,13 +1134,15 @@ function TransactionModal({
   const hasFriends = friends.length > 0;
   const showFriendFlow = hasFriends && selectedType === 'expense';
   const friendPaid = whoPaid !== 'user';
-  const participantCount = selectedFriends.length + 1;
-  const equalShare = participantCount > 0 ? (totalAmount || 0) / participantCount : 0;
+  const pickerDrag = useDragScroll();
+  const initials = useMemo(() => computeInitials(friends), [friends]);
+  const participantKeys = useMemo(() => [USER_KEY, ...selectedFriends], [selectedFriends]);
+  const splitActive = showFriendFlow && isSplit && selectedFriends.length > 0;
+  const splitCalc = computeSplit(totalAmount || 0, participantKeys, splitAmounts);
+  const splitValid = !splitActive || splitCalc.valid;
 
   // Only the user's own share counts toward the budget when the expense is split.
-  const myShare = (showFriendFlow && isSplit && selectedFriends.length > 0)
-    ? totalAmount - selectedFriends.reduce((s, id) => s + (splitAmounts[id] ?? equalShare), 0)
-    : totalAmount;
+  const myShare = splitActive ? (splitCalc.shares[USER_KEY] ?? 0) : totalAmount;
 
 
   const [budgetWarning, setBudgetWarning] = useState<string[] | null>(null);
@@ -1051,8 +1175,10 @@ function TransactionModal({
       const payload: any = { type: data.type, amount: data.amount, categoryId: data.categoryId, date: data.date, note: data.note };
       if (friendPaid) payload.paidByFriendId = whoPaid;
       else payload.accountId = data.accountId;
-      if (showFriendFlow && isSplit && selectedFriends.length > 0)
-        payload.splits = selectedFriends.map(id => ({ friendId: id, amount: Math.round((splitAmounts[id] ?? equalShare) * 100) / 100 }));
+      if (splitActive) {
+        if (!splitCalc.valid) return; // amounts must sum to the total
+        payload.splits = selectedFriends.map(id => ({ friendId: id, amount: splitCalc.shares[id] ?? 0 }));
+      }
       await onSubmit(payload);
       reset(); setWhoPaid('user'); setIsSplit(false); setSelectedFriends([]); setSplitAmounts({}); setAmountStr('0');
       onClose();
@@ -1093,8 +1219,8 @@ function TransactionModal({
             </div>
             <button
               onClick={handleSubmit(handleFormSubmit)}
-              disabled={isSubmitting}
-              className="text-sm font-semibold flex items-center gap-1"
+              disabled={isSubmitting || !splitValid}
+              className="text-sm font-semibold flex items-center gap-1 disabled:opacity-40"
               style={{ color: 'var(--c-income)' }}
             >
               SAVE
@@ -1181,35 +1307,68 @@ function TransactionModal({
                   </div>
                 </div>
                 {isSplit && (
-                  <div className="rounded-lg p-3 space-y-2" style={{ background: 'var(--c-surface)' }}>
-                    {friends.map(f => (
-                      <label key={f._id} className="flex items-center gap-2">
-                        <input type="checkbox" checked={selectedFriends.includes(f._id)} onChange={() => toggleFriend(f._id)} className="rounded" />
-                        <span className="text-sm flex-1" style={{ color: 'var(--c-text)' }}>{f.name}</span>
-                      </label>
-                    ))}
-                    {selectedFriends.length > 0 && (totalAmount || 0) > 0 && (
-                      <div className="mt-2 pt-2 space-y-1" style={{ borderTop: '1px solid var(--c-border)' }}>
-                        <div className="flex items-center justify-between gap-2">
-                          <span className="text-xs" style={{ color: 'var(--c-muted)' }}>You</span>
-                          <span className="t-input w-24 text-right text-xs py-1 select-none" style={{ color: 'var(--c-muted)' }}>
-                            {Math.round((totalAmount - selectedFriends.reduce((s, id) => s + (splitAmounts[id] ?? equalShare), 0)) * 100) / 100}
-                          </span>
+                  <div className="rounded-lg p-3 space-y-3" style={{ background: 'var(--c-surface)' }}>
+                    {/* Horizontal friend picker — drag / two-finger swipe, no scrollbar */}
+                    <div
+                      ref={pickerDrag.ref}
+                      className="flex gap-2 overflow-x-auto pb-1 -mx-1 px-1 no-scrollbar select-none cursor-grab active:cursor-grabbing"
+                    >
+                      {friends.map(f => {
+                        const sel = selectedFriends.includes(f._id);
+                        return (
+                          <button key={f._id} type="button" onClick={() => toggleFriend(f._id)}
+                            className="flex flex-col items-center gap-1 flex-shrink-0 w-14">
+                            <span className="relative rounded-full transition-all"
+                              style={{ boxShadow: sel ? '0 0 0 2px var(--c-surface), 0 0 0 4px var(--c-accent)' : 'none', opacity: sel ? 1 : 0.5 }}>
+                              <AvatarCircle label={initials[f._id]} color={avatarColor(f.name)} size={44} />
+                              {sel && (
+                                <span className="absolute -bottom-0.5 -right-0.5 flex items-center justify-center rounded-full"
+                                  style={{ width: 16, height: 16, background: 'var(--c-accent)', border: '2px solid var(--c-surface)' }}>
+                                  <svg viewBox="0 0 24 24" className="w-2.5 h-2.5" fill="none" stroke="var(--c-accent-fg)" strokeWidth="4"><polyline points="20 6 9 17 4 12" /></svg>
+                                </span>
+                              )}
+                            </span>
+                            <span className="text-[10px] truncate w-full text-center" style={{ color: sel ? 'var(--c-text)' : 'var(--c-muted)' }}>{f.name}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
+
+                    {/* Editable per-person amounts (You + selected friends) */}
+                    {splitActive && (totalAmount || 0) > 0 && (
+                      <div className="pt-2 space-y-2" style={{ borderTop: '1px solid var(--c-border)' }}>
+                        <div className="flex items-center justify-between">
+                          <span className="text-[10px] uppercase tracking-wider" style={{ color: 'var(--c-muted)' }}>Each person's share</span>
+                          <button type="button" onClick={() => setSplitAmounts({})} className="text-[11px] font-semibold" style={{ color: 'var(--c-accent)' }}>Split equally</button>
                         </div>
-                        {selectedFriends.map(id => {
-                          const f = friends.find(x => x._id === id);
+                        {participantKeys.map(key => {
+                          const isUser = key === USER_KEY;
+                          const f = isUser ? null : friends.find(x => x._id === key);
+                          const name = isUser ? 'You' : (f?.name ?? '');
+                          const isLocked = splitAmounts[key] !== undefined;
                           return (
-                            <div key={id} className="flex items-center justify-between gap-2">
-                              <span className="text-xs" style={{ color: 'var(--c-muted)' }}>{f?.name}</span>
+                            <div key={key} className="flex items-center gap-2">
+                              <AvatarCircle label={isUser ? undefined : initials[key]} color={isUser ? undefined : avatarColor(name)} isUser={isUser} size={30} />
+                              <span className="text-sm flex-1 truncate" style={{ color: 'var(--c-text)' }}>{name}</span>
+                              {isLocked && (
+                                <button type="button" onClick={() => setSplitAmounts(p => { const { [key]: _drop, ...rest } = p; return rest; })}
+                                  className="text-[10px] font-medium" style={{ color: 'var(--c-muted)' }} title="Reset to auto split">auto ↺</button>
+                              )}
+                              <span className="text-xs" style={{ color: 'var(--c-muted)' }}>₹</span>
                               <CalcAmountInput
-                                value={splitAmounts[id] ?? Math.round(equalShare * 100) / 100}
-                                onChange={(v) => setSplitAmounts(p => ({ ...p, [id]: v }))}
-                                className="t-input w-24 text-right text-xs py-1"
+                                value={splitCalc.shares[key] ?? 0}
+                                onChange={(v) => setSplitAmounts(p => ({ ...p, [key]: v }))}
+                                className="t-input w-24 text-right text-sm py-1"
                                 onFocusChange={setSplitFieldFocused}
                               />
                             </div>
                           );
                         })}
+                        {!splitCalc.valid && (
+                          <p className="text-xs font-semibold text-center pt-1" style={{ color: 'var(--c-expense)' }}>
+                            {splitCalc.unassigned > 0 ? `Unassigned ₹${round2(splitCalc.unassigned)}` : `Over by ₹${round2(-splitCalc.unassigned)}`}
+                          </p>
+                        )}
                       </div>
                     )}
                   </div>

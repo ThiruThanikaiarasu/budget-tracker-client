@@ -13,12 +13,13 @@ const ACCOUNT_TYPES = [
   { value: 'bank_account', label: 'Bank Account' },
   { value: 'credit_card', label: 'Credit Card' },
   { value: 'upi_wallet', label: 'UPI Wallet' },
+  { value: 'investment', label: 'Investment' },
   { value: 'other', label: 'Other' },
 ] as const;
 
 const COLORS = ['#3B82F6','#10B981','#F59E0B','#EF4444','#8B5CF6','#EC4899','#06B6D4','#F97316'];
 
-const accountTypeEnum = ['cash', 'bank_account', 'credit_card', 'upi_wallet', 'other'] as const;
+const accountTypeEnum = ['cash', 'bank_account', 'credit_card', 'upi_wallet', 'investment', 'other'] as const;
 
 const createSchema = z.object({
   name: z.string().min(1, 'Name is required'),

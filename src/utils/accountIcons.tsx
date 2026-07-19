@@ -8,6 +8,7 @@ export const ACCOUNT_TYPE_ICONS: Record<Account['type'], string> = {
   bank_account: '🏦',
   credit_card: '💳',
   upi_wallet: '📱',
+  investment: '📈',
   other: '💼',
 };
 

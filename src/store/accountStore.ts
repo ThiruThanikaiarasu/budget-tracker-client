@@ -5,7 +5,7 @@ import api from '../api/axios';
 export interface Account {
   _id: string;
   name: string;
-  type: 'cash' | 'bank_account' | 'credit_card' | 'upi_wallet' | 'other';
+  type: 'cash' | 'bank_account' | 'credit_card' | 'upi_wallet' | 'investment' | 'other';
   balance: number;
   color?: string;
   isActive: boolean;

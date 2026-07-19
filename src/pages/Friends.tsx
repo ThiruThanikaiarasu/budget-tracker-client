@@ -104,20 +104,20 @@ function Friends() {
       {/* Header */}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Friends</h1>
-          <p className="mt-1 text-sm text-gray-500">Manage shared expenses and debts</p>
+          <h1 className="text-2xl font-bold text-[var(--c-text)]">Friends</h1>
+          <p className="mt-1 text-sm text-[var(--c-muted)]">Manage shared expenses and debts</p>
         </div>
         <div className="flex flex-wrap gap-2 sm:gap-3">
           <button
             onClick={() => setShowAddExpense(true)}
             disabled={friends.length === 0}
-            className="flex-1 whitespace-nowrap rounded-lg border border-blue-600 px-3 py-2 text-sm font-medium text-blue-600 hover:bg-blue-50 disabled:opacity-50 sm:flex-none sm:px-4"
+            className="flex-1 whitespace-nowrap rounded-lg border border-[var(--c-accent)] px-3 py-2 text-sm font-medium text-[var(--c-accent)] hover:bg-[var(--c-surface2)] disabled:opacity-50 sm:flex-none sm:px-4"
           >
             + Add Expense
           </button>
           <button
             onClick={() => setShowAddFriend(true)}
-            className="flex-1 whitespace-nowrap rounded-lg bg-blue-600 px-3 py-2 text-sm font-medium text-white hover:bg-blue-700 sm:flex-none sm:px-4"
+            className="flex-1 whitespace-nowrap rounded-lg bg-[var(--c-accent)] px-3 py-2 text-sm font-medium text-white hover:opacity-90 sm:flex-none sm:px-4"
           >
             + Add Friend
           </button>
@@ -126,23 +126,23 @@ function Friends() {
 
       {/* Summary Bar */}
       <div className="mt-6 grid gap-4 sm:grid-cols-2">
-        <div className="rounded-lg bg-white p-5 shadow">
-          <p className="text-sm font-medium text-gray-500">You are owed</p>
-          <p className="mt-1 text-2xl font-bold text-green-600">{formatCurrency(totalOwed)}</p>
+        <div className="rounded-lg bg-[var(--c-surface)] p-5 shadow">
+          <p className="text-sm font-medium text-[var(--c-muted)]">You are owed</p>
+          <p className="mt-1 text-2xl font-bold text-[var(--c-income)]">{formatCurrency(totalOwed)}</p>
         </div>
-        <div className="rounded-lg bg-white p-5 shadow">
-          <p className="text-sm font-medium text-gray-500">You owe</p>
-          <p className="mt-1 text-2xl font-bold text-red-600">{formatCurrency(totalOwe)}</p>
+        <div className="rounded-lg bg-[var(--c-surface)] p-5 shadow">
+          <p className="text-sm font-medium text-[var(--c-muted)]">You owe</p>
+          <p className="mt-1 text-2xl font-bold text-[var(--c-expense)]">{formatCurrency(totalOwe)}</p>
         </div>
       </div>
 
       {/* Friends List */}
       {isLoading ? (
         <div className="mt-8 flex justify-center">
-          <div className="h-8 w-8 animate-spin rounded-full border-4 border-blue-600 border-t-transparent" />
+          <div className="h-8 w-8 animate-spin rounded-full border-4 border-[var(--c-accent)] border-t-transparent" />
         </div>
       ) : friends.length === 0 ? (
-        <div className="mt-8 text-center text-gray-500">
+        <div className="mt-8 text-center text-[var(--c-muted)]">
           <p>No friends added yet. Add a friend to start splitting expenses.</p>
         </div>
       ) : (
@@ -151,31 +151,31 @@ function Friends() {
             <div
               key={friend._id}
               onClick={() => { recordInteraction(friend._id); setSelectedFriend(friend); }}
-              className="flex cursor-pointer items-center justify-between rounded-lg bg-white p-4 shadow transition-colors hover:bg-gray-50"
+              className="flex cursor-pointer items-center justify-between rounded-lg bg-[var(--c-surface)] p-4 shadow transition-colors hover:bg-[var(--c-surface2)]"
             >
               <div className="flex items-center gap-3">
-                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-blue-100 text-sm font-bold text-blue-700">
+                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[var(--c-surface2)] text-sm font-bold text-[var(--c-accent)]">
                   {friend.name.charAt(0).toUpperCase()}
                 </div>
                 <div>
-                  <h3 className="font-semibold text-gray-900">{friend.name}</h3>
+                  <h3 className="font-semibold text-[var(--c-text)]">{friend.name}</h3>
                   {friend.phone && (
-                    <p className="text-xs text-gray-500">{friend.phone}</p>
+                    <p className="text-xs text-[var(--c-muted)]">{friend.phone}</p>
                   )}
                 </div>
               </div>
               <div className="text-right">
                 {friend.netBalance === 0 ? (
-                  <p className="text-sm text-gray-500">settled up</p>
+                  <p className="text-sm text-[var(--c-muted)]">settled up</p>
                 ) : friend.netBalance > 0 ? (
                   <>
-                    <p className="text-sm font-semibold text-green-600">
+                    <p className="text-sm font-semibold text-[var(--c-income)]">
                       owes you {formatCurrency(friend.netBalance)}
                     </p>
                   </>
                 ) : (
                   <>
-                    <p className="text-sm font-semibold text-red-600">
+                    <p className="text-sm font-semibold text-[var(--c-expense)]">
                       you owe {formatCurrency(Math.abs(friend.netBalance))}
                     </p>
                   </>
@@ -187,7 +187,7 @@ function Friends() {
                     e.stopPropagation();
                     setOpenMenuId(openMenuId === friend._id ? null : friend._id);
                   }}
-                  className="rounded-md p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
+                  className="rounded-md p-1.5 text-[var(--c-muted)] hover:bg-[var(--c-surface2)] hover:text-[var(--c-text)]"
                 >
                   <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
                     <path d="M10 6a2 2 0 110-4 2 2 0 010 4zM10 12a2 2 0 110-4 2 2 0 010 4zM10 18a2 2 0 110-4 2 2 0 010 4z" />
@@ -196,11 +196,11 @@ function Friends() {
                 {openMenuId === friend._id && (
                   <div
                     onClick={(e) => e.stopPropagation()}
-                    className="absolute right-0 z-10 mt-1 w-32 rounded-md bg-white py-1 shadow-lg ring-1 ring-black ring-opacity-5"
+                    className="absolute right-0 z-10 mt-1 w-32 rounded-md bg-[var(--c-surface)] py-1 shadow-lg border border-[var(--c-border)]"
                   >
                     <button
                       onClick={() => { setEditingFriend(friend); setOpenMenuId(null); }}
-                      className="block w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50"
+                      className="block w-full px-4 py-2 text-left text-sm text-[var(--c-text)] hover:bg-[var(--c-surface2)]"
                     >
                       Edit
                     </button>
@@ -283,53 +283,53 @@ function FriendModal({
     <Dialog open={open} onClose={onClose} className="relative z-50">
       <div className="fixed inset-0 bg-black/30" aria-hidden="true" />
       <div className="fixed inset-0 flex items-center justify-center p-4">
-        <DialogPanel className="w-full max-w-md rounded-lg bg-white p-6 shadow-xl">
-          <DialogTitle className="text-lg font-semibold text-gray-900">
+        <DialogPanel className="w-full max-w-md rounded-lg bg-[var(--c-surface)] p-6 shadow-xl">
+          <DialogTitle className="text-lg font-semibold text-[var(--c-text)]">
             {friend ? 'Edit Friend' : 'Add Friend'}
           </DialogTitle>
 
           <form onSubmit={handleSubmit(onSubmit)} className="mt-4 space-y-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700">Name</label>
+              <label className="block text-sm font-medium text-[var(--c-text)]">Name</label>
               <input
                 {...register('name')}
-                className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                className="mt-1 block w-full rounded-md border border-[var(--c-border)] px-3 py-2 text-sm focus:border-[var(--c-accent)] focus:outline-none focus:ring-1 focus:ring-[var(--c-accent)]"
                 placeholder="e.g. Rahul"
               />
-              {errors.name && <p className="mt-1 text-sm text-red-600">{errors.name.message}</p>}
+              {errors.name && <p className="mt-1 text-sm text-[var(--c-expense)]">{errors.name.message}</p>}
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700">Phone (optional)</label>
+              <label className="block text-sm font-medium text-[var(--c-text)]">Phone (optional)</label>
               <input
                 {...register('phone')}
-                className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                className="mt-1 block w-full rounded-md border border-[var(--c-border)] px-3 py-2 text-sm focus:border-[var(--c-accent)] focus:outline-none focus:ring-1 focus:ring-[var(--c-accent)]"
                 placeholder="e.g. 9876543210"
               />
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700">Email (optional)</label>
+              <label className="block text-sm font-medium text-[var(--c-text)]">Email (optional)</label>
               <input
                 {...register('email')}
-                className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                className="mt-1 block w-full rounded-md border border-[var(--c-border)] px-3 py-2 text-sm focus:border-[var(--c-accent)] focus:outline-none focus:ring-1 focus:ring-[var(--c-accent)]"
                 placeholder="e.g. rahul@email.com"
               />
-              {errors.email && <p className="mt-1 text-sm text-red-600">{errors.email.message}</p>}
+              {errors.email && <p className="mt-1 text-sm text-[var(--c-expense)]">{errors.email.message}</p>}
             </div>
 
             <div className="flex justify-end gap-3 pt-2">
               <button
                 type="button"
                 onClick={onClose}
-                className="rounded-md px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100"
+                className="rounded-md px-4 py-2 text-sm font-medium text-[var(--c-text)] hover:bg-[var(--c-surface2)]"
               >
                 Cancel
               </button>
               <button
                 type="submit"
                 disabled={isSubmitting}
-                className="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
+                className="rounded-md bg-[var(--c-accent)] px-4 py-2 text-sm font-medium text-white hover:opacity-90 disabled:opacity-50"
               >
                 {isSubmitting ? 'Saving...' : friend ? 'Save' : 'Add'}
               </button>
@@ -417,53 +417,53 @@ function AddExpenseModal({
     <Dialog open={true} onClose={onClose} className="relative z-50">
       <div className="fixed inset-0 bg-black/30" aria-hidden="true" />
       <div className="fixed inset-0 flex items-center justify-center p-4">
-        <DialogPanel className="w-full max-w-lg max-h-[90vh] overflow-y-auto rounded-lg bg-white p-6 shadow-xl">
-          <DialogTitle className="text-lg font-semibold text-gray-900">
+        <DialogPanel className="w-full max-w-lg max-h-[90vh] overflow-y-auto rounded-lg bg-[var(--c-surface)] p-6 shadow-xl">
+          <DialogTitle className="text-lg font-semibold text-[var(--c-text)]">
             Add Shared Expense
           </DialogTitle>
 
           <form onSubmit={handleSubmit(onSubmit)} className="mt-4 space-y-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700">Description</label>
+              <label className="block text-sm font-medium text-[var(--c-text)]">Description</label>
               <input
                 {...register('description')}
-                className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                className="mt-1 block w-full rounded-md border border-[var(--c-border)] px-3 py-2 text-sm focus:border-[var(--c-accent)] focus:outline-none focus:ring-1 focus:ring-[var(--c-accent)]"
                 placeholder="e.g. Dinner at restaurant"
               />
               {errors.description && (
-                <p className="mt-1 text-sm text-red-600">{errors.description.message}</p>
+                <p className="mt-1 text-sm text-[var(--c-expense)]">{errors.description.message}</p>
               )}
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700">Total Amount</label>
+              <label className="block text-sm font-medium text-[var(--c-text)]">Total Amount</label>
               <input
                 type="number"
                 step="any"
                 {...register('totalAmount', { valueAsNumber: true })}
                 onWheel={(e) => e.currentTarget.blur()}
-                className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                className="mt-1 block w-full rounded-md border border-[var(--c-border)] px-3 py-2 text-sm focus:border-[var(--c-accent)] focus:outline-none focus:ring-1 focus:ring-[var(--c-accent)]"
                 placeholder="0.00"
               />
               {errors.totalAmount && (
-                <p className="mt-1 text-sm text-red-600">{errors.totalAmount.message}</p>
+                <p className="mt-1 text-sm text-[var(--c-expense)]">{errors.totalAmount.message}</p>
               )}
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700">Date</label>
+              <label className="block text-sm font-medium text-[var(--c-text)]">Date</label>
               <input
                 type="date"
                 {...register('date')}
-                className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                className="mt-1 block w-full rounded-md border border-[var(--c-border)] px-3 py-2 text-sm focus:border-[var(--c-accent)] focus:outline-none focus:ring-1 focus:ring-[var(--c-accent)]"
               />
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700">Paid by</label>
+              <label className="block text-sm font-medium text-[var(--c-text)]">Paid by</label>
               <select
                 {...register('paidBy')}
-                className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                className="mt-1 block w-full rounded-md border border-[var(--c-border)] px-3 py-2 text-sm focus:border-[var(--c-accent)] focus:outline-none focus:ring-1 focus:ring-[var(--c-accent)]"
               >
                 <option value="user">You</option>
                 {friends.map((f) => (
@@ -476,16 +476,16 @@ function AddExpenseModal({
 
             {/* Select friends to split with */}
             <div>
-              <label className="block text-sm font-medium text-gray-700">Split between</label>
+              <label className="block text-sm font-medium text-[var(--c-text)]">Split between</label>
               <div className="mt-2 space-y-2">
                 <label className="flex items-center gap-2">
                   <input
                     type="checkbox"
                     checked={includeUser}
                     onChange={(e) => setIncludeUser(e.target.checked)}
-                    className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                    className="h-4 w-4 rounded border-[var(--c-border)] text-[var(--c-accent)] focus:ring-[var(--c-accent)]"
                   />
-                  <span className="text-sm text-gray-700">You</span>
+                  <span className="text-sm text-[var(--c-text)]">You</span>
                 </label>
                 {friends.map((f) => (
                   <label key={f._id} className="flex items-center gap-2">
@@ -493,9 +493,9 @@ function AddExpenseModal({
                       type="checkbox"
                       checked={selectedFriends.includes(f._id)}
                       onChange={() => toggleFriend(f._id)}
-                      className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                      className="h-4 w-4 rounded border-[var(--c-border)] text-[var(--c-accent)] focus:ring-[var(--c-accent)]"
                     />
-                    <span className="text-sm text-gray-700">{f.name}</span>
+                    <span className="text-sm text-[var(--c-text)]">{f.name}</span>
                   </label>
                 ))}
               </div>
@@ -504,34 +504,34 @@ function AddExpenseModal({
             {/* Split method */}
             {selectedFriends.length > 0 && (
               <div>
-                <label className="block text-sm font-medium text-gray-700">Split method</label>
+                <label className="block text-sm font-medium text-[var(--c-text)]">Split method</label>
                 <div className="mt-2 flex gap-4">
                   <label className="flex items-center gap-2">
                     <input
                       type="radio"
                       checked={splitMethod === 'equal'}
                       onChange={() => setSplitMethod('equal')}
-                      className="h-4 w-4 border-gray-300 text-blue-600 focus:ring-blue-500"
+                      className="h-4 w-4 border-[var(--c-border)] text-[var(--c-accent)] focus:ring-[var(--c-accent)]"
                     />
-                    <span className="text-sm text-gray-700">Equal</span>
+                    <span className="text-sm text-[var(--c-text)]">Equal</span>
                   </label>
                   <label className="flex items-center gap-2">
                     <input
                       type="radio"
                       checked={splitMethod === 'custom'}
                       onChange={() => setSplitMethod('custom')}
-                      className="h-4 w-4 border-gray-300 text-blue-600 focus:ring-blue-500"
+                      className="h-4 w-4 border-[var(--c-border)] text-[var(--c-accent)] focus:ring-[var(--c-accent)]"
                     />
-                    <span className="text-sm text-gray-700">Custom</span>
+                    <span className="text-sm text-[var(--c-text)]">Custom</span>
                   </label>
                 </div>
 
                 {/* Split preview */}
-                <div className="mt-3 rounded-md bg-gray-50 p-3 space-y-2">
+                <div className="mt-3 rounded-md bg-[var(--c-surface2)] p-3 space-y-2">
                   {includeUser && (
                     <div className="flex items-center justify-between text-sm">
-                      <span className="text-gray-700">You</span>
-                      <span className="font-medium text-gray-900">
+                      <span className="text-[var(--c-text)]">You</span>
+                      <span className="font-medium text-[var(--c-text)]">
                         {splitMethod === 'equal'
                           ? formatCurrency(equalShare)
                           : formatCurrency(
@@ -548,9 +548,9 @@ function AddExpenseModal({
                     const friend = friends.find((f) => f._id === friendId);
                     return (
                       <div key={friendId} className="flex items-center justify-between text-sm">
-                        <span className="text-gray-700">{friend?.name}</span>
+                        <span className="text-[var(--c-text)]">{friend?.name}</span>
                         {splitMethod === 'equal' ? (
-                          <span className="font-medium text-gray-900">
+                          <span className="font-medium text-[var(--c-text)]">
                             {formatCurrency(equalShare)}
                           </span>
                         ) : (
@@ -565,7 +565,7 @@ function AddExpenseModal({
                               }))
                             }
                             onWheel={(e) => e.currentTarget.blur()}
-                            className="w-28 rounded-md border border-gray-300 px-2 py-1 text-right text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                            className="w-28 rounded-md border border-[var(--c-border)] px-2 py-1 text-right text-sm focus:border-[var(--c-accent)] focus:outline-none focus:ring-1 focus:ring-[var(--c-accent)]"
                             placeholder="0.00"
                           />
                         )}
@@ -580,14 +580,14 @@ function AddExpenseModal({
               <button
                 type="button"
                 onClick={onClose}
-                className="rounded-md px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100"
+                className="rounded-md px-4 py-2 text-sm font-medium text-[var(--c-text)] hover:bg-[var(--c-surface2)]"
               >
                 Cancel
               </button>
               <button
                 type="submit"
                 disabled={isSubmitting || selectedFriends.length === 0}
-                className="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
+                className="rounded-md bg-[var(--c-accent)] px-4 py-2 text-sm font-medium text-white hover:opacity-90 disabled:opacity-50"
               >
                 {isSubmitting ? 'Adding...' : 'Add Expense'}
               </button>
@@ -708,24 +708,24 @@ function FriendDetail({ friend, onBack }: { friend: Friend; onBack: () => void }
       <div>
         <button
           onClick={onBack}
-          className="-ml-2 flex items-center gap-1 rounded-md px-2 py-1 text-sm font-medium text-gray-600 hover:bg-gray-100"
+          className="-ml-2 flex items-center gap-1 rounded-md px-2 py-1 text-sm font-medium text-[var(--c-muted)] hover:bg-[var(--c-surface2)]"
         >
           &larr; Back
         </button>
 
         <div className="mt-3 flex flex-col items-center text-center">
-          <div className="flex h-16 w-16 items-center justify-center rounded-full bg-blue-100 text-2xl font-bold text-blue-700">
+          <div className="flex h-16 w-16 items-center justify-center rounded-full bg-[var(--c-surface2)] text-2xl font-bold text-[var(--c-accent)]">
             {friend.name.charAt(0).toUpperCase()}
           </div>
-          <h1 className="mt-2 text-xl font-bold text-gray-900">{friend.name}</h1>
+          <h1 className="mt-2 text-xl font-bold text-[var(--c-text)]">{friend.name}</h1>
           {netBalance === 0 ? (
-            <p className="mt-0.5 text-sm text-gray-500">All settled up</p>
+            <p className="mt-0.5 text-sm text-[var(--c-muted)]">All settled up</p>
           ) : netBalance > 0 ? (
-            <p className="mt-0.5 text-sm font-semibold text-green-600">
+            <p className="mt-0.5 text-sm font-semibold text-[var(--c-income)]">
               owes you {formatCurrency(netBalance)}
             </p>
           ) : (
-            <p className="mt-0.5 text-sm font-semibold text-red-600">
+            <p className="mt-0.5 text-sm font-semibold text-[var(--c-expense)]">
               you owe {formatCurrency(Math.abs(netBalance))}
             </p>
           )}
@@ -738,7 +738,7 @@ function FriendDetail({ friend, onBack }: { friend: Friend; onBack: () => void }
                   coveredExpenseIds: openExpenses.map((e) => e._id),
                 })
               }
-              className="mt-3 rounded-lg bg-green-600 px-6 py-2 text-sm font-medium text-white hover:bg-green-700"
+              className="t-btn-primary mt-3 px-6 py-2"
             >
               Settle up
             </button>
@@ -749,19 +749,19 @@ function FriendDetail({ friend, onBack }: { friend: Friend; onBack: () => void }
       {/* Outstanding items */}
       <div className="mt-6">
         <div className="flex items-center justify-between">
-          <h2 className="text-lg font-semibold text-gray-900">Outstanding</h2>
+          <h2 className="text-lg font-semibold text-[var(--c-text)]">Outstanding</h2>
           {openExpenses.length > 0 &&
             (selectionMode ? (
               <button
                 onClick={exitSelection}
-                className="text-sm font-medium text-gray-500 hover:text-gray-700"
+                className="text-sm font-medium text-[var(--c-muted)] hover:text-[var(--c-text)]"
               >
                 Cancel
               </button>
             ) : (
               <button
                 onClick={() => setSelectionMode(true)}
-                className="text-sm font-medium text-blue-600 hover:text-blue-700"
+                className="text-sm font-medium text-[var(--c-accent)] hover:opacity-80"
               >
                 Select
               </button>
@@ -770,24 +770,24 @@ function FriendDetail({ friend, onBack }: { friend: Friend; onBack: () => void }
 
         {/* Debt breakdown summary */}
         {!isLoading && openExpenses.length > 0 && (
-          <div className="mt-3 grid grid-cols-2 gap-3 rounded-lg bg-gray-50 p-3">
+          <div className="mt-3 grid grid-cols-2 gap-3 rounded-lg bg-[var(--c-surface2)] p-3">
             <div className="text-center">
-              <p className="text-xs text-gray-500">You lent</p>
-              <p className="mt-0.5 text-base font-bold text-green-600">{formatCurrency(breakdown.lent)}</p>
+              <p className="text-xs text-[var(--c-muted)]">You lent</p>
+              <p className="mt-0.5 text-base font-bold text-[var(--c-income)]">{formatCurrency(breakdown.lent)}</p>
             </div>
             <div className="text-center">
-              <p className="text-xs text-gray-500">You borrowed</p>
-              <p className="mt-0.5 text-base font-bold text-red-600">{formatCurrency(breakdown.borrowed)}</p>
+              <p className="text-xs text-[var(--c-muted)]">You borrowed</p>
+              <p className="mt-0.5 text-base font-bold text-[var(--c-expense)]">{formatCurrency(breakdown.borrowed)}</p>
             </div>
           </div>
         )}
 
         {isLoading ? (
           <div className="mt-4 flex justify-center">
-            <div className="h-8 w-8 animate-spin rounded-full border-4 border-blue-600 border-t-transparent" />
+            <div className="h-8 w-8 animate-spin rounded-full border-4 border-[var(--c-accent)] border-t-transparent" />
           </div>
         ) : openExpenses.length === 0 ? (
-          <p className="mt-4 text-sm text-gray-500">
+          <p className="mt-4 text-sm text-[var(--c-muted)]">
             {hasHistory ? 'All settled up. Nothing outstanding.' : 'No shared expenses yet.'}
           </p>
         ) : (
@@ -799,9 +799,9 @@ function FriendDetail({ friend, onBack }: { friend: Friend; onBack: () => void }
                 <div
                   key={expense._id}
                   onClick={selectionMode ? () => toggleSelect(expense._id) : undefined}
-                  className={`flex items-center justify-between rounded-lg bg-white p-4 shadow ${
+                  className={`flex items-center justify-between rounded-lg bg-[var(--c-surface)] p-4 shadow ${
                     selectionMode ? 'cursor-pointer' : ''
-                  } ${selected ? 'ring-2 ring-blue-500' : ''}`}
+                  } ${selected ? 'ring-2 ring-[var(--c-accent)]' : ''}`}
                 >
                   <div className="flex items-center gap-3">
                     {selectionMode && (
@@ -809,12 +809,12 @@ function FriendDetail({ friend, onBack }: { friend: Friend; onBack: () => void }
                         type="checkbox"
                         checked={selected}
                         readOnly
-                        className="h-4 w-4 rounded border-gray-300 text-blue-600"
+                        className="h-4 w-4 rounded border-[var(--c-border)] text-[var(--c-accent)]"
                       />
                     )}
                     <div>
-                      <h3 className="font-medium text-gray-900">{expense.description}</h3>
-                      <p className="mt-1 text-xs text-gray-500">
+                      <h3 className="font-medium text-[var(--c-text)]">{expense.description}</h3>
+                      <p className="mt-1 text-xs text-[var(--c-muted)]">
                         {new Date(expense.date).toLocaleDateString('en-IN', {
                           day: 'numeric',
                           month: 'short',
@@ -827,15 +827,15 @@ function FriendDetail({ friend, onBack }: { friend: Friend; onBack: () => void }
                   </div>
                   <div className="flex items-center gap-3">
                     <div className="text-right">
-                      <p className="text-sm font-semibold text-gray-900">
+                      <p className="text-sm font-semibold text-[var(--c-text)]">
                         {formatCurrency(expense.totalAmount)}
                       </p>
                       {share > 0 ? (
-                        <p className="text-xs font-medium text-green-600">
+                        <p className="text-xs font-medium text-[var(--c-income)]">
                           {friend.name} owes +{formatCurrency(share)}
                         </p>
                       ) : share < 0 ? (
-                        <p className="text-xs font-medium text-red-600">
+                        <p className="text-xs font-medium text-[var(--c-expense)]">
                           you owe -{formatCurrency(-share)}
                         </p>
                       ) : null}
@@ -847,7 +847,7 @@ function FriendDetail({ friend, onBack }: { friend: Friend; onBack: () => void }
                             e.stopPropagation();
                             setOpenMenuId(openMenuId === expense._id ? null : expense._id);
                           }}
-                          className="rounded-md p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
+                          className="rounded-md p-1.5 text-[var(--c-muted)] hover:bg-[var(--c-surface2)] hover:text-[var(--c-text)]"
                         >
                           <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
                             <path d="M10 6a2 2 0 110-4 2 2 0 010 4zM10 12a2 2 0 110-4 2 2 0 010 4zM10 18a2 2 0 110-4 2 2 0 010 4z" />
@@ -856,11 +856,11 @@ function FriendDetail({ friend, onBack }: { friend: Friend; onBack: () => void }
                         {openMenuId === expense._id && (
                           <div
                             onClick={(e) => e.stopPropagation()}
-                            className="absolute right-0 z-10 mt-1 w-32 rounded-md bg-white py-1 shadow-lg ring-1 ring-black ring-opacity-5"
+                            className="absolute right-0 z-10 mt-1 w-32 rounded-md bg-[var(--c-surface)] py-1 shadow-lg border border-[var(--c-border)]"
                           >
                             <button
                               onClick={() => { deleteExpense(expense._id); setOpenMenuId(null); }}
-                              className="block w-full px-4 py-2 text-left text-sm text-red-600 hover:bg-red-50"
+                              className="block w-full px-4 py-2 text-left text-sm text-[var(--c-expense)] hover:bg-[var(--c-surface2)]"
                             >
                               Delete
                             </button>
@@ -879,24 +879,24 @@ function FriendDetail({ friend, onBack }: { friend: Friend; onBack: () => void }
         {hasHistory && (
           <button
             onClick={() => setShowHistory(true)}
-            className="mt-4 flex w-full items-center justify-between rounded-lg bg-white p-4 text-left shadow hover:bg-gray-50"
+            className="mt-4 flex w-full items-center justify-between rounded-lg bg-[var(--c-surface)] p-4 text-left shadow hover:bg-[var(--c-surface2)]"
           >
-            <span className="text-sm font-medium text-gray-700">
+            <span className="text-sm font-medium text-[var(--c-text)]">
               Previously settled
-              <span className="ml-1 text-gray-400">\u00B7 {settlements.length}</span>
+              <span className="ml-1 text-[var(--c-muted)]">\u00B7 {settlements.length}</span>
             </span>
-            <span className="text-gray-400">&rarr;</span>
+            <span className="text-[var(--c-muted)]">&rarr;</span>
           </button>
         )}
       </div>
 
       {/* Sticky selection action bar */}
       {selectionMode && selectedIds.size > 0 && (
-        <div className="fixed inset-x-0 bottom-0 z-40 border-t border-gray-200 bg-white p-4 shadow-lg">
+        <div className="fixed inset-x-0 bottom-0 z-40 border-t border-[var(--c-border)] bg-[var(--c-surface)] p-4 shadow-lg">
           <div className="mx-auto flex max-w-3xl items-center justify-between">
-            <div className="text-sm text-gray-700">
+            <div className="text-sm text-[var(--c-text)]">
               <span className="font-semibold">{selectedIds.size} selected</span>
-              <span className="ml-2 text-gray-500">{formatCurrency(Math.abs(selectedTotal))}</span>
+              <span className="ml-2 text-[var(--c-muted)]">{formatCurrency(Math.abs(selectedTotal))}</span>
             </div>
             <button
               onClick={() =>
@@ -907,7 +907,7 @@ function FriendDetail({ friend, onBack }: { friend: Friend; onBack: () => void }
                 })
               }
               disabled={selectedTotal === 0}
-              className="rounded-lg bg-green-600 px-5 py-2 text-sm font-medium text-white hover:bg-green-700 disabled:opacity-50"
+              className="t-btn-primary px-5 py-2"
             >
               Settle selected
             </button>
@@ -998,12 +998,12 @@ function SettleModal({
     <Dialog open={true} onClose={onClose} className="relative z-50">
       <div className="fixed inset-0 bg-black/30" aria-hidden="true" />
       <div className="fixed inset-0 flex items-center justify-center p-4">
-        <DialogPanel className="w-full max-w-md rounded-lg bg-white p-6 shadow-xl">
-          <DialogTitle className="text-lg font-semibold text-gray-900">
+        <DialogPanel className="w-full max-w-md rounded-lg bg-[var(--c-surface)] p-6 shadow-xl">
+          <DialogTitle className="text-lg font-semibold text-[var(--c-text)]">
             Settle Up with {friend.name}
           </DialogTitle>
 
-          <p className="mt-2 text-sm text-gray-500">
+          <p className="mt-2 text-sm text-[var(--c-muted)]">
             {friendOwes
               ? `${friend.name} owes you ${formatCurrency(amount)}`
               : `You owe ${friend.name} ${formatCurrency(amount)}`}
@@ -1013,12 +1013,12 @@ function SettleModal({
             <div className="mt-4 space-y-2">
               <button
                 onClick={() => { setMethod(friendOwes ? 'received' : 'paid'); setStep('account'); }}
-                className="flex w-full flex-col rounded-lg border border-gray-200 p-3 text-left hover:border-green-500 hover:bg-green-50"
+                className="flex w-full flex-col rounded-lg border border-[var(--c-border)] p-3 text-left hover:border-[var(--c-income)] hover:bg-[var(--c-surface2)]"
               >
-                <span className="text-sm font-medium text-gray-900">
+                <span className="text-sm font-medium text-[var(--c-text)]">
                   {friendOwes ? 'They paid me' : 'I paid them'}
                 </span>
-                <span className="text-xs text-gray-500">
+                <span className="text-xs text-[var(--c-muted)]">
                   {friendOwes
                     ? 'Money lands in one of your accounts'
                     : 'Money leaves one of your accounts'}
@@ -1027,12 +1027,12 @@ function SettleModal({
               <button
                 onClick={() => submit('waived')}
                 disabled={submitting}
-                className="flex w-full flex-col rounded-lg border border-gray-200 p-3 text-left hover:border-amber-500 hover:bg-amber-50 disabled:opacity-50"
+                className="flex w-full flex-col rounded-lg border border-[var(--c-border)] p-3 text-left hover:border-[var(--c-warning)] hover:bg-[var(--c-surface2)] disabled:opacity-50"
               >
-                <span className="text-sm font-medium text-gray-900">
+                <span className="text-sm font-medium text-[var(--c-text)]">
                   {friendOwes ? 'Waive it off (on me)' : 'They waived it'}
                 </span>
-                <span className="text-xs text-gray-500">
+                <span className="text-xs text-[var(--c-muted)]">
                   {friendOwes
                     ? 'Forgive the debt — counts as your expense'
                     : 'Debt forgiven — just clears the balance'}
@@ -1042,7 +1042,7 @@ function SettleModal({
               <div className="flex justify-end pt-2">
                 <button
                   onClick={onClose}
-                  className="rounded-md px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100"
+                  className="rounded-md px-4 py-2 text-sm font-medium text-[var(--c-text)] hover:bg-[var(--c-surface2)]"
                 >
                   Cancel
                 </button>
@@ -1051,13 +1051,13 @@ function SettleModal({
           ) : (
             <div className="mt-4 space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700">
+                <label className="block text-sm font-medium text-[var(--c-text)]">
                   {method === 'received' ? 'Deposit to account' : 'Pay from account'}
                 </label>
                 <select
                   value={accountId}
                   onChange={(e) => setAccountId(e.target.value)}
-                  className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                  className="mt-1 block w-full rounded-md border border-[var(--c-border)] px-3 py-2 text-sm focus:border-[var(--c-accent)] focus:outline-none focus:ring-1 focus:ring-[var(--c-accent)]"
                 >
                   {accounts.map((a) => (
                     <option key={a._id} value={a._id}>
@@ -1066,7 +1066,7 @@ function SettleModal({
                   ))}
                 </select>
                 {accounts.length === 0 && (
-                  <p className="mt-1 text-sm text-red-600">No accounts found. Add an account first.</p>
+                  <p className="mt-1 text-sm text-[var(--c-expense)]">No accounts found. Add an account first.</p>
                 )}
               </div>
 
@@ -1074,7 +1074,7 @@ function SettleModal({
                 <button
                   type="button"
                   onClick={() => setStep('method')}
-                  className="rounded-md px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100"
+                  className="rounded-md px-4 py-2 text-sm font-medium text-[var(--c-text)] hover:bg-[var(--c-surface2)]"
                 >
                   Back
                 </button>
@@ -1082,7 +1082,7 @@ function SettleModal({
                   type="button"
                   onClick={() => submit(method)}
                   disabled={submitting || !accountId}
-                  className="rounded-md bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700 disabled:opacity-50"
+                  className="t-btn-primary px-4 py-2"
                 >
                   {submitting ? 'Settling...' : `Settle ${formatCurrency(amount)}`}
                 </button>
@@ -1113,31 +1113,31 @@ function SettlementHistory({
     <div className="p-6">
       <button
         onClick={onBack}
-        className="-ml-2 flex items-center gap-1 rounded-md px-2 py-1 text-sm font-medium text-gray-600 hover:bg-gray-100"
+        className="-ml-2 flex items-center gap-1 rounded-md px-2 py-1 text-sm font-medium text-[var(--c-muted)] hover:bg-[var(--c-surface2)]"
       >
         &larr; Back
       </button>
-      <h1 className="mt-3 text-xl font-bold text-gray-900">Settlement history</h1>
-      <p className="mt-0.5 text-sm text-gray-500">with {friend.name}</p>
+      <h1 className="mt-3 text-xl font-bold text-[var(--c-text)]">Settlement history</h1>
+      <p className="mt-0.5 text-sm text-[var(--c-muted)]">with {friend.name}</p>
 
       {settlements.length === 0 ? (
-        <p className="mt-6 text-sm text-gray-500">No settlements yet.</p>
+        <p className="mt-6 text-sm text-[var(--c-muted)]">No settlements yet.</p>
       ) : (
         <div className="mt-4 space-y-3">
           {settlements.map((s) => (
-            <div key={s._id} className="rounded-lg bg-white p-4 shadow">
+            <div key={s._id} className="rounded-lg p-4 shadow" style={{ background: 'var(--c-surface)' }}>
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <span
-                    className={`rounded px-2 py-0.5 text-xs font-medium ${
-                      s.settlementMethod === 'waived'
-                        ? 'bg-amber-100 text-amber-700'
-                        : 'bg-green-100 text-green-700'
-                    }`}
+                    className="rounded px-2 py-0.5 text-xs font-medium"
+                    style={{
+                      background: 'var(--c-surface2)',
+                      color: s.settlementMethod === 'waived' ? 'var(--c-warning)' : 'var(--c-income)',
+                    }}
                   >
                     {methodLabel(s.settlementMethod)}
                   </span>
-                  <span className="text-xs text-gray-500">
+                  <span className="text-xs text-[var(--c-muted)]">
                     {new Date(s.date).toLocaleDateString('en-IN', {
                       day: 'numeric',
                       month: 'short',
@@ -1145,10 +1145,10 @@ function SettlementHistory({
                     })}
                   </span>
                 </div>
-                <p className="text-sm font-semibold text-gray-900">{formatCurrency(s.totalAmount)}</p>
+                <p className="text-sm font-semibold text-[var(--c-text)]">{formatCurrency(s.totalAmount)}</p>
               </div>
               {s.coveredExpenseIds && s.coveredExpenseIds.length > 0 && (
-                <p className="mt-2 text-xs text-gray-500">
+                <p className="mt-2 text-xs text-[var(--c-muted)]">
                   Cleared {s.coveredExpenseIds.length} item
                   {s.coveredExpenseIds.length > 1 ? 's' : ''}
                 </p>

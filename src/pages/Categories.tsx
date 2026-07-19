@@ -24,7 +24,7 @@ import { CSS } from '@dnd-kit/utilities';
 import useCategoryStore, { type Category } from '../store/categoryStore';
 import useDashboardStore from '../store/dashboardStore';
 import useAccountStore from '../store/accountStore';
-import { formatCurrency } from '../utils/format';
+import Amount from '../components/Amount';
 import { CATEGORY_ICONS, renderCategoryIcon } from '../utils/categoryIcons';
 
 
@@ -120,20 +120,21 @@ function Categories() {
     <div style={{ background: 'var(--c-bg)', minHeight: '100vh' }}>
       {/* ── Summary header ─────────────────────────────────────────── */}
       <div className="px-4 pt-6 pb-4 text-center" style={{ background: 'var(--c-header-bg)' }}>
-        <p className="text-base font-semibold" style={{ color: 'var(--c-text)' }}>
-          [ All Accounts {formatCurrency(totalBalance)} ]
+        <p className="cred-label">All accounts</p>
+        <p className="cred-serif mt-1 text-3xl font-semibold" style={{ color: 'var(--c-text)' }}>
+          <Amount value={totalBalance} />
         </p>
         <div className="mt-3 grid grid-cols-2 gap-4">
           <div>
-            <p className="text-[10px] uppercase tracking-wider" style={{ color: 'var(--c-muted)' }}>Expense so far</p>
+            <p className="cred-label">Expense so far</p>
             <p className="text-sm font-bold mt-0.5" style={{ color: 'var(--c-expense)' }}>
-              {summary ? formatCurrency(summary.totalExpense) : '—'}
+              {summary ? <Amount value={summary.totalExpense} /> : '—'}
             </p>
           </div>
           <div>
-            <p className="text-[10px] uppercase tracking-wider" style={{ color: 'var(--c-muted)' }}>Income so far</p>
+            <p className="cred-label">Income so far</p>
             <p className="text-sm font-bold mt-0.5" style={{ color: 'var(--c-income)' }}>
-              {summary ? formatCurrency(summary.totalIncome) : '—'}
+              {summary ? <Amount value={summary.totalIncome} /> : '—'}
             </p>
           </div>
         </div>
@@ -154,8 +155,7 @@ function Categories() {
           {incomeItems.length > 0 && (
             <div>
               <div className="px-4 pt-4 pb-2">
-                <p className="text-sm font-bold" style={{ color: 'var(--c-text)' }}>Income categories</p>
-                <div className="mt-1 h-px" style={{ background: 'var(--c-border)' }} />
+                <p className="cred-label">Income categories</p>
               </div>
               <SortableContext items={incomeItems.map(c => c._id)} strategy={verticalListSortingStrategy}>
                 {incomeItems.map(cat => (
@@ -176,8 +176,7 @@ function Categories() {
           {expenseItems.length > 0 && (
             <div>
               <div className="px-4 pt-4 pb-2">
-                <p className="text-sm font-bold" style={{ color: 'var(--c-text)' }}>Expense categories</p>
-                <div className="mt-1 h-px" style={{ background: 'var(--c-border)' }} />
+                <p className="cred-label">Expense categories</p>
               </div>
               <SortableContext items={expenseItems.map(c => c._id)} strategy={verticalListSortingStrategy}>
                 {expenseItems.map(cat => (
@@ -308,9 +307,8 @@ function SortableCategoryRow({
 function CategoryRow({ category, openMenuId, setOpenMenuId, onEdit, onDelete, isOverlay, dragListeners }: RowProps) {
   return (
     <div
-      className="flex items-center gap-3 px-4 py-3"
+      className={isOverlay ? 'flex items-center gap-3 px-4 py-3' : 'cred-divider flex items-center gap-3 px-4 py-3'}
       style={{
-        borderBottom: isOverlay ? 'none' : '1px solid var(--c-border)',
         background: isOverlay ? 'var(--c-surface)' : undefined,
         boxShadow: isOverlay ? '0 8px 32px rgba(0,0,0,0.18)' : undefined,
         borderRadius: isOverlay ? '14px' : undefined,
@@ -378,7 +376,7 @@ function ModalWrap({ title, children, onClose }: { title: string; children: Reac
       <div className="fixed inset-0 bg-black/60" />
       <div className="fixed inset-0 flex items-end sm:items-center justify-center p-0 sm:p-4">
         <DialogPanel className="w-full sm:max-w-md rounded-t-2xl sm:rounded-2xl p-5 shadow-2xl overflow-y-auto" style={{ background: 'var(--c-surface)', maxHeight: '90dvh' }}>
-          <DialogTitle className="text-base font-bold mb-4" style={{ color: 'var(--c-text)' }}>{title}</DialogTitle>
+          <DialogTitle className="cred-serif text-base font-semibold mb-4" style={{ color: 'var(--c-text)' }}>{title}</DialogTitle>
           {children}
         </DialogPanel>
       </div>

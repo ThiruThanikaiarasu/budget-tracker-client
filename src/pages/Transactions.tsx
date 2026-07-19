@@ -11,6 +11,7 @@ import useAccountStore, { type Account } from '../store/accountStore';
 import useFriendStore, { type Friend } from '../store/friendStore';
 import useBudgetStore, { precheckBudget } from '../store/budgetStore';
 import { formatCurrency } from '../utils/format';
+import { sortByFrecency } from '../utils/frecency';
 import { renderCategoryIcon } from '../utils/categoryIcons';
 import { renderAccountIcon } from '../utils/accountIcons';
 
@@ -1135,6 +1136,8 @@ function TransactionModal({
   const showFriendFlow = hasFriends && selectedType === 'expense';
   const friendPaid = whoPaid !== 'user';
   const pickerDrag = useDragScroll();
+  const recordInteraction = useFriendStore((s) => s.recordInteraction);
+  const sortedFriends = useMemo(() => sortByFrecency(friends), [friends]);
   const initials = useMemo(() => computeInitials(friends), [friends]);
   const participantKeys = useMemo(() => [USER_KEY, ...selectedFriends], [selectedFriends]);
   const splitActive = showFriendFlow && isSplit && selectedFriends.length > 0;
@@ -1180,6 +1183,11 @@ function TransactionModal({
         payload.splits = selectedFriends.map(id => ({ friendId: id, amount: splitCalc.shares[id] ?? 0 }));
       }
       await onSubmit(payload);
+      // Learn which friends get used together (frequent-first ordering).
+      const interacted = new Set<string>();
+      if (friendPaid) interacted.add(whoPaid);
+      if (splitActive) selectedFriends.forEach(id => interacted.add(id));
+      interacted.forEach(id => recordInteraction(id));
       reset(); setWhoPaid('user'); setIsSplit(false); setSelectedFriends([]); setSplitAmounts({}); setAmountStr('0');
       onClose();
     } catch { /* handled by store */ }
@@ -1195,7 +1203,7 @@ function TransactionModal({
         >
           {/* Top bar */}
           <div className="flex items-center justify-between px-4 py-3 flex-shrink-0" style={{ borderBottom: '1px solid var(--c-border)' }}>
-            <button onClick={onClose} className="text-sm font-semibold flex items-center gap-1" style={{ color: 'var(--c-expense)' }}>
+            <button onClick={onClose} className="text-sm font-semibold flex items-center gap-1 rounded-full px-3 py-1.5" style={{ color: 'var(--c-expense)', background: 'color-mix(in srgb, var(--c-expense) 13%, transparent)' }}>
               <svg viewBox="0 0 24 24" className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2.5">
                 <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
               </svg>
@@ -1220,8 +1228,8 @@ function TransactionModal({
             <button
               onClick={handleSubmit(handleFormSubmit)}
               disabled={isSubmitting || !splitValid}
-              className="text-sm font-semibold flex items-center gap-1 disabled:opacity-40"
-              style={{ color: 'var(--c-income)' }}
+              className="text-sm font-semibold flex items-center gap-1 rounded-full px-3 py-1.5 disabled:opacity-40"
+              style={{ color: 'var(--c-income)', background: 'color-mix(in srgb, var(--c-income) 13%, transparent)' }}
             >
               SAVE
               <svg viewBox="0 0 24 24" className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2.5">
@@ -1311,9 +1319,9 @@ function TransactionModal({
                     {/* Horizontal friend picker — drag / two-finger swipe, no scrollbar */}
                     <div
                       ref={pickerDrag.ref}
-                      className="flex gap-2 overflow-x-auto pb-1 -mx-1 px-1 no-scrollbar select-none cursor-grab active:cursor-grabbing"
+                      className="flex gap-2 overflow-x-auto py-2 -mx-1 px-1 no-scrollbar select-none cursor-grab active:cursor-grabbing"
                     >
-                      {friends.map(f => {
+                      {sortedFriends.map(f => {
                         const sel = selectedFriends.includes(f._id);
                         return (
                           <button key={f._id} type="button" onClick={() => toggleFriend(f._id)}

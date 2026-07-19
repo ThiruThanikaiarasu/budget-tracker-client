@@ -8,6 +8,8 @@ export interface Friend {
   phone?: string;
   email?: string;
   netBalance: number;
+  frecencyScore?: number;
+  lastInteractedAt?: string;
   createdAt: string;
 }
 
@@ -23,6 +25,7 @@ interface FriendState {
   fetchFriends: () => Promise<void>;
   createFriend: (data: CreateFriendData) => Promise<void>;
   updateFriend: (id: string, data: CreateFriendData) => Promise<void>;
+  recordInteraction: (id: string) => void;
 }
 
 const useFriendStore = create<FriendState>((set) => ({
@@ -61,6 +64,22 @@ const useFriendStore = create<FriendState>((set) => ({
       toast.error(error.response?.data?.message || 'Failed to update friend');
       throw error;
     }
+  },
+
+  // Fire-and-forget: bump the friend's frecency and merge the new score back
+  // in (preserving the computed netBalance). Powers "frequent friends first".
+  recordInteraction: (id) => {
+    api.post(`/friends/${id}/interact`)
+      .then(({ data }) => {
+        set((state) => ({
+          friends: state.friends.map((f) =>
+            f._id === id
+              ? { ...f, frecencyScore: data.friend.frecencyScore, lastInteractedAt: data.friend.lastInteractedAt }
+              : f
+          ),
+        }));
+      })
+      .catch(() => { /* non-critical; ignore */ });
   },
 }));
 

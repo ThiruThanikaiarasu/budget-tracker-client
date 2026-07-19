@@ -143,7 +143,7 @@ function MainLayout() {
       >
         {/* Brand */}
         <div className="px-5 py-6">
-          <h1 className="text-lg font-bold" style={{ color: 'var(--c-accent)' }}>
+          <h1 className="cred-serif text-lg font-bold" style={{ color: 'var(--c-accent)' }}>
             Budget Tracker
           </h1>
           {user && (
@@ -206,7 +206,7 @@ function MainLayout() {
             {Icons.hamburger}
           </button>
 
-          <span className="text-base font-bold" style={{ color: 'var(--c-accent)' }}>
+          <span className="cred-serif text-base font-bold" style={{ color: 'var(--c-accent)' }}>
             Budget Tracker
           </span>
 
@@ -276,7 +276,7 @@ function MainLayout() {
               style={{ borderBottom: '1px solid var(--c-border)' }}
             >
               <div>
-                <p className="text-base font-bold" style={{ color: 'var(--c-accent)' }}>
+                <p className="cred-serif text-base font-bold" style={{ color: 'var(--c-accent)' }}>
                   Budget Tracker
                 </p>
                 {user && (

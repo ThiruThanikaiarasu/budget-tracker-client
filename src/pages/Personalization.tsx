@@ -3,7 +3,7 @@ import useAuthStore from '../store/authStore';
 import useThemeStore, { THEMES } from '../store/themeStore';
 import useAccountStore from '../store/accountStore';
 import useTransactionStore from '../store/transactionStore';
-import { formatCurrency } from '../utils/format';
+import Amount from '../components/Amount';
 
 function getOrdinalSuffix(n: number): string {
   const s = ['th', 'st', 'nd', 'rd'];
@@ -39,21 +39,21 @@ function Personalization() {
   return (
     <div style={{ background: 'var(--c-bg)', minHeight: '100vh' }}>
       <div className="px-4 pt-6 pb-4" style={{ background: 'var(--c-header-bg)' }}>
-        <p className="text-lg font-bold" style={{ color: 'var(--c-text)' }}>Settings</p>
+        <p className="cred-serif text-lg font-semibold" style={{ color: 'var(--c-text)' }}>Settings</p>
         <p className="text-xs mt-0.5" style={{ color: 'var(--c-muted)' }}>Customize your experience</p>
       </div>
 
       <div className="px-4 py-4 space-y-6">
         {/* ── Theme ──────────────────────────────────────────────── */}
         <div className="rounded-xl p-4" style={{ background: 'var(--c-surface)' }}>
-          <p className="text-sm font-bold mb-1" style={{ color: 'var(--c-text)' }}>Theme</p>
+          <p className="cred-serif text-sm font-semibold mb-1" style={{ color: 'var(--c-text)' }}>Theme</p>
           <p className="text-xs mb-3" style={{ color: 'var(--c-muted)' }}>Choose your preferred colour scheme</p>
-          <div className="flex gap-2">
+          <div className="grid grid-cols-2 gap-2">
             {THEMES.map(t => (
               <button
                 key={t.id}
                 onClick={() => setTheme(t.id)}
-                className="flex-1 py-2.5 rounded-lg text-sm font-semibold transition-all"
+                className="py-2.5 rounded-lg text-sm font-semibold transition-all"
                 style={{
                   background: theme === t.id ? 'var(--c-accent)' : 'var(--c-surface2)',
                   color: theme === t.id ? 'var(--c-accent-fg)' : 'var(--c-muted)',
@@ -68,7 +68,7 @@ function Personalization() {
 
         {/* ── Financial Month ────────────────────────────────────── */}
         <div className="rounded-xl p-4" style={{ background: 'var(--c-surface)' }}>
-          <p className="text-sm font-bold mb-1" style={{ color: 'var(--c-text)' }}>Financial Month Start</p>
+          <p className="cred-serif text-sm font-semibold mb-1" style={{ color: 'var(--c-text)' }}>Financial Month Start</p>
           <p className="text-xs mb-3" style={{ color: 'var(--c-muted)' }}>
             Set which day your budget cycle starts (typically your salary date).
           </p>
@@ -95,8 +95,8 @@ function Personalization() {
             </div>
           </div>
 
-          <div className="mt-3 rounded-lg p-3" style={{ background: 'rgba(201,167,47,0.10)' }}>
-            <p className="text-sm" style={{ color: 'var(--c-accent)' }}>{getFinancialMonthPreview(startDay)}</p>
+          <div className="mt-3 rounded-lg p-3" style={{ background: 'var(--c-surface2)' }}>
+            <p className="text-sm font-medium" style={{ color: 'var(--c-text)' }}>{getFinancialMonthPreview(startDay)}</p>
             {startDay !== 1 && (
               <p className="mt-1 text-xs" style={{ color: 'var(--c-muted)' }}>
                 Example: "May 2026" budget covers {getOrdinalSuffix(startDay)} April to {getOrdinalSuffix(startDay - 1)} May
@@ -117,7 +117,7 @@ function Personalization() {
 
         {/* ── Clean up & new journey ─────────────────────────────── */}
         <div className="rounded-xl p-4" style={{ background: 'var(--c-surface)' }}>
-          <p className="text-sm font-bold mb-1" style={{ color: 'var(--c-text)' }}>Clean up &amp; new journey</p>
+          <p className="cred-serif text-sm font-semibold mb-1" style={{ color: 'var(--c-text)' }}>Clean up &amp; new journey</p>
           <p className="text-xs mb-3" style={{ color: 'var(--c-muted)' }}>
             Balances drifted from reality? Enter each account's actual balance and we'll
             book a one-off "Clean up" adjustment to match — your history stays intact and
@@ -170,7 +170,7 @@ function CleanupModal({ onClose }: { onClose: () => void }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: 'rgba(0,0,0,0.4)' }}>
       <div className="w-full max-w-md rounded-xl p-5" style={{ background: 'var(--c-surface)', maxHeight: '85vh', overflowY: 'auto' }}>
-        <p className="text-base font-bold" style={{ color: 'var(--c-text)' }}>Clean up &amp; new journey</p>
+        <p className="cred-serif text-base font-semibold" style={{ color: 'var(--c-text)' }}>Clean up &amp; new journey</p>
         <p className="text-xs mt-1" style={{ color: 'var(--c-muted)' }}>
           Enter the real balance for any account that's off. Leave the rest blank.
         </p>
@@ -183,7 +183,7 @@ function CleanupModal({ onClose }: { onClose: () => void }) {
               <div key={a._id} className="flex items-center justify-between gap-3">
                 <div className="min-w-0">
                   <p className="text-sm font-medium truncate" style={{ color: 'var(--c-text)' }}>{a.name}</p>
-                  <p className="text-[11px]" style={{ color: 'var(--c-muted)' }}>now {formatCurrency(a.balance)}</p>
+                  <p className="text-[11px]" style={{ color: 'var(--c-muted)' }}>now <Amount value={a.balance} /></p>
                 </div>
                 <input
                   type="number"

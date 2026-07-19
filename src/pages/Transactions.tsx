@@ -505,6 +505,7 @@ function Transactions() {
   const { totalExpense, totalIncome } = useMemo(() => {
     let e = 0, i = 0;
     for (const tx of transactions) {
+      if (tx.isAdjustment) continue; // clean-up entries don't count as spend/income
       if (tx.type === 'expense') e += tx.amount;
       else if (tx.type === 'income') i += tx.amount;
     }
@@ -666,9 +667,17 @@ function Transactions() {
                   {/* Name + account */}
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium truncate" style={{ color: 'var(--c-text)' }}>
-                      {tx.type === 'transfer' ? 'Transfer' : tx.categoryId?.name || 'Unknown'}
+                      {tx.isAdjustment ? 'Clean up' : tx.type === 'transfer' ? 'Transfer' : tx.categoryId?.name || 'Unknown'}
                     </p>
                     <div className="flex items-center gap-1 mt-0.5 min-w-0">
+                      {tx.isAdjustment && (
+                        <span
+                          className="inline-flex items-center rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide"
+                          style={{ background: 'var(--c-surface2)', color: 'var(--c-muted)' }}
+                        >
+                          new journey
+                        </span>
+                      )}
                       {tx.accountId ? (
                         <span
                           className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px]"

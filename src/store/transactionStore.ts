@@ -3,6 +3,7 @@ import toast from 'react-hot-toast';
 import api from '../api/axios';
 import useBudgetStore from './budgetStore';
 import useFriendStore from './friendStore';
+import useAccountStore from './accountStore';
 
 export interface Transaction {
   _id: string;
@@ -16,6 +17,8 @@ export interface Transaction {
   toAccountId?: { _id: string; name: string };
   /** Populated when a friend paid on behalf of the user. */
   paidByFriendId?: { _id: string; name: string };
+  /** Balance-reconciliation entry ("Clean up · new journey"); excluded from totals. */
+  isAdjustment?: boolean;
   note?: string;
   date: string;
   createdAt: string;
@@ -65,6 +68,7 @@ interface TransactionState {
   createTransaction: (data: CreateTransactionData) => Promise<void>;
   updateTransaction: (id: string, data: CreateTransactionData) => Promise<void>;
   deleteTransaction: (id: string) => Promise<void>;
+  cleanupAccounts: (balances: { accountId: string; newBalance: number }[]) => Promise<number>;
 }
 
 const useTransactionStore = create<TransactionState>((set) => ({
@@ -151,6 +155,25 @@ const useTransactionStore = create<TransactionState>((set) => ({
       useFriendStore.getState().fetchFriends();
     } catch (error: any) {
       toast.error(error.response?.data?.message || 'Failed to delete transaction');
+    }
+  },
+
+  cleanupAccounts: async (balances) => {
+    try {
+      const { data } = await api.post('/transactions/cleanup', { balances });
+      // Balances, history and budgets all shifted — refetch the affected stores.
+      await useAccountStore.getState().fetchAccounts();
+      await useTransactionStore.getState().fetchTransactions();
+      useBudgetStore.getState().refreshActive();
+      toast.success(
+        data.count > 0
+          ? `Cleaned up ${data.count} account${data.count > 1 ? 's' : ''}`
+          : 'All balances already up to date'
+      );
+      return data.count as number;
+    } catch (error: any) {
+      toast.error(error.response?.data?.message || 'Clean up failed');
+      throw error;
     }
   },
 }));

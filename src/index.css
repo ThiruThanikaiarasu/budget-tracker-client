@@ -38,6 +38,44 @@
   --c-warning: #e0922a;
 }
 
+/* ── CRED White (monochrome · editorial serif · always-black nav) ───── */
+[data-theme="cred-white"] {
+  --c-bg: #ffffff;
+  --c-surface: #ffffff;
+  --c-surface2: #f4f4f5;
+  --c-border: #e7e7ea;
+  --c-text: #0a0a0a;
+  --c-muted: #8e8e93;
+  --c-accent: #0a0a0a;      /* CTAs are solid black on white */
+  --c-accent-fg: #ffffff;
+  --c-expense: #e5484d;
+  --c-income: #16a06a;      /* green = success/meaning only */
+  --c-nav-bg: #0a0a0a;      /* nav bar is black even in white mode */
+  --c-nav-border: rgba(255, 255, 255, 0.08);
+  --c-active: #ffffff;      /* active nav item = white on black */
+  --c-header-bg: #ffffff;
+  --c-warning: #c98a00;     /* amber = utilisation/warning */
+}
+
+/* ── CRED Black (pure black · white CTAs) ───────────────────────────── */
+[data-theme="cred-black"] {
+  --c-bg: #000000;
+  --c-surface: #0e0e11;
+  --c-surface2: #17171b;
+  --c-border: rgba(255, 255, 255, 0.09);
+  --c-text: #f5f5f7;
+  --c-muted: #8a8a92;
+  --c-accent: #ffffff;      /* CTAs are white on black */
+  --c-accent-fg: #0a0a0a;
+  --c-expense: #ff5c60;
+  --c-income: #35c884;
+  --c-nav-bg: #000000;
+  --c-nav-border: rgba(255, 255, 255, 0.08);
+  --c-active: #ffffff;
+  --c-header-bg: #000000;
+  --c-warning: #f5a623;
+}
+
 /* ── Global resets ──────────────────────────────────────────────────── */
 * {
   box-sizing: border-box;
@@ -56,6 +94,54 @@ body {
 [data-theme="dark-olive"] ::-webkit-scrollbar { width: 4px; height: 4px; }
 [data-theme="dark-olive"] ::-webkit-scrollbar-track { background: transparent; }
 [data-theme="dark-olive"] ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.15); border-radius: 4px; }
+
+[data-theme="cred-black"] ::-webkit-scrollbar { width: 4px; height: 4px; }
+[data-theme="cred-black"] ::-webkit-scrollbar-track { background: transparent; }
+[data-theme="cred-black"] ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.14); border-radius: 4px; }
+
+/* ── CRED foundation ─────────────────────────────────────────────────── */
+/* Editorial serif for hero titles + big amounts — only active in CRED themes,
+   so Light / Dark-Olive keep their sans headings. */
+.cred-serif { font-family: inherit; }
+[data-theme^="cred"] .cred-serif {
+  font-family: 'Fraunces', Georgia, 'Times New Roman', serif;
+  font-optical-sizing: auto;
+  letter-spacing: -0.01em;
+}
+
+/* Uppercase, letter-spaced micro-label (section headers) */
+.cred-label {
+  text-transform: uppercase;
+  letter-spacing: 0.09em;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  color: var(--c-muted);
+}
+
+/* Outline pill (secondary actions / filters) */
+.cred-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  border-radius: 9999px;
+  border: 1px solid var(--c-border);
+  background: transparent;
+  color: var(--c-text);
+  padding: 0.4rem 0.85rem;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+/* Thin dashed divider between list rows (CRED payment-history style) */
+.cred-divider { border-bottom: 1px dashed var(--c-border); }
+
+/* Light-decimal amount: dim the fractional part */
+.cred-dec { opacity: 0.45; font-weight: 500; }
+
+/* CRED primary/outline buttons are flat & high-contrast (no gradient/glow) */
+[data-theme^="cred"] .t-btn-primary { box-shadow: none; background-image: none; }
+[data-theme^="cred"] .t-btn-outline:hover { background-color: var(--c-surface2); }
 
 /* ── Hide scrollbar (used for drag/swipe strips like the split avatars) ── */
 .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }

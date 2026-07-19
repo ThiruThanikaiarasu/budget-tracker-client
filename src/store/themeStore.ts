@@ -1,11 +1,13 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 
-export type AppTheme = 'light' | 'dark-olive';
+export type AppTheme = 'light' | 'dark-olive' | 'cred-white' | 'cred-black';
 
 export const THEMES: { id: AppTheme; label: string }[] = [
   { id: 'light', label: 'Light' },
   { id: 'dark-olive', label: 'Dark Olive' },
+  { id: 'cred-white', label: 'CRED White' },
+  { id: 'cred-black', label: 'CRED Black' },
 ];
 
 interface ThemeStore {

@@ -11,6 +11,7 @@ import useAccountStore, { type Account } from '../store/accountStore';
 import useFriendStore, { type Friend } from '../store/friendStore';
 import useBudgetStore, { precheckBudget } from '../store/budgetStore';
 import { formatCurrency } from '../utils/format';
+import Amount from '../components/Amount';
 import { sortByFrecency } from '../utils/frecency';
 import { renderCategoryIcon } from '../utils/categoryIcons';
 import { renderAccountIcon } from '../utils/accountIcons';
@@ -551,8 +552,8 @@ function Transactions() {
               <polyline points="15 18 9 12 15 6" />
             </svg>
           </button>
-          <span className="text-base font-semibold" style={{ color: 'var(--c-text)' }}>
-            {MONTHS[viewMonth]}, {viewYear}
+          <span className="cred-serif text-xl font-semibold" style={{ color: 'var(--c-text)' }}>
+            {MONTHS[viewMonth]} {viewYear}
           </span>
           <div className="flex items-center gap-2">
             <button onClick={nextMonth} className="p-1.5" style={{ color: 'var(--c-muted)' }}>
@@ -568,28 +569,22 @@ function Transactions() {
           </div>
         </div>
 
-        {/* Summary row */}
-        <div className="mt-3 grid grid-cols-3 gap-2 text-center">
-          <div>
-            <p className="text-[10px] uppercase tracking-wider font-semibold" style={{ color: 'var(--c-muted)' }}>Expense</p>
-            <p className="text-sm font-bold mt-0.5" style={{ color: 'var(--c-expense)' }}>
-              {formatCurrency(totalExpense)}
-            </p>
-          </div>
-          <div>
-            <p className="text-[10px] uppercase tracking-wider font-semibold" style={{ color: 'var(--c-muted)' }}>Income</p>
-            <p className="text-sm font-bold mt-0.5" style={{ color: 'var(--c-income)' }}>
-              {formatCurrency(totalIncome)}
-            </p>
-          </div>
-          <div>
-            <p className="text-[10px] uppercase tracking-wider font-semibold" style={{ color: 'var(--c-muted)' }}>Total</p>
-            <p
-              className="text-sm font-bold mt-0.5"
-              style={{ color: totalNet >= 0 ? 'var(--c-income)' : 'var(--c-expense)' }}
-            >
-              {totalNet >= 0 ? '+' : ''}{formatCurrency(totalNet)}
-            </p>
+        {/* Summary hero */}
+        <div className="mt-4 text-center">
+          <p className="cred-label">Net this month</p>
+          <p className="cred-serif mt-1 text-4xl font-semibold" style={{ color: 'var(--c-text)' }}>
+            <Amount value={Math.abs(totalNet)} prefix={totalNet < 0 ? '−' : totalNet > 0 ? '+' : ''} />
+          </p>
+          <div className="mt-2 flex items-center justify-center gap-3 text-xs" style={{ color: 'var(--c-muted)' }}>
+            <span>
+              Expense{' '}
+              <Amount value={totalExpense} className="font-semibold" style={{ color: 'var(--c-expense)' }} />
+            </span>
+            <span style={{ opacity: 0.35 }}>·</span>
+            <span>
+              Income{' '}
+              <Amount value={totalIncome} className="font-semibold" style={{ color: 'var(--c-income)' }} />
+            </span>
           </div>
         </div>
       </div>
@@ -630,14 +625,8 @@ function Transactions() {
           sortedDates.map(dateKey => (
             <div key={dateKey}>
               {/* Date header */}
-              <div
-                className="px-4 py-2 flex items-center gap-3"
-                style={{ borderBottom: '1px solid var(--c-border)' }}
-              >
-                <span className="text-sm font-bold" style={{ color: 'var(--c-text)' }}>
-                  {groupDate(dateKey)}
-                </span>
-                <div className="flex-1 h-px" style={{ background: 'var(--c-border)' }} />
+              <div className="px-4 pt-4 pb-1.5">
+                <span className="cred-label">{groupDate(dateKey)}</span>
               </div>
               {/* Rows */}
               {grouped[dateKey].map((tx, idx) => {
@@ -648,7 +637,7 @@ function Transactions() {
                   onClick={() => setDetailTx(tx)}
                   className="w-full flex items-center gap-3 px-4 py-3 text-left"
                   style={{
-                    borderBottom: idx < grouped[dateKey].length - 1 ? '1px solid var(--c-border)' : undefined,
+                    borderBottom: idx < grouped[dateKey].length - 1 ? '1px dashed var(--c-border)' : undefined,
                   }}
                 >
                   {/* Icon */}
@@ -704,12 +693,14 @@ function Transactions() {
                              : 'var(--c-muted)',
                       }}
                     >
-                      {tx.type === 'expense' ? '-' : tx.type === 'income' ? '+' : ''}
-                      {formatCurrency(isSplit ? tx.personalShare! : tx.amount)}
+                      <Amount
+                        value={isSplit ? tx.personalShare! : tx.amount}
+                        prefix={tx.type === 'expense' ? '−' : tx.type === 'income' ? '+' : ''}
+                      />
                     </span>
                     {isSplit && (
                       <span className="text-[10px]" style={{ color: 'var(--c-muted)' }}>
-                        of {formatCurrency(tx.amount)}
+                        of <Amount value={tx.amount} />
                       </span>
                     )}
                   </div>

@@ -7,6 +7,7 @@ import useFriendStore, { type Friend } from '../store/friendStore';
 import useSplitStore, { type SharedExpense } from '../store/splitStore';
 import useAccountStore from '../store/accountStore';
 import { formatCurrency } from '../utils/format';
+import Amount from '../components/Amount';
 import { sortByFrecency } from '../utils/frecency';
 
 // --- Schemas ---
@@ -104,20 +105,20 @@ function Friends() {
       {/* Header */}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-[var(--c-text)]">Friends</h1>
+          <h1 className="cred-serif text-2xl font-semibold" style={{ color: 'var(--c-text)' }}>Friends</h1>
           <p className="mt-1 text-sm text-[var(--c-muted)]">Manage shared expenses and debts</p>
         </div>
         <div className="flex flex-wrap gap-2 sm:gap-3">
           <button
             onClick={() => setShowAddExpense(true)}
             disabled={friends.length === 0}
-            className="flex-1 whitespace-nowrap rounded-lg border border-[var(--c-accent)] px-3 py-2 text-sm font-medium text-[var(--c-accent)] hover:bg-[var(--c-surface2)] disabled:opacity-50 sm:flex-none sm:px-4"
+            className="t-btn-outline flex-1 whitespace-nowrap sm:flex-none"
           >
             + Add Expense
           </button>
           <button
             onClick={() => setShowAddFriend(true)}
-            className="flex-1 whitespace-nowrap rounded-lg bg-[var(--c-accent)] px-3 py-2 text-sm font-medium text-white hover:opacity-90 sm:flex-none sm:px-4"
+            className="t-btn-primary flex-1 whitespace-nowrap sm:flex-none"
           >
             + Add Friend
           </button>
@@ -127,12 +128,16 @@ function Friends() {
       {/* Summary Bar */}
       <div className="mt-6 grid gap-4 sm:grid-cols-2">
         <div className="rounded-lg bg-[var(--c-surface)] p-5 shadow">
-          <p className="text-sm font-medium text-[var(--c-muted)]">You are owed</p>
-          <p className="mt-1 text-2xl font-bold text-[var(--c-income)]">{formatCurrency(totalOwed)}</p>
+          <p className="cred-label">You are owed</p>
+          <p className="cred-serif mt-1 text-2xl font-semibold" style={{ color: 'var(--c-income)' }}>
+            <Amount value={totalOwed} />
+          </p>
         </div>
         <div className="rounded-lg bg-[var(--c-surface)] p-5 shadow">
-          <p className="text-sm font-medium text-[var(--c-muted)]">You owe</p>
-          <p className="mt-1 text-2xl font-bold text-[var(--c-expense)]">{formatCurrency(totalOwe)}</p>
+          <p className="cred-label">You owe</p>
+          <p className="cred-serif mt-1 text-2xl font-semibold" style={{ color: 'var(--c-expense)' }}>
+            <Amount value={totalOwe} />
+          </p>
         </div>
       </div>
 
@@ -168,17 +173,13 @@ function Friends() {
                 {friend.netBalance === 0 ? (
                   <p className="text-sm text-[var(--c-muted)]">settled up</p>
                 ) : friend.netBalance > 0 ? (
-                  <>
-                    <p className="text-sm font-semibold text-[var(--c-income)]">
-                      owes you {formatCurrency(friend.netBalance)}
-                    </p>
-                  </>
+                  <p className="text-sm font-semibold text-[var(--c-income)]">
+                    owes you <Amount value={friend.netBalance} />
+                  </p>
                 ) : (
-                  <>
-                    <p className="text-sm font-semibold text-[var(--c-expense)]">
-                      you owe {formatCurrency(Math.abs(friend.netBalance))}
-                    </p>
-                  </>
+                  <p className="text-sm font-semibold text-[var(--c-expense)]">
+                    you owe <Amount value={Math.abs(friend.netBalance)} />
+                  </p>
                 )}
               </div>
               <div className="relative ml-3">
@@ -284,7 +285,7 @@ function FriendModal({
       <div className="fixed inset-0 bg-black/30" aria-hidden="true" />
       <div className="fixed inset-0 flex items-center justify-center p-4">
         <DialogPanel className="w-full max-w-md rounded-lg bg-[var(--c-surface)] p-6 shadow-xl">
-          <DialogTitle className="text-lg font-semibold text-[var(--c-text)]">
+          <DialogTitle className="cred-serif text-lg font-semibold" style={{ color: 'var(--c-text)' }}>
             {friend ? 'Edit Friend' : 'Add Friend'}
           </DialogTitle>
 
@@ -418,7 +419,7 @@ function AddExpenseModal({
       <div className="fixed inset-0 bg-black/30" aria-hidden="true" />
       <div className="fixed inset-0 flex items-center justify-center p-4">
         <DialogPanel className="w-full max-w-lg max-h-[90vh] overflow-y-auto rounded-lg bg-[var(--c-surface)] p-6 shadow-xl">
-          <DialogTitle className="text-lg font-semibold text-[var(--c-text)]">
+          <DialogTitle className="cred-serif text-lg font-semibold" style={{ color: 'var(--c-text)' }}>
             Add Shared Expense
           </DialogTitle>
 
@@ -717,16 +718,16 @@ function FriendDetail({ friend, onBack }: { friend: Friend; onBack: () => void }
           <div className="flex h-16 w-16 items-center justify-center rounded-full bg-[var(--c-surface2)] text-2xl font-bold text-[var(--c-accent)]">
             {friend.name.charAt(0).toUpperCase()}
           </div>
-          <h1 className="mt-2 text-xl font-bold text-[var(--c-text)]">{friend.name}</h1>
+          <h1 className="cred-serif mt-2 text-xl font-semibold" style={{ color: 'var(--c-text)' }}>{friend.name}</h1>
           {netBalance === 0 ? (
             <p className="mt-0.5 text-sm text-[var(--c-muted)]">All settled up</p>
           ) : netBalance > 0 ? (
             <p className="mt-0.5 text-sm font-semibold text-[var(--c-income)]">
-              owes you {formatCurrency(netBalance)}
+              owes you <Amount value={netBalance} />
             </p>
           ) : (
             <p className="mt-0.5 text-sm font-semibold text-[var(--c-expense)]">
-              you owe {formatCurrency(Math.abs(netBalance))}
+              you owe <Amount value={Math.abs(netBalance)} />
             </p>
           )}
           {netBalance !== 0 && (
@@ -749,7 +750,7 @@ function FriendDetail({ friend, onBack }: { friend: Friend; onBack: () => void }
       {/* Outstanding items */}
       <div className="mt-6">
         <div className="flex items-center justify-between">
-          <h2 className="text-lg font-semibold text-[var(--c-text)]">Outstanding</h2>
+          <h2 className="cred-label">Outstanding</h2>
           {openExpenses.length > 0 &&
             (selectionMode ? (
               <button
@@ -772,12 +773,12 @@ function FriendDetail({ friend, onBack }: { friend: Friend; onBack: () => void }
         {!isLoading && openExpenses.length > 0 && (
           <div className="mt-3 grid grid-cols-2 gap-3 rounded-lg bg-[var(--c-surface2)] p-3">
             <div className="text-center">
-              <p className="text-xs text-[var(--c-muted)]">You lent</p>
-              <p className="mt-0.5 text-base font-bold text-[var(--c-income)]">{formatCurrency(breakdown.lent)}</p>
+              <p className="cred-label">You lent</p>
+              <p className="mt-0.5 text-base font-bold text-[var(--c-income)]"><Amount value={breakdown.lent} /></p>
             </div>
             <div className="text-center">
-              <p className="text-xs text-[var(--c-muted)]">You borrowed</p>
-              <p className="mt-0.5 text-base font-bold text-[var(--c-expense)]">{formatCurrency(breakdown.borrowed)}</p>
+              <p className="cred-label">You borrowed</p>
+              <p className="mt-0.5 text-base font-bold text-[var(--c-expense)]"><Amount value={breakdown.borrowed} /></p>
             </div>
           </div>
         )}
@@ -828,15 +829,15 @@ function FriendDetail({ friend, onBack }: { friend: Friend; onBack: () => void }
                   <div className="flex items-center gap-3">
                     <div className="text-right">
                       <p className="text-sm font-semibold text-[var(--c-text)]">
-                        {formatCurrency(expense.totalAmount)}
+                        <Amount value={expense.totalAmount} />
                       </p>
                       {share > 0 ? (
                         <p className="text-xs font-medium text-[var(--c-income)]">
-                          {friend.name} owes +{formatCurrency(share)}
+                          {friend.name} owes <Amount value={share} prefix="+" />
                         </p>
                       ) : share < 0 ? (
                         <p className="text-xs font-medium text-[var(--c-expense)]">
-                          you owe -{formatCurrency(-share)}
+                          you owe <Amount value={-share} prefix="−" />
                         </p>
                       ) : null}
                     </div>
@@ -896,7 +897,7 @@ function FriendDetail({ friend, onBack }: { friend: Friend; onBack: () => void }
           <div className="mx-auto flex max-w-3xl items-center justify-between">
             <div className="text-sm text-[var(--c-text)]">
               <span className="font-semibold">{selectedIds.size} selected</span>
-              <span className="ml-2 text-[var(--c-muted)]">{formatCurrency(Math.abs(selectedTotal))}</span>
+              <span className="ml-2 text-[var(--c-muted)]"><Amount value={Math.abs(selectedTotal)} /></span>
             </div>
             <button
               onClick={() =>
@@ -999,14 +1000,13 @@ function SettleModal({
       <div className="fixed inset-0 bg-black/30" aria-hidden="true" />
       <div className="fixed inset-0 flex items-center justify-center p-4">
         <DialogPanel className="w-full max-w-md rounded-lg bg-[var(--c-surface)] p-6 shadow-xl">
-          <DialogTitle className="text-lg font-semibold text-[var(--c-text)]">
+          <DialogTitle className="cred-serif text-lg font-semibold" style={{ color: 'var(--c-text)' }}>
             Settle Up with {friend.name}
           </DialogTitle>
 
           <p className="mt-2 text-sm text-[var(--c-muted)]">
-            {friendOwes
-              ? `${friend.name} owes you ${formatCurrency(amount)}`
-              : `You owe ${friend.name} ${formatCurrency(amount)}`}
+            {friendOwes ? `${friend.name} owes you ` : `You owe ${friend.name} `}
+            <Amount value={amount} />
           </p>
 
           {step === 'method' ? (
@@ -1084,7 +1084,7 @@ function SettleModal({
                   disabled={submitting || !accountId}
                   className="t-btn-primary px-4 py-2"
                 >
-                  {submitting ? 'Settling...' : `Settle ${formatCurrency(amount)}`}
+                  {submitting ? 'Settling...' : <>Settle <Amount value={amount} /></>}
                 </button>
               </div>
             </div>
@@ -1117,7 +1117,7 @@ function SettlementHistory({
       >
         &larr; Back
       </button>
-      <h1 className="mt-3 text-xl font-bold text-[var(--c-text)]">Settlement history</h1>
+      <h1 className="cred-serif mt-3 text-xl font-semibold" style={{ color: 'var(--c-text)' }}>Settlement history</h1>
       <p className="mt-0.5 text-sm text-[var(--c-muted)]">with {friend.name}</p>
 
       {settlements.length === 0 ? (
@@ -1145,7 +1145,7 @@ function SettlementHistory({
                     })}
                   </span>
                 </div>
-                <p className="text-sm font-semibold text-[var(--c-text)]">{formatCurrency(s.totalAmount)}</p>
+                <p className="text-sm font-semibold text-[var(--c-text)]"><Amount value={s.totalAmount} /></p>
               </div>
               {s.coveredExpenseIds && s.coveredExpenseIds.length > 0 && (
                 <p className="mt-2 text-xs text-[var(--c-muted)]">

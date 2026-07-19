@@ -668,7 +668,7 @@ function Transactions() {
                     <p className="text-sm font-medium truncate" style={{ color: 'var(--c-text)' }}>
                       {tx.type === 'transfer' ? 'Transfer' : tx.categoryId?.name || 'Unknown'}
                     </p>
-                    <div className="flex items-center gap-1 mt-0.5">
+                    <div className="flex items-center gap-1 mt-0.5 min-w-0">
                       {tx.accountId ? (
                         <span
                           className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px]"
@@ -688,16 +688,8 @@ function Transactions() {
                         </span>
                       )}
                       {isSplit && (
-                        <span
-                          className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] font-medium"
-                          style={{ background: 'rgba(80,128,192,0.18)', color: '#5080c0' }}
-                        >
-                          ✂ Split
-                        </span>
-                      )}
-                      {tx.note && (
-                        <span className="text-[10px] truncate" style={{ color: 'var(--c-muted)' }}>
-                          · {tx.note}
+                        <span className="text-[11px] leading-none" style={{ color: '#5080c0' }} title="Split">
+                          ✂
                         </span>
                       )}
                     </div>
@@ -717,7 +709,7 @@ function Transactions() {
                     </span>
                     {isSplit && (
                       <span className="text-[10px]" style={{ color: 'var(--c-muted)' }}>
-                        your share · of {formatCurrency(tx.amount)}
+                        of {formatCurrency(tx.amount)}
                       </span>
                     )}
                   </div>
@@ -852,7 +844,7 @@ function Transactions() {
                       className="flex items-center gap-2 rounded-lg px-3 py-1.5"
                       style={{ background: 'var(--c-surface2)', color: 'var(--c-text)' }}
                     >
-                      <span className="text-sm">{detailTx.categoryId.icon}</span>
+                      {renderCategoryIcon(detailTx.categoryId.icon, detailTx.categoryId.name, 20)}
                       <span className="text-sm font-medium">{detailTx.categoryId.name}</span>
                     </span>
                   </div>

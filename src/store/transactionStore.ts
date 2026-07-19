@@ -59,12 +59,22 @@ interface CreateTransactionData {
   splits?: { friendId: string; amount: number }[];
 }
 
+export interface TransactionsSummary {
+  totalIncome: number;
+  totalExpense: number;
+  net: number;
+}
+
 interface TransactionState {
   transactions: Transaction[];
   pagination: Pagination;
   isLoading: boolean;
   isLoadingMore: boolean;
+  summary: TransactionsSummary | null;
   fetchTransactions: (filters?: TransactionFilters) => Promise<void>;
+  fetchTransactionsSummary: (
+    filters?: Pick<TransactionFilters, 'dateFrom' | 'dateTo' | 'type' | 'categoryId' | 'accountId'>
+  ) => Promise<void>;
   createTransaction: (data: CreateTransactionData) => Promise<void>;
   updateTransaction: (id: string, data: CreateTransactionData) => Promise<void>;
   deleteTransaction: (id: string) => Promise<void>;
@@ -76,6 +86,7 @@ const useTransactionStore = create<TransactionState>((set) => ({
   pagination: { page: 1, limit: 20, total: 0, pages: 0 },
   isLoading: false,
   isLoadingMore: false,
+  summary: null,
 
   fetchTransactions: async (filters) => {
     const append = filters?.append ?? false;
@@ -107,6 +118,26 @@ const useTransactionStore = create<TransactionState>((set) => ({
     } catch (error: any) {
       set({ isLoading: false, isLoadingMore: false });
       toast.error(error.response?.data?.message || 'Failed to fetch transactions');
+    }
+  },
+
+  // Income/expense totals for the current filter, computed server-side across
+  // every matching transaction — not just whatever pages infinite scroll has
+  // loaded into `transactions` so far. Fetch this once per filter/date-range
+  // change, never as part of the paginated "load more" flow.
+  fetchTransactionsSummary: async (filters) => {
+    try {
+      const params = new URLSearchParams();
+      if (filters?.dateFrom) params.set('dateFrom', filters.dateFrom);
+      if (filters?.dateTo) params.set('dateTo', filters.dateTo);
+      if (filters?.type) params.set('type', filters.type);
+      if (filters?.categoryId) params.set('categoryId', filters.categoryId);
+      if (filters?.accountId) params.set('accountId', filters.accountId);
+
+      const { data } = await api.get(`/transactions/summary?${params.toString()}`);
+      set({ summary: data.summary });
+    } catch {
+      // silently fail — header summary is non-critical
     }
   },
 

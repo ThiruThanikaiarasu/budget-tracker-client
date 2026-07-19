@@ -402,8 +402,8 @@ function AccountSelect({
 // ── Main page ─────────────────────────────────────────────────────────
 function Transactions() {
   const {
-    transactions, pagination, isLoading, isLoadingMore,
-    fetchTransactions, createTransaction, updateTransaction, deleteTransaction,
+    transactions, pagination, isLoading, isLoadingMore, summary,
+    fetchTransactions, fetchTransactionsSummary, createTransaction, updateTransaction, deleteTransaction,
   } = useTransactionStore();
   const sentinelRef = useRef<HTMLDivElement>(null);
   const { categories, fetchCategories } = useCategoryStore();
@@ -450,17 +450,26 @@ function Transactions() {
   const lastDay = new Date(viewYear, viewMonth + 1, 0).getDate();
   const dateTo = `${viewYear}-${String(viewMonth + 1).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`;
 
+  // Shared with the summary fetch so the header total is always scoped to
+  // exactly the same window/filters as the list — never derived from
+  // whatever pages happen to be loaded client-side.
+  const summaryFilters = useMemo(
+    () => ({
+      dateFrom,
+      dateTo,
+      type: typeFilter || undefined,
+      categoryId: categoryFilter || undefined,
+      accountId: accountFilter || undefined,
+    }),
+    [dateFrom, dateTo, typeFilter, categoryFilter, accountFilter]
+  );
+
   const load = useCallback(
     () => {
-      fetchTransactions({
-        dateFrom,
-        dateTo,
-        type: typeFilter || undefined,
-        categoryId: categoryFilter || undefined,
-        accountId: accountFilter || undefined,
-      });
+      fetchTransactions({ ...summaryFilters, page: 1 });
+      fetchTransactionsSummary(summaryFilters);
     },
-    [fetchTransactions, dateFrom, dateTo, typeFilter, categoryFilter, accountFilter]
+    [fetchTransactions, fetchTransactionsSummary, summaryFilters]
   );
 
   // Infinite scroll — load the next page when the sentinel enters the viewport.
@@ -473,15 +482,9 @@ function Transactions() {
     const observer = new IntersectionObserver(
       (entries) => {
         if (entries[0].isIntersecting) {
-          fetchTransactions({
-            dateFrom,
-            dateTo,
-            type: typeFilter || undefined,
-            categoryId: categoryFilter || undefined,
-            accountId: accountFilter || undefined,
-            page: pagination.page + 1,
-            append: true,
-          });
+          // Only extends the list — the header total is never re-derived from
+          // this, so scrolling further can't change it.
+          fetchTransactions({ ...summaryFilters, page: pagination.page + 1, append: true });
         }
       },
       { threshold: 0 }
@@ -489,7 +492,7 @@ function Transactions() {
 
     observer.observe(el);
     return () => observer.disconnect();
-  }, [isLoadingMore, pagination.page, pagination.pages, fetchTransactions, dateFrom, dateTo, typeFilter, categoryFilter, accountFilter]);
+  }, [isLoadingMore, pagination.page, pagination.pages, fetchTransactions, summaryFilters]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -503,15 +506,12 @@ function Transactions() {
   };
 
   // ── Derived data ─────────────────────────────────────────────────
-  const { totalExpense, totalIncome } = useMemo(() => {
-    let e = 0, i = 0;
-    for (const tx of transactions) {
-      if (tx.isAdjustment) continue; // clean-up entries don't count as spend/income
-      if (tx.type === 'expense') e += tx.amount;
-      else if (tx.type === 'income') i += tx.amount;
-    }
-    return { totalExpense: e, totalIncome: i };
-  }, [transactions]);
+  // Header totals come from the server (fetchTransactionsSummary), scoped to
+  // the full filtered date range — NOT summed from `transactions`, which only
+  // holds whatever page(s) infinite scroll has loaded so far. Summing the
+  // local list would make the total grow as you scroll, which is wrong.
+  const totalExpense = summary?.totalExpense ?? 0;
+  const totalIncome = summary?.totalIncome ?? 0;
   const totalNet = totalIncome - totalExpense;
 
   const grouped = useMemo(() => {
@@ -528,6 +528,7 @@ function Transactions() {
   const handleDelete = async (id: string) => {
     if (window.confirm('Delete this transaction?')) {
       await deleteTransaction(id);
+      fetchTransactionsSummary(summaryFilters);
       setDetailTx(null);
     }
   };
@@ -890,7 +891,10 @@ function Transactions() {
       <TransactionModal
         open={showCreate}
         onClose={handleCloseCreate}
-        onSubmit={createTransaction}
+        onSubmit={async (data) => {
+          await createTransaction(data);
+          fetchTransactionsSummary(summaryFilters);
+        }}
         categories={categories}
         accounts={activeAccounts}
         friends={friends}
@@ -902,7 +906,10 @@ function Transactions() {
         <TransactionModal
           open
           onClose={() => setEditingTx(null)}
-          onSubmit={(data) => updateTransaction(editingTx._id, data)}
+          onSubmit={async (data) => {
+            await updateTransaction(editingTx._id, data);
+            fetchTransactionsSummary(summaryFilters);
+          }}
           categories={categories}
           accounts={activeAccounts}
           friends={friends}

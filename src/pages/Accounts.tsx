@@ -6,6 +6,7 @@ import { Dialog, DialogPanel, DialogTitle } from '@headlessui/react';
 import useAccountStore, { type Account } from '../store/accountStore';
 import useDashboardStore from '../store/dashboardStore';
 import { formatCurrency } from '../utils/format';
+import Amount from '../components/Amount';
 import { renderAccountIcon } from '../utils/accountIcons';
 
 const ACCOUNT_TYPES = [
@@ -69,20 +70,21 @@ function Accounts() {
     <div style={{ background: 'var(--c-bg)', minHeight: '100vh' }}>
       {/* ── Summary header ─────────────────────────────────────────── */}
       <div className="px-4 pt-6 pb-4 text-center" style={{ background: 'var(--c-header-bg)' }}>
-        <p className="text-base font-semibold" style={{ color: 'var(--c-text)' }}>
-          [ All Accounts {formatCurrency(totalBalance)} ]
+        <p className="cred-label">All accounts</p>
+        <p className="cred-serif mt-1 text-3xl font-semibold" style={{ color: 'var(--c-text)' }}>
+          <Amount value={totalBalance} />
         </p>
         <div className="mt-3 grid grid-cols-2 gap-4">
           <div>
-            <p className="text-[10px] uppercase tracking-wider" style={{ color: 'var(--c-muted)' }}>Expense so far</p>
+            <p className="cred-label">Expense so far</p>
             <p className="text-sm font-bold mt-0.5" style={{ color: 'var(--c-expense)' }}>
-              {summary ? formatCurrency(summary.totalExpense) : '—'}
+              {summary ? <Amount value={summary.totalExpense} /> : '—'}
             </p>
           </div>
           <div>
-            <p className="text-[10px] uppercase tracking-wider" style={{ color: 'var(--c-muted)' }}>Income so far</p>
+            <p className="cred-label">Income so far</p>
             <p className="text-sm font-bold mt-0.5" style={{ color: 'var(--c-income)' }}>
-              {summary ? formatCurrency(summary.totalIncome) : '—'}
+              {summary ? <Amount value={summary.totalIncome} /> : '—'}
             </p>
           </div>
         </div>
@@ -99,8 +101,7 @@ function Accounts() {
       <div className="px-0">
         {/* Section label */}
         <div className="px-4 pt-4 pb-2">
-          <p className="text-sm font-bold" style={{ color: 'var(--c-text)' }}>Accounts</p>
-          <div className="mt-1 h-px" style={{ background: 'var(--c-border)' }} />
+          <p className="cred-label">Accounts</p>
         </div>
 
         {isLoading ? (
@@ -116,11 +117,8 @@ function Accounts() {
           accounts.map(account => (
             <div
               key={account._id}
-              className="flex items-center gap-3 px-4 py-3"
-              style={{
-                borderBottom: '1px solid var(--c-border)',
-                opacity: account.isActive ? 1 : 0.4,
-              }}
+              className="cred-divider flex items-center gap-3 px-4 py-3"
+              style={{ opacity: account.isActive ? 1 : 0.4 }}
             >
               {/* Icon circle */}
               {renderAccountIcon(account.type, account.color, 48)}
@@ -143,7 +141,7 @@ function Accounts() {
                     className="font-semibold"
                     style={{ color: account.balance >= 0 ? 'var(--c-income)' : 'var(--c-expense)' }}
                   >
-                    {formatCurrency(account.balance)}
+                    <Amount value={account.balance} />
                   </span>
                 </p>
               </div>
@@ -218,7 +216,7 @@ function ModalWrap({ title, children, onClose }: { title: string; children: Reac
           className="w-full sm:max-w-md rounded-t-2xl sm:rounded-2xl p-5 shadow-2xl overflow-y-auto"
           style={{ background: 'var(--c-surface)', maxHeight: '90dvh' }}
         >
-          <DialogTitle className="text-base font-bold mb-4" style={{ color: 'var(--c-text)' }}>
+          <DialogTitle className="cred-serif text-base font-semibold mb-4" style={{ color: 'var(--c-text)' }}>
             {title}
           </DialogTitle>
           {children}

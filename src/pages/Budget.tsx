@@ -5,6 +5,7 @@ import useBudgetStore, { type DaySummary, type MonthlySummary } from '../store/b
 import useCategoryStore from '../store/categoryStore';
 import useAuthStore from '../store/authStore';
 import { formatCurrency } from '../utils/format';
+import Amount from '../components/Amount';
 import { renderCategoryIcon } from '../utils/categoryIcons';
 import api from '../api/axios';
 
@@ -159,7 +160,7 @@ function Budget() {
             </svg>
           </button>
           <div className="text-center">
-            <p className="text-base font-semibold" style={{ color: 'var(--c-text)' }}>{formatMonthLabel(selectedMonth)}</p>
+            <p className="cred-serif text-lg font-semibold" style={{ color: 'var(--c-text)' }}>{formatMonthLabel(selectedMonth)}</p>
             {periodLabel && <p className="text-[10px] mt-0.5" style={{ color: 'var(--c-muted)' }}>{periodLabel}</p>}
           </div>
           <button onClick={() => navigateMonth(1)} className="p-1.5" style={{ color: 'var(--c-muted)' }}>
@@ -169,20 +170,21 @@ function Budget() {
           </button>
         </div>
 
-        {/* Budget summary */}
-        <div className="mt-3 grid grid-cols-2 gap-4 text-center">
-          <div>
-            <p className="text-[10px] uppercase tracking-wider font-semibold" style={{ color: 'var(--c-muted)' }}>Total Budget</p>
-            <p className="text-sm font-bold mt-0.5" style={{ color: 'var(--c-text)' }}>
-              {monthlySummary?.totalBudget ? formatCurrency(monthlySummary.totalBudget) : '—'}
-            </p>
-          </div>
-          <div>
-            <p className="text-[10px] uppercase tracking-wider font-semibold" style={{ color: 'var(--c-muted)' }}>Total Spent</p>
-            <p className="text-sm font-bold mt-0.5" style={{ color: 'var(--c-expense)' }}>
-              {monthlySummary ? formatCurrency(monthlySummary.totalSpent) : '—'}
-            </p>
-          </div>
+        {/* Budget summary hero */}
+        <div className="mt-4 text-center">
+          <p className="cred-label">Spent this month</p>
+          <p className="cred-serif mt-1 text-4xl font-semibold" style={{ color: 'var(--c-text)' }}>
+            {monthlySummary ? <Amount value={monthlySummary.totalSpent} /> : '—'}
+          </p>
+          <p className="mt-2 text-xs" style={{ color: 'var(--c-muted)' }}>
+            of{' '}
+            {monthlySummary?.totalBudget ? (
+              <Amount value={monthlySummary.totalBudget} className="font-semibold" style={{ color: 'var(--c-text)' }} />
+            ) : (
+              '—'
+            )}{' '}
+            budgeted
+          </p>
         </div>
       </div>
 
@@ -208,9 +210,9 @@ function Budget() {
           {monthlySummary?.overallLimit && (
             <div className="px-4 py-4" style={{ borderBottom: '1px solid var(--c-border)' }}>
               <div className="flex items-center justify-between mb-1">
-                <span className="text-xs" style={{ color: 'var(--c-muted)' }}>Overall</span>
+                <span className="cred-label">Overall</span>
                 <span className="text-xs" style={{ color: 'var(--c-muted)' }}>
-                  {formatCurrency(monthlySummary.totalSpent)} / {formatCurrency(monthlySummary.overallLimit)}
+                  <Amount value={monthlySummary.totalSpent} /> of <Amount value={monthlySummary.overallLimit} />
                 </span>
               </div>
               <div className="h-2 rounded-full overflow-hidden" style={{ background: 'var(--c-surface2)' }}>
@@ -225,7 +227,7 @@ function Budget() {
               </div>
               {monthlySummary.dailyLimit != null && (
                 <p className="text-[10px] mt-1" style={{ color: 'var(--c-muted)' }}>
-                  Daily allowance: {formatCurrency(monthlySummary.dailyLimit)}
+                  Daily allowance: <Amount value={monthlySummary.dailyLimit} />
                 </p>
               )}
             </div>
@@ -235,10 +237,7 @@ function Budget() {
           {budgetedCategories.length > 0 && (
             <div>
               <div className="px-4 pt-4 pb-2">
-                <p className="text-sm font-bold" style={{ color: 'var(--c-text)' }}>
-                  Budgeted categories: {formatMonthLabel(selectedMonth)}
-                </p>
-                <div className="mt-1 h-px" style={{ background: 'var(--c-border)' }} />
+                <p className="cred-label">Budgeted categories · {formatMonthLabel(selectedMonth)}</p>
               </div>
               {budgetedCategories.map(cat => {
                 const isCarryForward = cat.carryForward;
@@ -251,7 +250,7 @@ function Budget() {
                 const over = isCarryForward ? (pot !== null && pot < 0) : cat.totalSpent > cat.limit;
 
                 return (
-                  <div key={cat.categoryId._id} className="px-4 py-3" style={{ borderBottom: '1px solid var(--c-border)' }}>
+                  <div key={cat.categoryId._id} className="cred-divider px-4 py-3">
                     <div className="flex items-center gap-3">
                       {renderCategoryIcon(cat.categoryId.icon, cat.categoryId.name, 40)}
                       <div className="flex-1 min-w-0">
@@ -259,13 +258,13 @@ function Budget() {
                           <div className="flex items-center gap-1.5">
                             <p className="text-sm font-medium" style={{ color: 'var(--c-text)' }}>{cat.categoryId.name}</p>
                             {isCarryForward && (
-                              <span className="text-[9px] font-bold uppercase tracking-wider px-1 py-0.5 rounded" style={{ background: 'rgba(201,167,47,0.15)', color: 'var(--c-accent)' }}>
+                              <span className="text-[9px] font-bold uppercase tracking-wider px-1 py-0.5 rounded" style={{ background: 'rgba(197,142,0,0.12)', color: 'var(--c-warning)' }}>
                                 Saving
                               </span>
                             )}
                           </div>
                           <p className="text-xs" style={{ color: over ? 'var(--c-expense)' : 'var(--c-muted)' }}>
-                            {formatCurrency(cat.totalSpent)} / {formatCurrency(cat.limit)}
+                            <Amount value={cat.totalSpent} /> of <Amount value={cat.limit} />
                           </p>
                         </div>
                         <div className="h-1.5 rounded-full overflow-hidden" style={{ background: 'var(--c-surface2)' }}>
@@ -279,13 +278,13 @@ function Budget() {
                         </div>
                         {isCarryForward && pot !== null ? (
                           <p className="text-[10px] mt-0.5 font-semibold" style={{ color: over ? 'var(--c-expense)' : 'var(--c-income)' }}>
-                            {over
-                              ? `Pot overdrawn by ${formatCurrency(Math.abs(pot))}`
-                              : `Saved up: ${formatCurrency(pot)} available`}
+                            {over ? 'Pot overdrawn by ' : 'Saved up: '}
+                            <Amount value={Math.abs(pot)} />
+                            {!over && ' available'}
                           </p>
                         ) : cat.frequency === 'daily' && cat.adaptiveDaily !== null ? (
                           <p className="text-[10px] mt-0.5" style={{ color: 'var(--c-muted)' }}>
-                            Today's pace: {formatCurrency(cat.adaptiveDaily)} / day
+                            Today's pace: <Amount value={cat.adaptiveDaily} /> / day
                           </p>
                         ) : (
                           <p className="text-[10px] mt-0.5" style={{ color: 'var(--c-muted)' }}>
@@ -311,14 +310,12 @@ function Budget() {
           {unbudgetedCategories.length > 0 && (
             <div>
               <div className="px-4 pt-4 pb-2">
-                <p className="text-sm font-bold" style={{ color: 'var(--c-text)' }}>Not budgeted this month</p>
-                <div className="mt-1 h-px" style={{ background: 'var(--c-border)' }} />
+                <p className="cred-label">Not budgeted this month</p>
               </div>
               {unbudgetedCategories.map(cat => (
                 <div
                   key={cat._id}
-                  className="flex items-center gap-3 px-4 py-3"
-                  style={{ borderBottom: '1px solid var(--c-border)' }}
+                  className="cred-divider flex items-center gap-3 px-4 py-3"
                 >
                   {renderCategoryIcon(cat.icon, cat.name, 40)}
                   <p className="flex-1 text-sm font-medium" style={{ color: 'var(--c-text)' }}>{cat.name}</p>
@@ -819,7 +816,7 @@ function DetailedView({ summary, month, onBack }: { summary: MonthlySummary; mon
           </svg>
         </button>
         <div>
-          <p className="text-base font-bold" style={{ color: 'var(--c-text)' }}>Daily Breakdown</p>
+          <p className="cred-serif text-lg font-semibold" style={{ color: 'var(--c-text)' }}>Daily Breakdown</p>
           <p className="text-xs" style={{ color: 'var(--c-muted)' }}>{formatMonthLabel(month)}</p>
         </div>
       </div>
@@ -827,13 +824,15 @@ function DetailedView({ summary, month, onBack }: { summary: MonthlySummary; mon
       {/* Summary stats */}
       <div className="grid grid-cols-3 gap-3 px-4 py-4" style={{ borderBottom: '1px solid var(--c-border)' }}>
         {[
-          ['Budget', summary.totalBudget ? formatCurrency(summary.totalBudget) : '—', 'var(--c-text)'],
-          ['Spent', formatCurrency(summary.totalSpent), 'var(--c-expense)'],
-          ['Daily', summary.dailyLimit ? formatCurrency(summary.dailyLimit) : '—', 'var(--c-text)'],
+          ['Budget', summary.totalBudget, 'var(--c-text)'],
+          ['Spent', summary.totalSpent, 'var(--c-expense)'],
+          ['Daily', summary.dailyLimit, 'var(--c-text)'],
         ].map(([label, value, color]) => (
-          <div key={label} className="text-center rounded-xl p-3" style={{ background: 'var(--c-surface)' }}>
-            <p className="text-[10px] uppercase tracking-wider" style={{ color: 'var(--c-muted)' }}>{label}</p>
-            <p className="text-sm font-bold mt-0.5" style={{ color }}>{value}</p>
+          <div key={label as string} className="text-center rounded-xl p-3" style={{ background: 'var(--c-surface)' }}>
+            <p className="cred-label">{label}</p>
+            <p className="text-sm font-bold mt-0.5" style={{ color: color as string }}>
+              {value ? <Amount value={value as number} /> : '—'}
+            </p>
           </div>
         ))}
       </div>
@@ -849,11 +848,10 @@ function DetailedView({ summary, month, onBack }: { summary: MonthlySummary; mon
           return (
             <div
               key={day.date}
-              className="flex items-center px-4 py-3 gap-3"
+              className="cred-divider flex items-center px-4 py-3 gap-3"
               style={{
-                borderBottom: '1px solid var(--c-border)',
                 opacity: isFuture ? 0.4 : 1,
-                background: isToday ? 'rgba(201,167,47,0.06)' : undefined,
+                background: isToday ? 'var(--c-surface2)' : undefined,
               }}
             >
               <div className="w-10 text-center">
@@ -864,12 +862,12 @@ function DetailedView({ summary, month, onBack }: { summary: MonthlySummary; mon
               </div>
               <div className="flex-1">
                 {isPast && day.spent > 0 ? (
-                  <p className="text-sm font-semibold" style={{ color: 'var(--c-text)' }}>{formatCurrency(day.spent)}</p>
+                  <p className="text-sm font-semibold" style={{ color: 'var(--c-text)' }}><Amount value={day.spent} /></p>
                 ) : isPast ? (
                   <p className="text-sm" style={{ color: 'var(--c-muted)' }}>No spending</p>
                 ) : null}
                 {day.dailyLimit != null && (
-                  <p className="text-[10px]" style={{ color: 'var(--c-muted)' }}>Limit: {formatCurrency(day.dailyLimit)}</p>
+                  <p className="text-[10px]" style={{ color: 'var(--c-muted)' }}>Limit: <Amount value={day.dailyLimit} /></p>
                 )}
               </div>
               {diff !== null && isPast && (
@@ -880,7 +878,7 @@ function DetailedView({ summary, month, onBack }: { summary: MonthlySummary; mon
                     color: diff >= 0 ? 'var(--c-income)' : 'var(--c-expense)',
                   }}
                 >
-                  {diff >= 0 ? '+' : ''}{formatCurrency(diff)}
+                  <Amount value={Math.abs(diff)} prefix={diff >= 0 ? '+' : '−'} />
                 </span>
               )}
               {isToday && (

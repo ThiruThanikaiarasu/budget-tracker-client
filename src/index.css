@@ -223,11 +223,139 @@ input[type="number"] { -moz-appearance: textfield; }
 }
 .t-btn-outline:hover { background-color: rgba(201, 167, 47, 0.1); }
 
+/* ── CRED White authentication ─────────────────────────────────────── */
+.auth-page {
+  position: relative;
+  overflow: hidden;
+  padding: 1.5rem;
+  background: #f7f7f8;
+  color: #0a0a0a;
+}
+
+.auth-page::before {
+  position: absolute;
+  top: -12rem;
+  left: 50%;
+  width: 34rem;
+  height: 34rem;
+  border: 1px solid #e4e4e7;
+  border-radius: 9999px;
+  background: #fff;
+  transform: translateX(-50%);
+  content: '';
+}
+
+.auth-card {
+  position: relative;
+  z-index: 1;
+  border: 1px solid #e4e4e7;
+  border-radius: 1.5rem;
+  background: #fff;
+  padding: 2.25rem;
+  box-shadow: 0 1.5rem 4rem rgba(0, 0, 0, 0.08);
+}
+
+.auth-kicker {
+  color: #8e8e93;
+  font-size: 0.625rem;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+}
+
+.auth-title {
+  margin-top: 0.65rem;
+  color: #0a0a0a;
+  font-family: 'Fraunces', Georgia, serif;
+  font-size: 2rem;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+
+.auth-subtitle {
+  margin-top: 0.4rem;
+  color: #8e8e93;
+  font-size: 0.8rem;
+}
+
+.auth-label {
+  margin-bottom: 0.4rem;
+  color: #66666c;
+  font-size: 0.625rem;
+  font-weight: 650;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.auth-input {
+  display: block;
+  width: 100%;
+  min-height: 2.85rem;
+  border: 1px solid #dedee1;
+  border-radius: 9999px;
+  background: #fff;
+  padding: 0 1rem;
+  color: #0a0a0a;
+  font-size: 0.8rem;
+  outline: none;
+  transition: border-color 150ms ease, box-shadow 150ms ease;
+}
+
+.auth-input:focus {
+  border-color: #0a0a0a;
+  box-shadow: 0 0 0 3px rgba(10, 10, 10, 0.07);
+}
+
+.auth-input::placeholder { color: #aaaab0; }
+
+.auth-error {
+  margin: 0.35rem 0 0 0.75rem;
+  color: #e5484d;
+  font-size: 0.675rem;
+}
+
+.auth-submit {
+  width: 100%;
+  min-height: 2.85rem;
+  border: 0;
+  border-radius: 9999px;
+  background: #0a0a0a;
+  color: #fff;
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: opacity 150ms ease, transform 150ms ease;
+}
+
+.auth-submit:hover { opacity: 0.88; }
+.auth-submit:active { transform: scale(0.99); }
+.auth-submit:disabled { cursor: not-allowed; opacity: 0.45; }
+
+.auth-switch {
+  margin-top: 1.25rem;
+  color: #8e8e93;
+  text-align: center;
+  font-size: 0.75rem;
+}
+
+.auth-switch a {
+  color: #0a0a0a;
+  font-weight: 700;
+  text-decoration: underline;
+  text-underline-offset: 0.2rem;
+}
+
+@media (max-width: 480px) {
+  .auth-page { padding: 1rem; }
+  .auth-card { padding: 1.5rem; }
+  .auth-title { font-size: 1.65rem; }
+}
+
 /* ── CRED White payment history ────────────────────────────────────── */
 /* Deliberately scoped to this theme and route; other themes retain the
    existing Records layout unchanged. */
-[data-theme="cred-white"] .transactions-route-header { display: none; }
-
 [data-theme="cred-white"] .transactions-page {
   font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
 }
@@ -257,6 +385,21 @@ input[type="number"] { -moz-appearance: textfield; }
   font-size: 0.9375rem;
   font-weight: 600;
   letter-spacing: 0;
+}
+
+[data-theme="cred-white"] .transactions-heading {
+  display: flex;
+  align-items: baseline;
+  gap: 0.6rem;
+}
+
+[data-theme="cred-white"] .transactions-heading-month {
+  color: var(--c-muted);
+  font-size: 0.55rem;
+  font-weight: 650;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  white-space: nowrap;
 }
 
 [data-theme="cred-white"] .transactions-filter-toggle,
@@ -370,6 +513,102 @@ input[type="number"] { -moz-appearance: textfield; }
   color: var(--c-text) !important;
   font-size: 0.7875rem;
   font-weight: 650;
+}
+
+[data-theme="cred-white"] .transaction-detail {
+  border: 1px solid var(--c-border);
+  box-shadow: 0 1.5rem 4rem rgba(0, 0, 0, 0.2);
+}
+
+[data-theme="cred-white"] .transaction-detail-header {
+  padding: 1.25rem 1.5rem 1.75rem;
+  background: #0a0a0a !important;
+}
+
+[data-theme="cred-white"] .transaction-detail-header > div:last-child > p:first-child {
+  font-size: 0.575rem;
+  letter-spacing: 0.18em;
+}
+
+[data-theme="cred-white"] .transaction-detail-header > div:last-child > p:nth-child(2) {
+  font-family: 'Fraunces', Georgia, serif;
+  font-size: 2.35rem;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+
+[data-theme="cred-white"] .transaction-detail-body {
+  padding: 1.25rem 1.5rem;
+}
+
+[data-theme="cred-white"] .transaction-detail-body > div {
+  min-height: 2.75rem;
+  border-bottom: 1px dashed var(--c-border);
+}
+
+[data-theme="cred-white"] .transaction-detail-body > div:last-child {
+  border-bottom: 0;
+}
+
+[data-theme="cred-white"] .transaction-detail-chip {
+  border: 1px solid var(--c-border);
+  border-radius: 9999px;
+  background: #fff !important;
+  font-size: 0.75rem;
+}
+
+[data-theme="cred-white"] .transaction-detail-chip > span:first-child {
+  filter: grayscale(1);
+}
+
+[data-theme="cred-white"] .transaction-detail-chip > div {
+  border: 1px solid #dedee1;
+  background: #fff !important;
+}
+
+[data-theme="cred-white"] .transaction-detail-chip svg {
+  fill: var(--c-text);
+}
+
+.transaction-form-icon-action {
+  width: 2.5rem;
+  height: 2.5rem;
+  flex: 0 0 2.5rem;
+  border: 0;
+  background: transparent;
+  color: var(--c-text);
+  transition: background-color 150ms ease, opacity 150ms ease;
+}
+
+.transaction-form-icon-action:hover {
+  background: transparent;
+  opacity: 0.6;
+}
+
+.account-icon-svg { display: none; }
+
+[data-theme="cred-white"] .transaction-select-icon {
+  display: inline-flex;
+  flex: 0 0 auto;
+}
+
+[data-theme="cred-white"] .transaction-select-icon > div {
+  border: 1px solid #dedee1;
+  background: #fff !important;
+  color: var(--c-text);
+}
+
+[data-theme="cred-white"] .transaction-select-icon > div:not(.account-icon) svg {
+  fill: var(--c-text);
+}
+
+[data-theme="cred-white"] .transaction-select-icon .account-icon-emoji { display: none; }
+[data-theme="cred-white"] .transaction-select-icon .account-icon-svg { display: block; }
+
+[data-theme="cred-white"] .split-avatar {
+  border: 1px solid #dedee1;
+  background: #fff !important;
+  color: var(--c-text) !important;
 }
 
 /* ── CRED White monthly budget ─────────────────────────────────────── */

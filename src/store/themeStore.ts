@@ -18,7 +18,7 @@ interface ThemeStore {
 const useThemeStore = create<ThemeStore>()(
   persist(
     (set) => ({
-      theme: 'dark-olive',
+      theme: 'cred-white',
       setTheme: (theme) => set({ theme }),
     }),
     { name: 'app-theme' }

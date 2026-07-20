@@ -177,7 +177,7 @@ function computeSplit(total: number, keys: string[], locked: Record<string, numb
 function AvatarCircle({ label, color, isUser, size = 44 }: { label?: string; color?: string; isUser?: boolean; size?: number }) {
   return (
     <span
-      className="flex items-center justify-center rounded-full font-semibold flex-shrink-0"
+      className="split-avatar flex items-center justify-center rounded-full font-semibold flex-shrink-0"
       style={{
         width: size, height: size, fontSize: size * 0.36,
         background: isUser ? 'var(--c-accent)' : color,
@@ -310,7 +310,7 @@ function CategorySelect({
       >
         {selected ? (
           <span className="flex items-center gap-2 truncate">
-            {renderCategoryIcon(selected.icon, selected.name, 22)}
+            <span className="transaction-select-icon">{renderCategoryIcon(selected.icon, selected.name, 22)}</span>
             <span className="truncate">{selected.name}</span>
           </span>
         ) : (
@@ -352,7 +352,7 @@ function CategorySelect({
                   fontWeight: c._id === value ? 600 : 400,
                 }}
               >
-                {renderCategoryIcon(c.icon, c.name, 22)}
+                <span className="transaction-select-icon">{renderCategoryIcon(c.icon, c.name, 22)}</span>
                 <span className="truncate">{c.name}</span>
               </button>
             ))}
@@ -381,7 +381,7 @@ function AccountSelect({
         >
           {selected ? (
             <span className="flex items-center gap-2 truncate">
-              {renderAccountIcon(selected.type, selected.color, 22)}
+              <span className="transaction-select-icon">{renderAccountIcon(selected.type, selected.color, 22)}</span>
               <span className="truncate">{selected.name}</span>
             </span>
           ) : (
@@ -399,7 +399,7 @@ function AccountSelect({
                   className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm cursor-pointer"
                   style={{ background: focus ? 'var(--c-surface)' : 'transparent', color: 'var(--c-text)', fontWeight: selected ? 600 : 400 }}
                 >
-                  {renderAccountIcon(a.type, a.color, 22)}
+                  <span className="transaction-select-icon">{renderAccountIcon(a.type, a.color, 22)}</span>
                   <span className="truncate">{a.name}</span>
                 </div>
               )}
@@ -568,9 +568,14 @@ function Transactions() {
               <polyline points="15 18 9 12 15 6" />
             </svg>
           </button>
-          <span className="transactions-title cred-serif text-xl font-semibold" style={{ color: 'var(--c-text)' }}>
-            {isCredWhite ? 'payment history' : `${MONTHS[viewMonth]} ${viewYear}`}
-          </span>
+          <div className="transactions-heading">
+            <span className="transactions-title cred-serif text-xl font-semibold" style={{ color: 'var(--c-text)' }}>
+              {isCredWhite ? 'payment history' : `${MONTHS[viewMonth]} ${viewYear}`}
+            </span>
+            {isCredWhite && (
+              <span className="transactions-heading-month">{MONTHS[viewMonth]} {viewYear}</span>
+            )}
+          </div>
           <div className="flex items-center gap-2">
             <button onClick={nextMonth} className="transactions-next p-1.5" style={{ color: 'var(--c-muted)' }}>
               <svg viewBox="0 0 24 24" className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2">
@@ -766,11 +771,11 @@ function Transactions() {
         <Dialog open onClose={() => setDetailTx(null)} className="relative z-50">
           <div className="fixed inset-0 bg-black/60" />
           <div className="fixed inset-0 flex items-center justify-center p-4">
-            <DialogPanel className="w-full max-w-sm rounded-2xl overflow-hidden shadow-2xl">
+            <DialogPanel className="transaction-detail w-full max-w-sm rounded-2xl overflow-hidden shadow-2xl">
               {/* Colored header */}
               <div
-                className="px-4 pt-4 pb-8 relative"
-                style={{ backgroundColor: DETAIL_HEADER_COLOR[detailTx.type] || '#888' }}
+                className="transaction-detail-header px-4 pt-4 pb-8 relative"
+                style={{ backgroundColor: isCredWhite ? 'var(--c-text)' : (DETAIL_HEADER_COLOR[detailTx.type] || '#888') }}
               >
                 <div className="flex items-center justify-between">
                   <button onClick={() => setDetailTx(null)} className="text-white/80 hover:text-white p-1">
@@ -821,14 +826,14 @@ function Transactions() {
                 </div>
               </div>
               {/* Details */}
-              <div className="p-4 space-y-3" style={{ background: 'var(--c-surface)' }}>
+              <div className="transaction-detail-body p-4 space-y-3" style={{ background: 'var(--c-surface)' }}>
                 {detailTx.accountId ? (
                   <div className="flex items-center justify-between">
                     <span className="text-sm" style={{ color: 'var(--c-muted)' }}>
                       {detailTx.type === 'transfer' ? 'From' : 'Account'}
                     </span>
                     <span
-                      className="flex items-center gap-2 rounded-lg px-3 py-1.5"
+                      className="transaction-detail-chip flex items-center gap-2 rounded-lg px-3 py-1.5"
                       style={{ background: 'var(--c-surface2)', color: 'var(--c-text)' }}
                     >
                       <span className="text-sm">💳</span>
@@ -839,7 +844,7 @@ function Transactions() {
                   <div className="flex items-center justify-between">
                     <span className="text-sm" style={{ color: 'var(--c-muted)' }}>Paid by</span>
                     <span
-                      className="flex items-center gap-2 rounded-lg px-3 py-1.5"
+                      className="transaction-detail-chip flex items-center gap-2 rounded-lg px-3 py-1.5"
                       style={{ background: 'var(--c-surface2)', color: 'var(--c-text)' }}
                     >
                       <span className="text-sm">👤</span>
@@ -851,7 +856,7 @@ function Transactions() {
                   <div className="flex items-center justify-between">
                     <span className="text-sm" style={{ color: 'var(--c-muted)' }}>To</span>
                     <span
-                      className="flex items-center gap-2 rounded-lg px-3 py-1.5"
+                      className="transaction-detail-chip flex items-center gap-2 rounded-lg px-3 py-1.5"
                       style={{ background: 'var(--c-surface2)', color: 'var(--c-text)' }}
                     >
                       <span className="text-sm">💳</span>
@@ -863,7 +868,7 @@ function Transactions() {
                   <div className="flex items-center justify-between">
                     <span className="text-sm" style={{ color: 'var(--c-muted)' }}>Category</span>
                     <span
-                      className="flex items-center gap-2 rounded-lg px-3 py-1.5"
+                      className="transaction-detail-chip flex items-center gap-2 rounded-lg px-3 py-1.5"
                       style={{ background: 'var(--c-surface2)', color: 'var(--c-text)' }}
                     >
                       {renderCategoryIcon(detailTx.categoryId.icon, detailTx.categoryId.name, 20)}
@@ -1223,11 +1228,11 @@ function TransactionModal({
         >
           {/* Top bar */}
           <div className="flex items-center justify-between px-4 py-3 flex-shrink-0" style={{ borderBottom: '1px solid var(--c-border)' }}>
-            <button onClick={onClose} className="text-sm font-semibold flex items-center gap-1 rounded-full px-3 py-1.5" style={{ color: 'var(--c-expense)', background: 'color-mix(in srgb, var(--c-expense) 13%, transparent)' }}>
-              <svg viewBox="0 0 24 24" className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2.5">
-                <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
+            <button type="button" onClick={onClose} aria-label="Go back" title="Go back" className="transaction-form-icon-action flex items-center justify-center rounded-full">
+              <svg viewBox="0 0 24 24" className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <line x1="20" y1="12" x2="4" y2="12" />
+                <polyline points="10 18 4 12 10 6" />
               </svg>
-              CANCEL
             </button>
             {/* Type tabs */}
             <div className="flex gap-1 text-xs font-bold tracking-wider">
@@ -1248,11 +1253,11 @@ function TransactionModal({
             <button
               onClick={handleSubmit(handleFormSubmit)}
               disabled={isSubmitting || !splitValid}
-              className="text-sm font-semibold flex items-center gap-1 rounded-full px-3 py-1.5 disabled:opacity-40"
-              style={{ color: 'var(--c-income)', background: 'color-mix(in srgb, var(--c-income) 13%, transparent)' }}
+              aria-label="Save transaction"
+              title="Save transaction"
+              className="transaction-form-icon-action flex items-center justify-center rounded-full disabled:opacity-40"
             >
-              SAVE
-              <svg viewBox="0 0 24 24" className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2.5">
+              <svg viewBox="0 0 24 24" className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2.25" strokeLinecap="round" strokeLinejoin="round">
                 <polyline points="20 6 9 17 4 12" />
               </svg>
             </button>

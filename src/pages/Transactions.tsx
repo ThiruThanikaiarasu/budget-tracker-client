@@ -10,6 +10,7 @@ import useCategoryStore from '../store/categoryStore';
 import useAccountStore, { type Account } from '../store/accountStore';
 import useFriendStore, { type Friend } from '../store/friendStore';
 import useBudgetStore, { precheckBudget } from '../store/budgetStore';
+import useThemeStore from '../store/themeStore';
 import { formatCurrency } from '../utils/format';
 import Amount from '../components/Amount';
 import { sortByFrecency } from '../utils/frecency';
@@ -32,6 +33,17 @@ function fmtDateTime(dateStr: string): string {
     month: 'long', day: 'numeric', year: 'numeric',
     hour: 'numeric', minute: '2-digit', hour12: true,
   });
+}
+
+function fmtPaymentTime(dateStr: string): string {
+  return new Date(dateStr).toLocaleTimeString('en-IN', {
+    hour: 'numeric', minute: '2-digit', hour12: true,
+  }).toLowerCase();
+}
+
+function paymentMonthLabel(dateStr: string): string {
+  const [year, month] = dateStr.split('-').map(Number);
+  return `${MONTHS[month - 1].slice(0, 3).toUpperCase()} '${String(year).slice(-2)}`;
 }
 
 const DETAIL_HEADER_COLOR: Record<string, string> = {
@@ -401,6 +413,8 @@ function AccountSelect({
 
 // ── Main page ─────────────────────────────────────────────────────────
 function Transactions() {
+  const theme = useThemeStore((s) => s.theme);
+  const isCredWhite = theme === 'cred-white';
   const {
     transactions, pagination, isLoading, isLoadingMore, summary,
     fetchTransactions, fetchTransactionsSummary, createTransaction, updateTransaction, deleteTransaction,
@@ -541,10 +555,10 @@ function Transactions() {
   const activeAccounts = accounts.filter(a => a.isActive);
 
   return (
-    <div style={{ background: 'var(--c-bg)', minHeight: '100vh' }}>
+    <div className="transactions-page" style={{ background: 'var(--c-bg)', minHeight: '100vh' }}>
       {/* ── Sticky header ─────────────────────────────────────────── */}
       <div
-        className="sticky top-0 z-10 px-4 pt-4 pb-3"
+        className="transactions-header sticky top-0 z-10 px-4 pt-4 pb-3"
         style={{ background: 'var(--c-header-bg)' }}
       >
         {/* Month navigator */}
@@ -554,16 +568,16 @@ function Transactions() {
               <polyline points="15 18 9 12 15 6" />
             </svg>
           </button>
-          <span className="cred-serif text-xl font-semibold" style={{ color: 'var(--c-text)' }}>
-            {MONTHS[viewMonth]} {viewYear}
+          <span className="transactions-title cred-serif text-xl font-semibold" style={{ color: 'var(--c-text)' }}>
+            {isCredWhite ? 'payment history' : `${MONTHS[viewMonth]} ${viewYear}`}
           </span>
           <div className="flex items-center gap-2">
-            <button onClick={nextMonth} className="p-1.5" style={{ color: 'var(--c-muted)' }}>
+            <button onClick={nextMonth} className="transactions-next p-1.5" style={{ color: 'var(--c-muted)' }}>
               <svg viewBox="0 0 24 24" className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2">
                 <polyline points="9 18 15 12 9 6" />
               </svg>
             </button>
-            <button onClick={() => setShowFilter(v => !v)} className="p-1.5" style={{ color: showFilter ? 'var(--c-accent)' : 'var(--c-muted)' }}>
+            <button onClick={() => setShowFilter(v => !v)} className="transactions-filter-toggle p-1.5" style={{ color: showFilter ? 'var(--c-accent)' : 'var(--c-muted)' }}>
               <svg viewBox="0 0 24 24" className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2">
                 <line x1="4" y1="6" x2="20" y2="6" /><line x1="8" y1="12" x2="16" y2="12" /><line x1="12" y1="18" x2="12" y2="18" />
               </svg>
@@ -572,7 +586,7 @@ function Transactions() {
         </div>
 
         {/* Summary hero */}
-        <div className="mt-4 text-center">
+        <div className="transactions-summary mt-4 text-center">
           <p className="cred-label">Net this month</p>
           <p className="cred-serif mt-1 text-4xl font-semibold" style={{ color: 'var(--c-text)' }}>
             <Amount value={Math.abs(totalNet)} prefix={totalNet < 0 ? '−' : totalNet > 0 ? '+' : ''} />
@@ -592,20 +606,20 @@ function Transactions() {
       </div>
 
       {/* ── Filter panel ──────────────────────────────────────────── */}
-      {showFilter && (
-        <div className="px-4 py-3 space-y-2" style={{ background: 'var(--c-surface)', borderBottom: '1px solid var(--c-border)' }}>
-          <div className="grid grid-cols-3 gap-2">
-            <select value={typeFilter} onChange={e => setTypeFilter(e.target.value)} className="t-select text-xs">
-              <option value="">All types</option>
+      {(showFilter || isCredWhite) && (
+        <div className="transactions-filters px-4 py-3 space-y-2" style={{ background: 'var(--c-surface)', borderBottom: '1px solid var(--c-border)' }}>
+          <div className="transactions-filter-grid grid grid-cols-3 gap-2">
+            <select aria-label="Filter by transaction type" value={typeFilter} onChange={e => setTypeFilter(e.target.value)} className="t-select text-xs">
+              <option value="">{isCredWhite ? 'Filter' : 'All types'}</option>
               <option value="income">Income</option>
               <option value="expense">Expense</option>
             </select>
-            <select value={categoryFilter} onChange={e => setCategoryFilter(e.target.value)} className="t-select text-xs">
-              <option value="">All categories</option>
+            <select aria-label="Filter by category" value={categoryFilter} onChange={e => setCategoryFilter(e.target.value)} className="t-select text-xs">
+              <option value="">{isCredWhite ? 'Category' : 'All categories'}</option>
               {categories.map(c => <option key={c._id} value={c._id}>{c.icon} {c.name}</option>)}
             </select>
-            <select value={accountFilter} onChange={e => setAccountFilter(e.target.value)} className="t-select text-xs">
-              <option value="">All accounts</option>
+            <select aria-label="Filter by payment method" value={accountFilter} onChange={e => setAccountFilter(e.target.value)} className="t-select text-xs">
+              <option value="">{isCredWhite ? 'Payment methods' : 'All accounts'}</option>
               {accounts.map(a => <option key={a._id} value={a._id}>{a.name}</option>)}
             </select>
           </div>
@@ -627,8 +641,8 @@ function Transactions() {
           sortedDates.map(dateKey => (
             <div key={dateKey}>
               {/* Date header */}
-              <div className="px-4 pt-4 pb-1.5">
-                <span className="cred-label">{groupDate(dateKey)}</span>
+              <div className="transactions-date px-4 pt-4 pb-1.5">
+                <span className="cred-label">{isCredWhite ? paymentMonthLabel(dateKey) : groupDate(dateKey)}</span>
               </div>
               {/* Rows */}
               {grouped[dateKey].map((tx, idx) => {
@@ -637,7 +651,7 @@ function Transactions() {
                 <button
                   key={tx._id}
                   onClick={() => setDetailTx(tx)}
-                  className="w-full flex items-center gap-3 px-4 py-3 text-left"
+                  className="transaction-row w-full flex items-center gap-3 px-4 py-3 text-left"
                   style={{
                     borderBottom: idx < grouped[dateKey].length - 1 ? '1px dashed var(--c-border)' : undefined,
                   }}
@@ -656,10 +670,16 @@ function Transactions() {
                   )}
                   {/* Name + account */}
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium truncate" style={{ color: 'var(--c-text)' }}>
+                    <p className="transaction-name text-sm font-medium truncate" style={{ color: 'var(--c-text)' }}>
                       {tx.isAdjustment ? 'Clean up' : tx.type === 'transfer' ? 'Transfer' : tx.categoryId?.name || 'Unknown'}
                     </p>
-                    <div className="flex items-center gap-1 mt-0.5 min-w-0">
+                    <div className="transaction-meta flex items-center gap-1 mt-0.5 min-w-0">
+                      {isCredWhite && (
+                        <>
+                          <span className="transaction-success" aria-label="Completed">✓</span>
+                          <span className="transaction-time">{fmtPaymentTime(tx.date)}</span>
+                        </>
+                      )}
                       {tx.isAdjustment && (
                         <span
                           className="inline-flex items-center rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide"
@@ -668,7 +688,7 @@ function Transactions() {
                           new journey
                         </span>
                       )}
-                      {tx.accountId ? (
+                      {!isCredWhite && (tx.accountId ? (
                         <span
                           className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px]"
                           style={{ background: 'var(--c-surface2)', color: 'var(--c-muted)' }}
@@ -685,7 +705,7 @@ function Transactions() {
                             ? `Debt · ${tx.paidByFriendId.name}`
                             : 'Debt'}
                         </span>
-                      )}
+                      ))}
                       {isSplit && (
                         <span className="text-[11px] leading-none" style={{ color: '#5080c0' }} title="Split">
                           ✂
@@ -696,9 +716,10 @@ function Transactions() {
                   {/* Amount */}
                   <div className="flex flex-col items-end flex-shrink-0">
                     <span
-                      className="text-sm font-bold"
+                      className="transaction-amount text-sm font-bold"
                       style={{
-                        color: tx.type === 'income' ? 'var(--c-income)'
+                        color: isCredWhite ? 'var(--c-text)'
+                             : tx.type === 'income' ? 'var(--c-income)'
                              : tx.type === 'expense' ? 'var(--c-expense)'
                              : 'var(--c-muted)',
                       }}

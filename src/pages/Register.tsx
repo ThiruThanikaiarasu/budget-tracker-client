@@ -27,14 +27,14 @@ function Register() {
 
   useEffect(() => {
     if (isAuthenticated) {
-      navigate('/dashboard', { replace: true });
+      navigate('/transactions', { replace: true });
     }
   }, [isAuthenticated, navigate]);
 
   const onSubmit = async (data: RegisterFormData) => {
     try {
       await registerUser(data.email, data.password, data.name);
-      navigate('/dashboard');
+      navigate('/transactions');
     } catch {
       // Error toast is handled in the store
     }

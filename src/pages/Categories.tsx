@@ -24,6 +24,7 @@ import { CSS } from '@dnd-kit/utilities';
 import useCategoryStore, { type Category } from '../store/categoryStore';
 import useDashboardStore from '../store/dashboardStore';
 import useAccountStore from '../store/accountStore';
+import useThemeStore from '../store/themeStore';
 import Amount from '../components/Amount';
 import { CATEGORY_ICONS, renderCategoryIcon } from '../utils/categoryIcons';
 
@@ -49,6 +50,7 @@ const categorySchema = z.object({
 type CategoryFormData = z.infer<typeof categorySchema>;
 
 function Categories() {
+  const isCredWhite = useThemeStore((s) => s.theme === 'cred-white');
   const { categories, isLoading, fetchCategories, createCategory, updateCategory, deleteCategory, reorderCategories } = useCategoryStore();
   const { summary, fetchSummary } = useDashboardStore();
   const { accounts, fetchAccounts } = useAccountStore();
@@ -117,10 +119,10 @@ function Categories() {
   const totalBalance = accounts.filter(a => a.isActive).reduce((s, a) => s + a.balance, 0);
 
   return (
-    <div style={{ background: 'var(--c-bg)', minHeight: '100vh' }}>
+    <div className="categories-page" style={{ background: 'var(--c-bg)', minHeight: '100vh' }}>
       {/* ── Summary header ─────────────────────────────────────────── */}
-      <div className="px-4 pt-6 pb-4 text-center" style={{ background: 'var(--c-header-bg)' }}>
-        <p className="cred-label">All accounts</p>
+      <div className="categories-header px-4 pt-6 pb-4 text-center" style={{ background: 'var(--c-header-bg)' }}>
+        <p className="cred-label">{isCredWhite ? 'categories' : 'All accounts'}</p>
         <p className="cred-serif mt-1 text-3xl font-semibold" style={{ color: 'var(--c-text)' }}>
           <Amount value={totalBalance} />
         </p>
@@ -154,7 +156,7 @@ function Categories() {
           {/* ── Income categories ────────────────────────────────── */}
           {incomeItems.length > 0 && (
             <div>
-              <div className="px-4 pt-4 pb-2">
+              <div className="categories-section-heading px-4 pt-4 pb-2">
                 <p className="cred-label">Income categories</p>
               </div>
               <SortableContext items={incomeItems.map(c => c._id)} strategy={verticalListSortingStrategy}>
@@ -175,7 +177,7 @@ function Categories() {
           {/* ── Expense categories ───────────────────────────────── */}
           {expenseItems.length > 0 && (
             <div>
-              <div className="px-4 pt-4 pb-2">
+              <div className="categories-section-heading px-4 pt-4 pb-2">
                 <p className="cred-label">Expense categories</p>
               </div>
               <SortableContext items={expenseItems.map(c => c._id)} strategy={verticalListSortingStrategy}>
@@ -216,7 +218,7 @@ function Categories() {
       )}
 
       {/* ── Add new category button ──────────────────────────── */}
-      <div className="px-4 py-6">
+      <div className="categories-add px-4 py-6">
         <button
           onClick={() => setShowCreate(true)}
           className="w-full py-3 rounded-xl text-sm font-bold uppercase tracking-wider flex items-center justify-center gap-2"
@@ -307,7 +309,7 @@ function SortableCategoryRow({
 function CategoryRow({ category, openMenuId, setOpenMenuId, onEdit, onDelete, isOverlay, dragListeners }: RowProps) {
   return (
     <div
-      className={isOverlay ? 'flex items-center gap-3 px-4 py-3' : 'cred-divider flex items-center gap-3 px-4 py-3'}
+      className={`category-row ${isOverlay ? 'is-overlay flex items-center gap-3 px-4 py-3' : 'cred-divider flex items-center gap-3 px-4 py-3'}`}
       style={{
         background: isOverlay ? 'var(--c-surface)' : undefined,
         boxShadow: isOverlay ? '0 8px 32px rgba(0,0,0,0.18)' : undefined,
@@ -324,7 +326,7 @@ function CategoryRow({ category, openMenuId, setOpenMenuId, onEdit, onDelete, is
       </div>
 
       {/* Icon circle */}
-      {renderCategoryIcon(category.icon, category.name, 40)}
+      <span className="category-row-icon">{renderCategoryIcon(category.icon, category.name, 40)}</span>
 
       {/* Name */}
       <p className="flex-1 text-sm font-medium truncate" style={{ color: 'var(--c-text)' }}>
@@ -345,7 +347,7 @@ function CategoryRow({ category, openMenuId, setOpenMenuId, onEdit, onDelete, is
           {openMenuId === category._id && (
             <div
               onClick={e => e.stopPropagation()}
-              className="absolute right-0 z-20 mt-1 w-32 rounded-xl py-1 shadow-xl"
+              className="category-row-menu absolute right-0 z-20 mt-1 w-32 rounded-xl py-1 shadow-xl"
               style={{ background: 'var(--c-surface)', border: '1px solid var(--c-border)' }}
             >
               <button
@@ -375,7 +377,7 @@ function ModalWrap({ title, children, onClose }: { title: string; children: Reac
     <Dialog open onClose={onClose} className="relative z-50">
       <div className="fixed inset-0 bg-black/60" />
       <div className="fixed inset-0 flex items-end sm:items-center justify-center p-0 sm:p-4">
-        <DialogPanel className="w-full sm:max-w-md rounded-t-2xl sm:rounded-2xl p-5 shadow-2xl overflow-y-auto" style={{ background: 'var(--c-surface)', maxHeight: '90dvh' }}>
+        <DialogPanel className="category-modal w-full sm:max-w-md rounded-t-2xl sm:rounded-2xl p-5 shadow-2xl overflow-y-auto" style={{ background: 'var(--c-surface)', maxHeight: '90dvh' }}>
           <DialogTitle className="cred-serif text-base font-semibold mb-4" style={{ color: 'var(--c-text)' }}>{title}</DialogTitle>
           {children}
         </DialogPanel>
@@ -420,7 +422,7 @@ function CategoryModal({ open, onClose, onSubmit, title, submitLabel, defaultVal
         <div>
           <label className="block text-xs font-medium mb-2" style={{ color: 'var(--c-muted)' }}>Icon</label>
           <div
-            className="grid rounded-xl p-3"
+            className="category-icon-picker grid rounded-xl p-3"
             style={{
               gridTemplateColumns: 'repeat(5, 1fr)',
               gap: '12px',
@@ -436,7 +438,7 @@ function CategoryModal({ open, onClose, onSubmit, title, submitLabel, defaultVal
                 type="button"
                 onClick={() => setValue('icon', selectedIcon === icon.key ? '' : icon.key)}
                 title={icon.label}
-                className="flex flex-col items-center gap-1 rounded-xl transition-all"
+                className="category-icon-option flex flex-col items-center gap-1 rounded-xl transition-all"
                 style={{
                   padding: '8px 4px',
                   outline: selectedIcon === icon.key ? `2.5px solid var(--c-accent)` : '2.5px solid transparent',
@@ -445,7 +447,7 @@ function CategoryModal({ open, onClose, onSubmit, title, submitLabel, defaultVal
                 }}
               >
                 <div
-                  className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0"
+                  className="category-picker-icon w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0"
                   style={{ backgroundColor: icon.bg }}
                 >
                   <svg viewBox="0 0 24 24" style={{ width: 22, height: 22 }} fill="white">

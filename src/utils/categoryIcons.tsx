@@ -59,7 +59,13 @@ export const CATEGORY_ICONS: CatIconDef[] = [
   },
   {
     key: 'fruit', label: 'Fruits', bg: '#16A34A',
-    d: 'M17.21 9l-4.38-6.56c-.19-.28-.51-.42-.83-.42-.32 0-.64.14-.83.43L6.79 9H2c-.55 0-1 .45-1 1 0 .09.01.18.04.27l2.54 9.27c.23.84 1 1.46 1.92 1.46h13c.92 0 1.69-.62 1.93-1.46l2.54-9.27L23 10c0-.55-.45-1-1-1h-4.79zM9 9l3-4.4L15 9H9zm3 8c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2z',
+    d: [
+      'M11.2 7.2c.1-2.7 1.35-4.65 3.8-5.7-.05 2.45-1.3 4.25-3.8 5.7zM12.4 4.2c-1.85-.1-3.25-.9-4.2-2.4 2.05-.35 3.55.45 4.2 2.4z',
+      'M9 6a2 2 0 1 0 0 4 2 2 0 1 0 0-4zM13 6a2 2 0 1 0 0 4 2 2 0 1 0 0-4z',
+      'M7 9.5a2 2 0 1 0 0 4 2 2 0 1 0 0-4zM11 9.5a2 2 0 1 0 0 4 2 2 0 1 0 0-4zM15 9.5a2 2 0 1 0 0 4 2 2 0 1 0 0-4z',
+      'M9 13a2 2 0 1 0 0 4 2 2 0 1 0 0-4zM13 13a2 2 0 1 0 0 4 2 2 0 1 0 0-4z',
+      'M11 16.5a2 2 0 1 0 0 4 2 2 0 1 0 0-4z',
+    ],
   },
   {
     key: 'fastfood', label: 'Fast Food', bg: '#EA580C',
@@ -233,6 +239,9 @@ export const CATEGORY_ICONS: CatIconDef[] = [
 const ICON_MAP = new Map<string, CatIconDef>(
   CATEGORY_ICONS.map(i => [i.key, i])
 );
+const ICON_LABEL_MAP = new Map<string, CatIconDef>(
+  CATEGORY_ICONS.map(i => [i.label.toLowerCase(), i])
+);
 
 // ── Background colour for legacy emoji/name-based icons ───────────────
 const CAT_COLORS = [
@@ -252,7 +261,11 @@ export function renderCategoryIcon(
   name: string,
   size = 40
 ): JSX.Element {
-  const iconDef = icon ? ICON_MAP.get(icon) : undefined;
+  // Older categories were created before icon keys were stored. Reuse an
+  // existing classic icon when their name matches a registry label (for
+  // example Shopping → bag and Fruits → fruit).
+  const iconDef = (icon ? ICON_MAP.get(icon) : undefined)
+    ?? ICON_LABEL_MAP.get(name.trim().toLowerCase());
 
   if (iconDef) {
     return (

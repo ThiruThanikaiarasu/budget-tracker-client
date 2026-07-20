@@ -26,14 +26,14 @@ function Login() {
 
   useEffect(() => {
     if (isAuthenticated) {
-      navigate('/dashboard', { replace: true });
+      navigate('/transactions', { replace: true });
     }
   }, [isAuthenticated, navigate]);
 
   const onSubmit = async (data: LoginFormData) => {
     try {
       await login(data.email, data.password);
-      navigate('/dashboard');
+      navigate('/transactions');
     } catch {
       // Error toast is handled in the store
     }

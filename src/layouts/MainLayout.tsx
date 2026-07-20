@@ -97,9 +97,9 @@ const Icons = {
 
 // ── Bottom nav (mobile): exactly 5 tabs ───────────────────────────────
 const BOTTOM_NAV = [
-  { to: '/transactions', label: 'Records', icon: Icons.records },
   { to: '/dashboard', label: 'Analysis', icon: Icons.analysis },
   { to: '/budget', label: 'Budgets', icon: Icons.budgets },
+  { to: '/transactions', label: 'Records', icon: Icons.records },
   { to: '/accounts', label: 'Accounts', icon: Icons.accounts },
   { to: '/categories', label: 'Categories', icon: Icons.categories },
 ];
@@ -132,7 +132,10 @@ function MainLayout() {
   };
 
   return (
-    <div className="flex h-screen" style={{ background: 'var(--c-bg)' }}>
+    <div
+      className="main-layout flex h-screen"
+      style={{ background: 'var(--c-bg)' }}
+    >
       {/* ── Desktop sidebar ──────────────────────────────────────────── */}
       <aside
         className="hidden md:flex md:flex-col md:w-60 flex-shrink-0"
@@ -160,16 +163,16 @@ function MainLayout() {
               key={item.to}
               to={item.to}
               className={({ isActive }) =>
-                `flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
-                  isActive ? 'font-semibold' : ''
+                `desktop-nav-link flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
+                  isActive ? 'is-active font-semibold' : ''
                 }`
               }
               style={({ isActive }) => ({
                 color: isActive ? 'var(--c-accent)' : 'var(--c-muted)',
-                backgroundColor: isActive ? 'var(--c-surface)' : 'transparent',
+                backgroundColor: 'transparent',
               })}
             >
-              {item.icon}
+              <span className="nav-icon-shell">{item.icon}</span>
               <span>{item.label}</span>
             </NavLink>
           ))}
@@ -195,7 +198,7 @@ function MainLayout() {
 
         {/* ── Mobile top header ──────────────────────────────────────── */}
         <header
-          className="md:hidden flex items-center justify-between px-4 h-14 flex-shrink-0 z-10"
+          className={`app-mobile-header ${location.pathname === '/transactions' ? 'transactions-route-header' : ''} md:hidden flex items-center justify-between px-4 h-14 flex-shrink-0 z-10`}
           style={{ background: 'var(--c-header-bg)', borderBottom: '1px solid var(--c-border)' }}
         >
           <button
@@ -228,7 +231,7 @@ function MainLayout() {
 
         {/* ── Mobile bottom nav ────────────────────────────────────── */}
         <nav
-          className="fixed bottom-0 left-0 right-0 md:hidden flex z-20"
+          className="mobile-bottom-nav fixed bottom-0 left-0 right-0 md:hidden flex z-20"
           style={{
             background: 'var(--c-nav-bg)',
             borderTop: '1px solid var(--c-nav-border)',
@@ -242,10 +245,10 @@ function MainLayout() {
               <NavLink
                 key={item.to}
                 to={item.to}
-                className="flex flex-1 flex-col items-center justify-center gap-0.5 py-2 min-w-0"
+                className={`mobile-nav-link ${item.to === '/transactions' ? 'mobile-nav-primary' : ''} ${isActive ? 'is-active' : ''} flex flex-1 flex-col items-center justify-center gap-0.5 py-2 min-w-0`}
                 style={{ color: isActive ? 'var(--c-active)' : 'var(--c-muted)' }}
               >
-                {item.icon}
+                <span className="nav-icon-shell">{item.icon}</span>
                 <span className="text-[9px] font-medium leading-tight truncate w-full text-center">
                   {item.label}
                 </span>

@@ -15,11 +15,14 @@ import {
 import useDashboardStore from '../store/dashboardStore';
 import useAccountStore from '../store/accountStore';
 import useBudgetStore from '../store/budgetStore';
+import useThemeStore from '../store/themeStore';
+import { renderCategoryIcon } from '../utils/categoryIcons';
 
 const PIE_COLORS = [
   '#3B82F6', '#EF4444', '#10B981', '#F59E0B', '#8B5CF6',
   '#EC4899', '#06B6D4', '#F97316', '#6366F1', '#14B8A6',
 ];
+const CRED_PIE_COLORS = ['#0a0a0a', '#343438', '#5d5d63', '#85858c', '#adadb3', '#d4d4d8'];
 
 function formatCurrency(amount: number) {
   return new Intl.NumberFormat('en-IN', {
@@ -37,6 +40,7 @@ function formatMonth(monthStr: string) {
 }
 
 function Dashboard() {
+  const isCredWhite = useThemeStore((s) => s.theme === 'cred-white');
   const {
     summary,
     breakdown,
@@ -74,9 +78,9 @@ function Dashboard() {
   }
 
   return (
-    <div className="space-y-6 p-4 sm:p-6">
+    <div className="analysis-page space-y-6 p-4 sm:p-6">
       {/* Header */}
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+      <div className="analysis-header flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
           <p className="mt-1 text-sm text-gray-500">Your financial overview</p>
@@ -100,9 +104,9 @@ function Dashboard() {
       </div>
 
       {/* Summary Cards */}
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="analysis-summary grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {/* Total Balance */}
-        <div className="rounded-lg bg-white p-5 shadow">
+        <div className="analysis-summary-card rounded-lg bg-white p-5 shadow">
           <p className="text-sm font-medium text-gray-500">Total Balance</p>
           <p className={`mt-1 text-2xl font-bold ${totalBalance >= 0 ? 'text-blue-600' : 'text-red-600'}`}>
             {formatCurrency(totalBalance)}
@@ -113,7 +117,7 @@ function Dashboard() {
         </div>
 
         {/* Income */}
-        <div className="rounded-lg bg-white p-5 shadow">
+        <div className="analysis-summary-card rounded-lg bg-white p-5 shadow">
           <p className="text-sm font-medium text-gray-500">Income (This Month)</p>
           <p className="mt-1 text-2xl font-bold text-green-600">
             {formatCurrency(summary?.totalIncome ?? 0)}
@@ -121,7 +125,7 @@ function Dashboard() {
         </div>
 
         {/* Expense */}
-        <div className="rounded-lg bg-white p-5 shadow">
+        <div className="analysis-summary-card rounded-lg bg-white p-5 shadow">
           <p className="text-sm font-medium text-gray-500">Expense (This Month)</p>
           <p className="mt-1 text-2xl font-bold text-red-600">
             {formatCurrency(summary?.totalExpense ?? 0)}
@@ -129,7 +133,7 @@ function Dashboard() {
         </div>
 
         {/* Net */}
-        <div className="rounded-lg bg-white p-5 shadow">
+        <div className="analysis-summary-card rounded-lg bg-white p-5 shadow">
           <p className="text-sm font-medium text-gray-500">Net (This Month)</p>
           <p className={`mt-1 text-2xl font-bold ${(summary?.net ?? 0) >= 0 ? 'text-green-600' : 'text-red-600'}`}>
             {formatCurrency(summary?.net ?? 0)}
@@ -139,7 +143,7 @@ function Dashboard() {
 
       {/* Budget Alert */}
       {todaySummary && (
-        <div className={`rounded-lg p-4 shadow ${todaySummary.isOver ? 'bg-red-50 border border-red-200' : 'bg-green-50 border border-green-200'}`}>
+        <div className={`analysis-budget-status rounded-lg p-4 shadow ${todaySummary.isOver ? 'is-over bg-red-50 border border-red-200' : 'bg-green-50 border border-green-200'}`}>
           <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
             <div>
               <h3 className={`text-sm font-semibold ${todaySummary.isOver ? 'text-red-800' : 'text-green-800'}`}>
@@ -171,9 +175,10 @@ function Dashboard() {
                   .map((c) => (
                     <span
                       key={c.categoryId._id}
-                      className="rounded-full bg-red-100 px-2.5 py-0.5 text-xs font-medium text-red-700"
+                      className="analysis-over-category inline-flex items-center gap-1 rounded-full bg-red-100 px-2.5 py-0.5 text-xs font-medium text-red-700"
                     >
-                      {c.categoryId.icon} {c.categoryId.name}: {formatCurrency(c.spent)} / {formatCurrency(c.effectiveLimit)}
+                      {isCredWhite && <span className="analysis-category-icon">{renderCategoryIcon(c.categoryId.icon, c.categoryId.name, 16)}</span>}
+                      {!isCredWhite && c.categoryId.icon} {c.categoryId.name}: {formatCurrency(c.spent)} / {formatCurrency(c.effectiveLimit)}
                       {' '}({c.frequency})
                     </span>
                   ))}
@@ -184,39 +189,52 @@ function Dashboard() {
       )}
 
       {/* Charts Row */}
-      <div className="grid gap-6 lg:grid-cols-2">
+      <div className="analysis-charts grid gap-6 lg:grid-cols-2">
         {/* Category Breakdown - Pie Chart */}
-        <div className="rounded-lg bg-white p-5 shadow">
+        <div className="analysis-panel rounded-lg bg-white p-5 shadow">
           <h2 className="text-lg font-semibold text-gray-900">Expense Breakdown</h2>
           <p className="mb-4 text-sm text-gray-500">By category this month</p>
           {breakdown.length === 0 ? (
             <p className="py-10 text-center text-sm text-gray-400">No expense data for this month</p>
           ) : (
-            <ResponsiveContainer width="100%" height={300}>
-              <PieChart>
-                <Pie
-                  data={breakdown}
-                  dataKey="total"
-                  nameKey="categoryName"
-                  cx="50%"
-                  cy="50%"
-                  innerRadius={60}
-                  outerRadius={100}
-                  paddingAngle={2}
-                >
-                  {breakdown.map((_entry, index) => (
-                    <Cell key={index} fill={PIE_COLORS[index % PIE_COLORS.length]} />
+            <>
+              <ResponsiveContainer width="100%" height={isCredWhite ? 220 : 300}>
+                <PieChart>
+                  <Pie
+                    data={breakdown}
+                    dataKey="total"
+                    nameKey="categoryName"
+                    cx="50%"
+                    cy="50%"
+                    innerRadius={isCredWhite ? 48 : 60}
+                    outerRadius={isCredWhite ? 82 : 100}
+                    paddingAngle={2}
+                  >
+                    {breakdown.map((_entry, index) => (
+                      <Cell key={index} fill={(isCredWhite ? CRED_PIE_COLORS : PIE_COLORS)[index % (isCredWhite ? CRED_PIE_COLORS : PIE_COLORS).length]} />
+                    ))}
+                  </Pie>
+                  <Tooltip formatter={(value) => formatCurrency(Number(value))} />
+                  {!isCredWhite && <Legend />}
+                </PieChart>
+              </ResponsiveContainer>
+              {isCredWhite && (
+                <div className="analysis-chart-legend">
+                  {breakdown.map((entry, index) => (
+                    <div key={entry.categoryId} className="analysis-chart-legend-item">
+                      <span style={{ background: CRED_PIE_COLORS[index % CRED_PIE_COLORS.length] }} />
+                      <span title={entry.categoryName}>{entry.categoryName}</span>
+                      <strong>{formatCurrency(entry.total)}</strong>
+                    </div>
                   ))}
-                </Pie>
-                <Tooltip formatter={(value) => formatCurrency(Number(value))} />
-                <Legend />
-              </PieChart>
-            </ResponsiveContainer>
+                </div>
+              )}
+            </>
           )}
         </div>
 
         {/* Monthly Trend - Bar Chart */}
-        <div className="rounded-lg bg-white p-5 shadow">
+        <div className="analysis-panel rounded-lg bg-white p-5 shadow">
           <h2 className="text-lg font-semibold text-gray-900">Monthly Trend</h2>
           <p className="mb-4 text-sm text-gray-500">Income vs Expense</p>
           {trend.length === 0 ? (
@@ -228,8 +246,8 @@ function Dashboard() {
                 <YAxis tickFormatter={(v) => formatCurrency(Number(v))} width={90} />
                 <Tooltip formatter={(value) => formatCurrency(Number(value))} />
                 <Legend />
-                <Bar dataKey="income" name="Income" fill="#10B981" radius={[4, 4, 0, 0]} />
-                <Bar dataKey="expense" name="Expense" fill="#EF4444" radius={[4, 4, 0, 0]} />
+                <Bar dataKey="income" name="Income" fill={isCredWhite ? '#0a0a0a' : '#10B981'} radius={[4, 4, 0, 0]} />
+                <Bar dataKey="expense" name="Expense" fill={isCredWhite ? '#a1a1aa' : '#EF4444'} radius={[4, 4, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
           )}
@@ -237,7 +255,7 @@ function Dashboard() {
       </div>
 
       {/* Recent Transactions */}
-      <div className="rounded-lg bg-white p-5 shadow">
+      <div className="analysis-panel analysis-recent rounded-lg bg-white p-5 shadow">
         <div className="flex items-center justify-between">
           <h2 className="text-lg font-semibold text-gray-900">Recent Transactions</h2>
           <Link to="/transactions" className="text-sm font-medium text-blue-600 hover:text-blue-700">
@@ -250,9 +268,13 @@ function Dashboard() {
         ) : (
           <div className="mt-4 divide-y divide-gray-100">
             {recentTransactions.map((tx) => (
-              <div key={tx._id} className="flex items-center justify-between py-3">
+              <div key={tx._id} className="analysis-transaction flex items-center justify-between py-3">
                 <div className="flex items-center gap-3">
-                  <span
+                  {isCredWhite && tx.categoryId ? (
+                    <span className="analysis-category-icon">
+                      {renderCategoryIcon(tx.categoryId.icon, tx.categoryId.name, 32)}
+                    </span>
+                  ) : <span
                     className={`flex h-8 w-8 items-center justify-center rounded-full text-sm ${
                       tx.type === 'income'
                         ? 'bg-green-100 text-green-600'
@@ -262,7 +284,7 @@ function Dashboard() {
                     }`}
                   >
                     {tx.type === 'income' ? '+' : tx.type === 'expense' ? '-' : '~'}
-                  </span>
+                  </span>}
                   <div>
                     <p className="text-sm font-medium text-gray-900">
                       {tx.categoryId?.name ?? (tx.type === 'transfer' ? 'Transfer' : 'Uncategorized')}

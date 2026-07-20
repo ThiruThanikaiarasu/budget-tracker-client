@@ -4,6 +4,7 @@ import toast from 'react-hot-toast';
 import useBudgetStore, { type DaySummary, type MonthlySummary } from '../store/budgetStore';
 import useCategoryStore from '../store/categoryStore';
 import useAuthStore from '../store/authStore';
+import useThemeStore from '../store/themeStore';
 import { formatCurrency } from '../utils/format';
 import Amount from '../components/Amount';
 import { renderCategoryIcon } from '../utils/categoryIcons';
@@ -31,6 +32,7 @@ function parseDateStr(dateStr: string): Date {
 }
 
 function Budget() {
+  const isCredWhite = useThemeStore((s) => s.theme === 'cred-white');
   const { budget, monthlySummary, isLoading, fetchBudget, upsertBudget, fetchMonthlySummary } = useBudgetStore();
   const { categories, fetchCategories } = useCategoryStore();
   const { user } = useAuthStore();
@@ -149,9 +151,9 @@ function Budget() {
   const budgetedCategories = monthlySummary?.categorySummary || [];
 
   return (
-    <div style={{ background: 'var(--c-bg)', minHeight: '100vh' }}>
+    <div className="budget-page" style={{ background: 'var(--c-bg)', minHeight: '100vh' }}>
       {/* ── Sticky header ─────────────────────────────────────────── */}
-      <div className="sticky top-0 z-10 px-4 pt-4 pb-3" style={{ background: 'var(--c-header-bg)' }}>
+      <div className="budget-header sticky top-0 z-10 px-4 pt-4 pb-3" style={{ background: 'var(--c-header-bg)' }}>
         {/* Month navigator */}
         <div className="flex items-center justify-between">
           <button onClick={() => navigateMonth(-1)} className="p-1.5" style={{ color: 'var(--c-muted)' }}>
@@ -160,7 +162,10 @@ function Budget() {
             </svg>
           </button>
           <div className="text-center">
-            <p className="cred-serif text-lg font-semibold" style={{ color: 'var(--c-text)' }}>{formatMonthLabel(selectedMonth)}</p>
+            <p className="cred-serif text-lg font-semibold" style={{ color: 'var(--c-text)' }}>
+              {isCredWhite ? 'monthly budget' : formatMonthLabel(selectedMonth)}
+            </p>
+            {isCredWhite && <p className="budget-month-label">{formatMonthLabel(selectedMonth)}</p>}
             {periodLabel && <p className="text-[10px] mt-0.5" style={{ color: 'var(--c-muted)' }}>{periodLabel}</p>}
           </div>
           <button onClick={() => navigateMonth(1)} className="p-1.5" style={{ color: 'var(--c-muted)' }}>
@@ -171,7 +176,7 @@ function Budget() {
         </div>
 
         {/* Budget summary hero */}
-        <div className="mt-4 text-center">
+        <div className="budget-hero mt-4 text-center">
           <p className="cred-label">Spent this month</p>
           <p className="cred-serif mt-1 text-4xl font-semibold" style={{ color: 'var(--c-text)' }}>
             {monthlySummary ? <Amount value={monthlySummary.totalSpent} /> : '—'}
@@ -189,7 +194,7 @@ function Budget() {
       </div>
 
       {/* ── Action row ────────────────────────────────────────────── */}
-      <div className="px-4 py-3 flex gap-2" style={{ borderBottom: '1px solid var(--c-border)' }}>
+      <div className="budget-actions px-4 py-3 flex gap-2" style={{ borderBottom: '1px solid var(--c-border)' }}>
         <button onClick={() => setShowForm(true)} className="t-btn-outline flex-1 text-center">
           {budget ? 'Edit Budget' : '+ Set Budget'}
         </button>
@@ -208,7 +213,7 @@ function Budget() {
         <>
           {/* ── Overall progress bar ──────────────────────────── */}
           {monthlySummary?.overallLimit && (
-            <div className="px-4 py-4" style={{ borderBottom: '1px solid var(--c-border)' }}>
+            <div className="budget-overall px-4 py-4" style={{ borderBottom: '1px solid var(--c-border)' }}>
               <div className="flex items-center justify-between mb-1">
                 <span className="cred-label">Overall</span>
                 <span className="text-xs" style={{ color: 'var(--c-muted)' }}>
@@ -235,8 +240,8 @@ function Budget() {
 
           {/* ── Budgeted categories ───────────────────────────── */}
           {budgetedCategories.length > 0 && (
-            <div>
-              <div className="px-4 pt-4 pb-2">
+            <div className="budget-category-section">
+              <div className="budget-section-heading px-4 pt-4 pb-2">
                 <p className="cred-label">Budgeted categories · {formatMonthLabel(selectedMonth)}</p>
               </div>
               {budgetedCategories.map(cat => {
@@ -250,9 +255,9 @@ function Budget() {
                 const over = isCarryForward ? (pot !== null && pot < 0) : cat.totalSpent > cat.limit;
 
                 return (
-                  <div key={cat.categoryId._id} className="cred-divider px-4 py-3">
+                  <div key={cat.categoryId._id} className="budget-category-row cred-divider px-4 py-3">
                     <div className="flex items-center gap-3">
-                      {renderCategoryIcon(cat.categoryId.icon, cat.categoryId.name, 40)}
+                      <span className="budget-category-icon">{renderCategoryIcon(cat.categoryId.icon, cat.categoryId.name, 40)}</span>
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center justify-between mb-1">
                           <div className="flex items-center gap-1.5">
@@ -301,23 +306,23 @@ function Budget() {
 
           {/* ── Calendar ──────────────────────────────────────── */}
           {monthlySummary && (
-            <div className="px-4 py-4" style={{ borderBottom: '1px solid var(--c-border)' }}>
+            <div className="budget-calendar px-4 py-4" style={{ borderBottom: '1px solid var(--c-border)' }}>
               <CalendarGrid days={monthlySummary.days} periodStart={monthlySummary.periodStart} />
             </div>
           )}
 
           {/* ── Not budgeted this month ───────────────────────── */}
           {unbudgetedCategories.length > 0 && (
-            <div>
-              <div className="px-4 pt-4 pb-2">
+            <div className="budget-category-section">
+              <div className="budget-section-heading px-4 pt-4 pb-2">
                 <p className="cred-label">Not budgeted this month</p>
               </div>
               {unbudgetedCategories.map(cat => (
                 <div
                   key={cat._id}
-                  className="cred-divider flex items-center gap-3 px-4 py-3"
+                  className="budget-category-row cred-divider flex items-center gap-3 px-4 py-3"
                 >
-                  {renderCategoryIcon(cat.icon, cat.name, 40)}
+                  <span className="budget-category-icon">{renderCategoryIcon(cat.icon, cat.name, 40)}</span>
                   <p className="flex-1 text-sm font-medium" style={{ color: 'var(--c-text)' }}>{cat.name}</p>
                   <button
                     onClick={() => handleSetBudgetForCategory(cat._id)}
@@ -807,7 +812,7 @@ function DetailedView({ summary, month, onBack }: { summary: MonthlySummary; mon
   const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
 
   return (
-    <div style={{ background: 'var(--c-bg)', minHeight: '100vh' }}>
+    <div className="budget-detail-page" style={{ background: 'var(--c-bg)', minHeight: '100vh' }}>
       {/* Header */}
       <div className="px-4 pt-4 pb-3 flex items-center gap-3" style={{ background: 'var(--c-header-bg)' }}>
         <button onClick={onBack} className="p-1.5" style={{ color: 'var(--c-muted)' }}>

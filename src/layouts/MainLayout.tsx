@@ -307,13 +307,13 @@ function MainLayout() {
                     key={item.to}
                     to={item.to}
                     onClick={() => setDrawerOpen(false)}
-                    className="flex items-center gap-3 px-3 py-3 rounded-lg text-sm font-medium"
+                    className={`drawer-nav-link ${isActive ? 'is-active' : ''} flex items-center gap-3 px-3 py-3 rounded-lg text-sm font-medium`}
                     style={{
-                      color: isActive ? 'var(--c-accent)' : 'var(--c-muted)',
-                      backgroundColor: isActive ? 'var(--c-surface)' : 'transparent',
+                      color: isActive ? 'var(--c-active)' : 'var(--c-muted)',
+                      backgroundColor: 'transparent',
                     }}
                   >
-                    {item.icon}
+                    <span className="nav-icon-shell">{item.icon}</span>
                     <span>{item.label}</span>
                   </NavLink>
                 );

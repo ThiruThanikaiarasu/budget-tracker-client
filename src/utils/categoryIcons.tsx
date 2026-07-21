@@ -242,6 +242,31 @@ const ICON_MAP = new Map<string, CatIconDef>(
 const ICON_LABEL_MAP = new Map<string, CatIconDef>(
   CATEGORY_ICONS.map(i => [i.label.toLowerCase(), i])
 );
+const LEGACY_NAME_TO_ICON_KEY: Record<string, string> = {
+  'accessories repair': 'tools',
+  breakfast: 'restaurant',
+  broadband: 'wifi',
+  'clothing & accessories': 'clothing',
+  dinner: 'restaurant',
+  food: 'restaurant',
+  freelance: 'work',
+  'gadget & accessories': 'computer',
+  gadgets: 'computer',
+  interest: 'savings',
+  intrest: 'savings',
+  'investment return': 'investment',
+  lunch: 'restaurant',
+  'mobile recharge': 'phone',
+  'personal care': 'beauty',
+  petrol: 'fuel',
+  rent: 'home',
+  other: 'work',
+  others: 'work',
+  snacks: 'fastfood',
+  social: 'gift',
+  tea: 'coffee',
+  transport: 'bus',
+};
 
 // ── Background colour for legacy emoji/name-based icons ───────────────
 const CAT_COLORS = [
@@ -264,8 +289,11 @@ export function renderCategoryIcon(
   // Older categories were created before icon keys were stored. Reuse an
   // existing classic icon when their name matches a registry label (for
   // example Shopping → bag and Fruits → fruit).
+  const normalizedName = name.trim().toLowerCase();
+  const legacyKey = LEGACY_NAME_TO_ICON_KEY[normalizedName];
   const iconDef = (icon ? ICON_MAP.get(icon) : undefined)
-    ?? ICON_LABEL_MAP.get(name.trim().toLowerCase());
+    ?? ICON_LABEL_MAP.get(normalizedName)
+    ?? (legacyKey ? ICON_MAP.get(legacyKey) : undefined);
 
   if (iconDef) {
     return (

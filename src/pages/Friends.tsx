@@ -129,13 +129,13 @@ function Friends() {
       <div className="mt-6 grid gap-4 sm:grid-cols-2">
         <div className="rounded-lg bg-[var(--c-surface)] p-5 shadow">
           <p className="cred-label">You are owed</p>
-          <p className="cred-serif mt-1 text-2xl font-semibold" style={{ color: 'var(--c-income)' }}>
+          <p className="friend-balance friend-balance-positive cred-serif mt-1 text-2xl font-semibold" style={{ color: 'var(--c-income)' }}>
             <Amount value={totalOwed} />
           </p>
         </div>
         <div className="rounded-lg bg-[var(--c-surface)] p-5 shadow">
           <p className="cred-label">You owe</p>
-          <p className="cred-serif mt-1 text-2xl font-semibold" style={{ color: 'var(--c-expense)' }}>
+          <p className="friend-balance friend-balance-negative cred-serif mt-1 text-2xl font-semibold" style={{ color: 'var(--c-expense)' }}>
             <Amount value={totalOwe} />
           </p>
         </div>
@@ -173,11 +173,11 @@ function Friends() {
                 {friend.netBalance === 0 ? (
                   <p className="text-sm text-[var(--c-muted)]">settled up</p>
                 ) : friend.netBalance > 0 ? (
-                  <p className="text-sm font-semibold text-[var(--c-income)]">
+                  <p className="friend-balance friend-balance-positive text-sm font-semibold text-[var(--c-income)]">
                     owes you <Amount value={friend.netBalance} />
                   </p>
                 ) : (
-                  <p className="text-sm font-semibold text-[var(--c-expense)]">
+                  <p className="friend-balance friend-balance-negative text-sm font-semibold text-[var(--c-expense)]">
                     you owe <Amount value={Math.abs(friend.netBalance)} />
                   </p>
                 )}
@@ -722,11 +722,11 @@ function FriendDetail({ friend, onBack }: { friend: Friend; onBack: () => void }
           {netBalance === 0 ? (
             <p className="mt-0.5 text-sm text-[var(--c-muted)]">All settled up</p>
           ) : netBalance > 0 ? (
-            <p className="mt-0.5 text-sm font-semibold text-[var(--c-income)]">
+            <p className="friend-balance friend-balance-positive mt-0.5 text-sm font-semibold text-[var(--c-income)]">
               owes you <Amount value={netBalance} />
             </p>
           ) : (
-            <p className="mt-0.5 text-sm font-semibold text-[var(--c-expense)]">
+            <p className="friend-balance friend-balance-negative mt-0.5 text-sm font-semibold text-[var(--c-expense)]">
               you owe <Amount value={Math.abs(netBalance)} />
             </p>
           )}
@@ -774,11 +774,11 @@ function FriendDetail({ friend, onBack }: { friend: Friend; onBack: () => void }
           <div className="mt-3 grid grid-cols-2 gap-3 rounded-lg bg-[var(--c-surface2)] p-3">
             <div className="text-center">
               <p className="cred-label">You lent</p>
-              <p className="mt-0.5 text-base font-bold text-[var(--c-income)]"><Amount value={breakdown.lent} /></p>
+              <p className="friend-balance friend-balance-positive mt-0.5 text-base font-bold text-[var(--c-income)]"><Amount value={breakdown.lent} /></p>
             </div>
             <div className="text-center">
               <p className="cred-label">You borrowed</p>
-              <p className="mt-0.5 text-base font-bold text-[var(--c-expense)]"><Amount value={breakdown.borrowed} /></p>
+              <p className="friend-balance friend-balance-negative mt-0.5 text-base font-bold text-[var(--c-expense)]"><Amount value={breakdown.borrowed} /></p>
             </div>
           </div>
         )}
@@ -832,11 +832,11 @@ function FriendDetail({ friend, onBack }: { friend: Friend; onBack: () => void }
                         <Amount value={expense.totalAmount} />
                       </p>
                       {share > 0 ? (
-                        <p className="text-xs font-medium text-[var(--c-income)]">
+                        <p className="friend-balance friend-balance-positive text-xs font-medium text-[var(--c-income)]">
                           {friend.name} owes <Amount value={share} prefix="+" />
                         </p>
                       ) : share < 0 ? (
-                        <p className="text-xs font-medium text-[var(--c-expense)]">
+                        <p className="friend-balance friend-balance-negative text-xs font-medium text-[var(--c-expense)]">
                           you owe <Amount value={-share} prefix="−" />
                         </p>
                       ) : null}

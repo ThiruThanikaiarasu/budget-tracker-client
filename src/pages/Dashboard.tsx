@@ -96,7 +96,7 @@ function Dashboard() {
           <Link
             to="/transactions"
             state={{ openCreate: true, initialType: 'expense' }}
-            className="flex-1 whitespace-nowrap rounded-lg bg-red-600 px-3 py-2 text-center text-sm font-medium text-white hover:bg-red-700 sm:flex-none sm:px-4"
+            className="analysis-add-expense flex-1 whitespace-nowrap rounded-lg bg-red-600 px-3 py-2 text-center text-sm font-medium text-white hover:bg-red-700 sm:flex-none sm:px-4"
           >
             + Add Expense
           </Link>

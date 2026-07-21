@@ -353,6 +353,20 @@ input[type="number"] { -moz-appearance: textfield; }
   .auth-title { font-size: 1.65rem; }
 }
 
+/* High-contrast debt colors for the CRED White Friends views. */
+[data-theme="cred-white"] .friend-balance-positive {
+  color: #087a55 !important;
+}
+
+[data-theme="cred-white"] .friend-balance-negative {
+  color: #b42318 !important;
+}
+
+[data-theme="cred-white"] .friend-balance .cred-dec {
+  opacity: 1;
+  font-weight: inherit;
+}
+
 /* ── CRED White payment history ────────────────────────────────────── */
 /* Deliberately scoped to this theme and route; other themes retain the
    existing Records layout unchanged. */
@@ -425,8 +439,10 @@ input[type="number"] { -moz-appearance: textfield; }
 [data-theme="cred-white"] .transactions-filters::-webkit-scrollbar { display: none; }
 
 [data-theme="cred-white"] .transactions-filter-grid {
-  display: flex;
-  width: max-content;
+  display: grid;
+  width: 100%;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  align-items: center;
   gap: 0.5625rem;
 }
 
@@ -445,8 +461,31 @@ input[type="number"] { -moz-appearance: textfield; }
   text-transform: uppercase;
 }
 
-[data-theme="cred-white"] .transactions-filter-grid .t-select:first-child { min-width: 6.15rem; }
-[data-theme="cred-white"] .transactions-filter-grid .t-select:last-child { min-width: 9rem; }
+[data-theme="cred-white"] .records-filter-type,
+[data-theme="cred-white"] .records-filter-category,
+[data-theme="cred-white"] .records-filter-account {
+  width: 100%;
+  min-width: 0 !important;
+}
+
+[data-theme="cred-white"] .records-filter-button {
+  display: flex !important;
+  height: 2.25rem;
+  align-items: center;
+  justify-content: space-between;
+  line-height: 1;
+  white-space: nowrap;
+  padding: 0 1.0125rem !important;
+}
+
+[data-theme="cred-white"] .records-filter-button > svg {
+  align-self: center;
+  margin-left: auto;
+}
+
+[data-theme="cred-white"] .records-filter-button > span:first-child {
+  min-width: 0;
+}
 
 [data-theme="cred-white"] .transactions-date {
   padding: 1.6125rem 2.0625rem 0.8625rem;
@@ -614,6 +653,13 @@ input[type="number"] { -moz-appearance: textfield; }
 /* ── CRED White monthly budget ─────────────────────────────────────── */
 [data-theme="cred-white"] .budget-page {
   font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --c-income: #087a55;
+  --c-expense: #b42318;
+}
+
+[data-theme="cred-white"] .budget-detail-page {
+  --c-income: #087a55;
+  --c-expense: #b42318;
 }
 
 [data-theme="cred-white"] .budget-header {
@@ -1145,6 +1191,75 @@ input[type="number"] { -moz-appearance: textfield; }
     0 0 1.15rem color-mix(in srgb, var(--c-accent) 32%, transparent);
 }
 
+/* Match the mobile drawer's borderless active glow on the white desktop rail. */
+[data-theme="cred-white"] .desktop-nav-link.is-active .nav-icon-shell {
+  background: transparent;
+  box-shadow: none;
+}
+
+[data-theme="cred-white"] .desktop-nav-link.is-active .nav-icon-shell::before {
+  position: absolute;
+  z-index: 0;
+  inset: -0.8rem;
+  border-radius: 9999px;
+  background: radial-gradient(
+    circle,
+    rgba(0, 0, 0, 0.13) 0%,
+    rgba(0, 0, 0, 0.055) 40%,
+    transparent 72%
+  );
+  filter: blur(0.2rem);
+  pointer-events: none;
+  content: '';
+}
+
+[data-theme="cred-white"] .desktop-nav-link.is-active .nav-icon-shell svg {
+  position: relative;
+  z-index: 1;
+  filter:
+    drop-shadow(0 0 0.3rem rgba(0, 0, 0, 0.28))
+    drop-shadow(0 0 0.75rem rgba(0, 0, 0, 0.14));
+}
+
+[data-theme="cred-white"] .desktop-nav-link.is-active > span:last-child {
+  text-shadow: 0 0 0.55rem rgba(0, 0, 0, 0.14);
+}
+
+.drawer-nav-link.is-active .nav-icon-shell {
+  background: transparent;
+  box-shadow: none;
+}
+
+.drawer-nav-link.is-active .nav-icon-shell::before {
+  position: absolute;
+  z-index: 0;
+  inset: -0.85rem;
+  border-radius: 9999px;
+  background: radial-gradient(
+    circle,
+    color-mix(in srgb, var(--c-active) 36%, transparent) 0%,
+    color-mix(in srgb, var(--c-active) 15%, transparent) 38%,
+    transparent 72%
+  );
+  filter: blur(0.18rem);
+  pointer-events: none;
+  content: '';
+}
+
+.drawer-nav-link.is-active .nav-icon-shell svg {
+  position: relative;
+  z-index: 1;
+  filter:
+    drop-shadow(0 0 0.35rem color-mix(in srgb, var(--c-active) 69%, transparent))
+    drop-shadow(0 0 0.9rem color-mix(in srgb, var(--c-active) 51%, transparent));
+}
+
+.drawer-nav-link.is-active > span:last-child {
+  text-shadow:
+    0 0 0.3rem color-mix(in srgb, var(--c-active) 50%, transparent),
+    0 0 0.65rem color-mix(in srgb, var(--c-active) 28%, transparent);
+}
+
 .mobile-bottom-nav {
   min-height: 4rem;
   overflow: visible;
@@ -1180,7 +1295,25 @@ input[type="number"] { -moz-appearance: textfield; }
 
 @media (max-width: 480px) {
   [data-theme="cred-white"] .transactions-header { padding-inline: 1.125rem; }
-  [data-theme="cred-white"] .transactions-filters { padding-inline: 1.125rem; }
+  [data-theme="cred-white"] .transactions-filters {
+    overflow-x: visible;
+    padding-inline: 1.125rem;
+  }
+  [data-theme="cred-white"] .transactions-filter-grid {
+    display: grid;
+    width: 100%;
+    grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.2fr);
+  }
+  [data-theme="cred-white"] .transactions-filter-grid .t-select,
+  [data-theme="cred-white"] .records-filter-type,
+  [data-theme="cred-white"] .records-filter-category,
+  [data-theme="cred-white"] .records-filter-account {
+    width: 100%;
+    min-width: 0;
+  }
+  [data-theme="cred-white"] .records-filter-account {
+    grid-column: 1 / -1;
+  }
   [data-theme="cred-white"] .transactions-date { padding-inline: 1.125rem; }
   [data-theme="cred-white"] .transaction-row {
     margin-inline: 1.125rem;
@@ -1210,6 +1343,9 @@ input[type="number"] { -moz-appearance: textfield; }
   }
   [data-theme="cred-white"] .analysis-summary {
     grid-template-columns: minmax(0, 1fr) !important;
+  }
+  [data-theme="cred-white"] .analysis-add-expense {
+    display: none;
   }
   [data-theme="cred-white"] .analysis-chart-legend {
     grid-template-columns: minmax(0, 1fr);

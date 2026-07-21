@@ -247,7 +247,7 @@ function SelectOptions({ children }: { children: ReactNode }) {
   return (
     <ListboxOptions
       anchor="bottom start"
-      className="z-50 mt-2 w-[var(--button-width)] rounded-xl p-1.5 space-y-0.5 shadow-lg"
+      className="z-50 mt-2 w-max min-w-[var(--button-width)] max-w-[16rem] rounded-xl p-1.5 space-y-0.5 shadow-lg"
       style={{
         background: 'var(--c-surface2)',
         border: '1px solid var(--c-border)',
@@ -401,6 +401,74 @@ function AccountSelect({
                 >
                   <span className="transaction-select-icon">{renderAccountIcon(a.type, a.color, 22)}</span>
                   <span className="truncate">{a.name}</span>
+                </div>
+              )}
+            </ListboxOption>
+          ))}
+        </SelectOptions>
+      </div>
+    </Listbox>
+  );
+}
+
+// ── Records filters (styled listboxes with the same visual language) ──
+const TYPE_FILTER_ITEMS: { _id: string; name: string }[] = [
+  { _id: 'income', name: 'Income' },
+  { _id: 'expense', name: 'Expense' },
+];
+
+function RecordsFilterSelect<T extends { _id: string; name: string }>({
+  items, value, onChange, placeholder, allLabel, renderIcon,
+}: {
+  items: T[];
+  value: string;
+  onChange: (id: string) => void;
+  placeholder: string;
+  allLabel: string;
+  renderIcon?: (item: T) => ReactNode;
+}) {
+  const selected = items.find(item => item._id === value);
+
+  return (
+    <Listbox value={value} onChange={onChange}>
+      <div className="relative w-full">
+        <ListboxButton className="t-select records-filter-button flex w-full items-center justify-between gap-2 text-left">
+          <span className="flex min-w-0 items-center gap-2">
+            {selected && renderIcon && <span className="transaction-select-icon">{renderIcon(selected)}</span>}
+            <span className="truncate">{selected?.name ?? placeholder}</span>
+          </span>
+          <svg viewBox="0 0 24 24" className="h-4 w-4 flex-shrink-0" fill="none" stroke="currentColor" strokeWidth="2">
+            <polyline points="6 9 12 15 18 9" />
+          </svg>
+        </ListboxButton>
+        <SelectOptions>
+          <ListboxOption value="">
+            {({ focus, selected: isSelected }) => (
+              <div
+                className="cursor-pointer rounded-lg px-3 py-2 text-sm"
+                style={{
+                  background: focus ? 'var(--c-surface)' : 'transparent',
+                  color: 'var(--c-muted)',
+                  fontWeight: isSelected ? 600 : 400,
+                }}
+              >
+                {allLabel}
+              </div>
+            )}
+          </ListboxOption>
+          {items.map(item => (
+            <ListboxOption key={item._id} value={item._id}>
+              {({ focus, selected: isSelected }) => (
+                <div
+                  className="flex cursor-pointer items-center gap-2 rounded-lg px-3 py-2 text-sm"
+                  style={{
+                    background: focus ? 'var(--c-surface)' : 'transparent',
+                    color: 'var(--c-text)',
+                    fontWeight: isSelected ? 600 : 400,
+                  }}
+                >
+                  {renderIcon && <span className="transaction-select-icon">{renderIcon(item)}</span>}
+                  <span className="truncate">{item.name}</span>
                 </div>
               )}
             </ListboxOption>
@@ -613,20 +681,56 @@ function Transactions() {
       {/* ── Filter panel ──────────────────────────────────────────── */}
       {(showFilter || isCredWhite) && (
         <div className="transactions-filters px-4 py-3 space-y-2" style={{ background: 'var(--c-surface)', borderBottom: '1px solid var(--c-border)' }}>
-          <div className="transactions-filter-grid grid grid-cols-3 gap-2">
-            <select aria-label="Filter by transaction type" value={typeFilter} onChange={e => setTypeFilter(e.target.value)} className="t-select text-xs">
-              <option value="">{isCredWhite ? 'Filter' : 'All types'}</option>
-              <option value="income">Income</option>
-              <option value="expense">Expense</option>
-            </select>
-            <select aria-label="Filter by category" value={categoryFilter} onChange={e => setCategoryFilter(e.target.value)} className="t-select text-xs">
-              <option value="">{isCredWhite ? 'Category' : 'All categories'}</option>
-              {categories.map(c => <option key={c._id} value={c._id}>{c.icon} {c.name}</option>)}
-            </select>
-            <select aria-label="Filter by payment method" value={accountFilter} onChange={e => setAccountFilter(e.target.value)} className="t-select text-xs">
-              <option value="">{isCredWhite ? 'Payment methods' : 'All accounts'}</option>
-              {accounts.map(a => <option key={a._id} value={a._id}>{a.name}</option>)}
-            </select>
+          <div className="transactions-filter-grid">
+            {isCredWhite ? (
+              <>
+                <div className="records-filter-type">
+                  <RecordsFilterSelect
+                    items={TYPE_FILTER_ITEMS}
+                    value={typeFilter}
+                    onChange={setTypeFilter}
+                    placeholder="Filter"
+                    allLabel="All"
+                  />
+                </div>
+                <div className="records-filter-category">
+                  <RecordsFilterSelect
+                    items={categories}
+                    value={categoryFilter}
+                    onChange={setCategoryFilter}
+                    placeholder="Category"
+                    allLabel="All"
+                    renderIcon={(category) => renderCategoryIcon(category.icon, category.name, 22)}
+                  />
+                </div>
+                <div className="records-filter-account">
+                  <RecordsFilterSelect
+                    items={accounts}
+                    value={accountFilter}
+                    onChange={setAccountFilter}
+                    placeholder="Payment methods"
+                    allLabel="All"
+                    renderIcon={(account) => renderAccountIcon(account.type, account.color, 22)}
+                  />
+                </div>
+              </>
+            ) : (
+              <>
+                <select aria-label="Filter by transaction type" value={typeFilter} onChange={e => setTypeFilter(e.target.value)} className="t-select text-xs">
+                  <option value="">All types</option>
+                  <option value="income">Income</option>
+                  <option value="expense">Expense</option>
+                </select>
+                <select aria-label="Filter by category" value={categoryFilter} onChange={e => setCategoryFilter(e.target.value)} className="t-select text-xs">
+                  <option value="">All categories</option>
+                  {categories.map(c => <option key={c._id} value={c._id}>{c.icon} {c.name}</option>)}
+                </select>
+                <select aria-label="Filter by payment method" value={accountFilter} onChange={e => setAccountFilter(e.target.value)} className="t-select text-xs">
+                  <option value="">All accounts</option>
+                  {accounts.map(a => <option key={a._id} value={a._id}>{a.name}</option>)}
+                </select>
+              </>
+            )}
           </div>
         </div>
       )}

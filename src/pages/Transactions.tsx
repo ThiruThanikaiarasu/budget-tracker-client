@@ -42,8 +42,8 @@ function fmtPaymentTime(dateStr: string): string {
 }
 
 function paymentMonthLabel(dateStr: string): string {
-  const [year, month] = dateStr.split('-').map(Number);
-  return `${MONTHS[month - 1].slice(0, 3).toUpperCase()} '${String(year).slice(-2)}`;
+  const [year, month, day] = dateStr.split('-').map(Number);
+  return `${day} ${MONTHS[month - 1].slice(0, 3).toUpperCase()} '${String(year).slice(-2)}`;
 }
 
 const DETAIL_HEADER_COLOR: Record<string, string> = {

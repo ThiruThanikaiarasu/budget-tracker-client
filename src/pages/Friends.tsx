@@ -48,6 +48,17 @@ function signedShare(expense: SharedExpense, friendId: string): number {
   return 0;
 }
 
+function sharedExpenseLabel(expense: SharedExpense): string {
+  const description = expense.description.trim();
+  if (description && description.toLowerCase() !== 'shared expense') return description;
+
+  if (expense.transactionId && typeof expense.transactionId !== 'string') {
+    return expense.transactionId.categoryId?.name || 'Shared expense';
+  }
+
+  return 'Shared expense';
+}
+
 // A single expense's contribution to the running net balance, including
 // settlements (which cancel debt in the opposite direction).
 function balanceContribution(expense: SharedExpense, friendId: string): number {
@@ -814,7 +825,7 @@ function FriendDetail({ friend, onBack }: { friend: Friend; onBack: () => void }
                       />
                     )}
                     <div>
-                      <h3 className="font-medium text-[var(--c-text)]">{expense.description}</h3>
+                      <h3 className="font-medium text-[var(--c-text)]">{sharedExpenseLabel(expense)}</h3>
                       <p className="mt-1 text-xs text-[var(--c-muted)]">
                         {new Date(expense.date).toLocaleDateString('en-IN', {
                           day: 'numeric',

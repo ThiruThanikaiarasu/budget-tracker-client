@@ -9,6 +9,10 @@ export interface Split {
 
 export interface SharedExpense {
   _id: string;
+  transactionId?: {
+    _id: string;
+    categoryId?: { _id: string; name: string; icon: string } | null;
+  } | string;
   description: string;
   totalAmount: number;
   paidBy: string;

@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
   PieChart,
@@ -15,8 +15,25 @@ import {
 import useDashboardStore from '../store/dashboardStore';
 import useAccountStore from '../store/accountStore';
 import useBudgetStore from '../store/budgetStore';
+import useAuthStore from '../store/authStore';
 import useThemeStore from '../store/themeStore';
 import { renderCategoryIcon } from '../utils/categoryIcons';
+
+function getCurrentFinancialMonth(startDay: number) {
+  const now = new Date();
+  let year = now.getFullYear();
+  let month = now.getMonth() + 1;
+  if (startDay > 1 && now.getDate() >= startDay) {
+    month += 1;
+    if (month > 12) { month = 1; year += 1; }
+  }
+  return `${year}-${String(month).padStart(2, '0')}`;
+}
+
+function formatMonthLabel(month: string) {
+  const [y, m] = month.split('-').map(Number);
+  return new Date(y, m - 1).toLocaleDateString('en-IN', { month: 'long', year: 'numeric' });
+}
 
 const PIE_COLORS = [
   '#3B82F6', '#EF4444', '#10B981', '#F59E0B', '#8B5CF6',
@@ -55,15 +72,28 @@ function Dashboard() {
 
   const { accounts, fetchAccounts } = useAccountStore();
   const { todaySummary, fetchTodaySummary } = useBudgetStore();
+  const { user } = useAuthStore();
+
+  const startDay = user?.financialMonthStartDay ?? 1;
+  const [categoryMonth, setCategoryMonth] = useState(getCurrentFinancialMonth(startDay));
+
+  const navigateCategoryMonth = (delta: number) => {
+    const [y, m] = categoryMonth.split('-').map(Number);
+    const d = new Date(y, m - 1 + delta, 1);
+    setCategoryMonth(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`);
+  };
 
   useEffect(() => {
     fetchSummary();
-    fetchCategoryBreakdown();
     fetchMonthlyTrend();
     fetchRecentTransactions();
     fetchAccounts();
     fetchTodaySummary();
-  }, [fetchSummary, fetchCategoryBreakdown, fetchMonthlyTrend, fetchRecentTransactions, fetchAccounts, fetchTodaySummary]);
+  }, [fetchSummary, fetchMonthlyTrend, fetchRecentTransactions, fetchAccounts, fetchTodaySummary]);
+
+  useEffect(() => {
+    fetchCategoryBreakdown(categoryMonth);
+  }, [categoryMonth, fetchCategoryBreakdown]);
 
   const totalBalance = accounts
     .filter((a) => a.isActive)
@@ -192,10 +222,38 @@ function Dashboard() {
       <div className="analysis-charts grid gap-6 lg:grid-cols-2">
         {/* Category Breakdown - Pie Chart */}
         <div className="analysis-panel rounded-lg bg-white p-5 shadow">
-          <h2 className="text-lg font-semibold text-gray-900">Expense Breakdown</h2>
-          <p className="mb-4 text-sm text-gray-500">By category this month</p>
+          <div className="flex items-center justify-between gap-2">
+            <div>
+              <h2 className="text-lg font-semibold text-gray-900">Expense Breakdown</h2>
+              <p className="text-sm text-gray-500">By category</p>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <button
+                onClick={() => navigateCategoryMonth(-1)}
+                aria-label="Previous month"
+                className="rounded-full p-1.5 text-gray-500 hover:bg-gray-100"
+              >
+                <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2">
+                  <polyline points="15 18 9 12 15 6" />
+                </svg>
+              </button>
+              <span className="min-w-[92px] text-center text-sm font-medium text-gray-700">
+                {formatMonthLabel(categoryMonth)}
+              </span>
+              <button
+                onClick={() => navigateCategoryMonth(1)}
+                aria-label="Next month"
+                className="rounded-full p-1.5 text-gray-500 hover:bg-gray-100"
+              >
+                <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2">
+                  <polyline points="9 18 15 12 9 6" />
+                </svg>
+              </button>
+            </div>
+          </div>
+          <div className="mb-4" />
           {breakdown.length === 0 ? (
-            <p className="py-10 text-center text-sm text-gray-400">No expense data for this month</p>
+            <p className="py-10 text-center text-sm text-gray-400">No expenses in {formatMonthLabel(categoryMonth)}</p>
           ) : (
             <>
               <ResponsiveContainer width="100%" height={isCredWhite ? 220 : 300}>
@@ -252,6 +310,96 @@ function Dashboard() {
             </ResponsiveContainer>
           )}
         </div>
+      </div>
+
+      {/* All Categories */}
+      <div className="analysis-panel analysis-all-categories rounded-lg bg-white p-5 shadow">
+        <div className="flex items-center justify-between gap-2">
+          <div>
+            <h2 className="text-lg font-semibold text-gray-900">All Categories</h2>
+            <p className="text-sm text-gray-500">Every category you spent on, ranked highest first</p>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <button
+              onClick={() => navigateCategoryMonth(-1)}
+              aria-label="Previous month"
+              className="rounded-full p-1.5 text-gray-500 hover:bg-gray-100"
+            >
+              <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2">
+                <polyline points="15 18 9 12 15 6" />
+              </svg>
+            </button>
+            <span className="min-w-[92px] text-center text-sm font-medium text-gray-700">
+              {formatMonthLabel(categoryMonth)}
+            </span>
+            <button
+              onClick={() => navigateCategoryMonth(1)}
+              aria-label="Next month"
+              className="rounded-full p-1.5 text-gray-500 hover:bg-gray-100"
+            >
+              <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2">
+                <polyline points="9 18 15 12 9 6" />
+              </svg>
+            </button>
+          </div>
+        </div>
+
+        {breakdown.length === 0 ? (
+          <p className="py-10 text-center text-sm text-gray-400">No expenses in {formatMonthLabel(categoryMonth)}</p>
+        ) : (
+          (() => {
+            const monthTotal = breakdown.reduce((sum, c) => sum + c.total, 0);
+            return (
+              <div className="mt-4 divide-y divide-gray-100">
+                {breakdown.map((entry, index) => {
+                  const pct = monthTotal > 0 ? (entry.total / monthTotal) * 100 : 0;
+                  return (
+                    <div key={entry.categoryId} className="flex items-center gap-3 py-3">
+                      {isCredWhite ? (
+                        <span className="analysis-category-icon">
+                          {renderCategoryIcon(entry.categoryIcon, entry.categoryName, 32)}
+                        </span>
+                      ) : (
+                        <span
+                          className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full text-sm"
+                          style={{ background: `${(isCredWhite ? CRED_PIE_COLORS : PIE_COLORS)[index % (isCredWhite ? CRED_PIE_COLORS : PIE_COLORS).length]}22` }}
+                        >
+                          {entry.categoryIcon || '💸'}
+                        </span>
+                      )}
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-baseline justify-between gap-2">
+                          <p className="truncate text-sm font-medium text-gray-900">{entry.categoryName}</p>
+                          <p className="whitespace-nowrap text-sm font-semibold text-gray-900">
+                            {formatCurrency(entry.total)}
+                          </p>
+                        </div>
+                        <div className="mt-1.5 flex items-center gap-2">
+                          <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-gray-100">
+                            <div
+                              className="h-full rounded-full"
+                              style={{
+                                width: `${pct}%`,
+                                background: (isCredWhite ? CRED_PIE_COLORS : PIE_COLORS)[index % (isCredWhite ? CRED_PIE_COLORS : PIE_COLORS).length],
+                              }}
+                            />
+                          </div>
+                          <span className="w-10 flex-shrink-0 text-right text-xs text-gray-400">
+                            {pct.toFixed(0)}%
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+                <div className="flex items-center justify-between pt-3 text-sm font-semibold text-gray-900">
+                  <span>Total</span>
+                  <span>{formatCurrency(monthTotal)}</span>
+                </div>
+              </div>
+            );
+          })()
+        )}
       </div>
 
       {/* Recent Transactions */}

@@ -1591,31 +1591,39 @@ function TransactionModal({
                 </div>
                 {isSplit && (
                   <div className="rounded-lg p-3 space-y-3" style={{ background: 'var(--c-surface)' }}>
-                    {/* Horizontal friend picker — drag / two-finger swipe, no scrollbar */}
-                    <div
-                      ref={pickerDrag.ref}
-                      className="flex gap-2 overflow-x-auto py-2 -mx-1 px-1 no-scrollbar select-none cursor-grab active:cursor-grabbing"
-                    >
-                      {sortedFriends.map(f => {
-                        const sel = selectedFriends.includes(f._id);
-                        return (
-                          <button key={f._id} type="button" onClick={() => toggleFriend(f._id)}
-                            className="flex flex-col items-center gap-1 flex-shrink-0 w-14">
-                            <span className="relative rounded-full transition-all"
-                              style={{ boxShadow: sel ? '0 0 0 2px var(--c-surface), 0 0 0 4px var(--c-accent)' : 'none', opacity: sel ? 1 : 0.5 }}>
-                              <AvatarCircle label={initials[f._id]} color={avatarColor(f.name)} size={44} />
-                              {sel && (
-                                <span className="absolute -bottom-0.5 -right-0.5 flex items-center justify-center rounded-full"
-                                  style={{ width: 16, height: 16, background: 'var(--c-accent)', border: '2px solid var(--c-surface)' }}>
-                                  <svg viewBox="0 0 24 24" className="w-2.5 h-2.5" fill="none" stroke="var(--c-accent-fg)" strokeWidth="4"><polyline points="20 6 9 17 4 12" /></svg>
+                    {/* Add more people to the split (anyone besides who already paid) —
+                        only shown when there's someone else who could be added. */}
+                    {sortedFriends.length > 0 && (
+                      <div>
+                        <span className="block text-[10px] uppercase tracking-wider mb-1" style={{ color: 'var(--c-muted)' }}>
+                          Split with — tap to add
+                        </span>
+                        <div
+                          ref={pickerDrag.ref}
+                          className="flex gap-2 overflow-x-auto py-2 -mx-1 px-1 no-scrollbar select-none cursor-grab active:cursor-grabbing"
+                        >
+                          {sortedFriends.map(f => {
+                            const sel = selectedFriends.includes(f._id);
+                            return (
+                              <button key={f._id} type="button" onClick={() => toggleFriend(f._id)}
+                                className="flex flex-col items-center gap-1 flex-shrink-0 w-14">
+                                <span className="relative rounded-full transition-all"
+                                  style={{ boxShadow: sel ? '0 0 0 2px var(--c-surface), 0 0 0 4px var(--c-accent)' : 'none', opacity: sel ? 1 : 0.5 }}>
+                                  <AvatarCircle label={initials[f._id]} color={avatarColor(f.name)} size={44} />
+                                  {sel && (
+                                    <span className="absolute -bottom-0.5 -right-0.5 flex items-center justify-center rounded-full"
+                                      style={{ width: 16, height: 16, background: 'var(--c-accent)', border: '2px solid var(--c-surface)' }}>
+                                      <svg viewBox="0 0 24 24" className="w-2.5 h-2.5" fill="none" stroke="var(--c-accent-fg)" strokeWidth="4"><polyline points="20 6 9 17 4 12" /></svg>
+                                    </span>
+                                  )}
                                 </span>
-                              )}
-                            </span>
-                            <span className="text-[10px] truncate w-full text-center" style={{ color: sel ? 'var(--c-text)' : 'var(--c-muted)' }}>{f.name}</span>
-                          </button>
-                        );
-                      })}
-                    </div>
+                                <span className="text-[10px] truncate w-full text-center" style={{ color: sel ? 'var(--c-text)' : 'var(--c-muted)' }}>{f.name}</span>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
 
                     {/* Editable per-person amounts (You + selected friends) */}
                     {splitActive && (totalAmount || 0) > 0 && (

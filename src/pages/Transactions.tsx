@@ -1301,6 +1301,9 @@ function TransactionModal({
   }, [isEdit, accounts, setValue]);
 
   const [whoPaid, setWhoPaid] = useState<'user' | string>('user');
+  // Whether the "Others" friend list is expanded under Who paid — transient,
+  // collapses once a pick is made so only one friend-list is open at a time.
+  const [whoPaidExpanded, setWhoPaidExpanded] = useState(false);
   const [receivedFrom, setReceivedFrom] = useState<'' | string>('');
   const [isSplit, setIsSplit] = useState(false);
   const [selectedFriends, setSelectedFriends] = useState<string[]>([]);
@@ -1313,6 +1316,7 @@ function TransactionModal({
     // split.paidBy is a fallback for records created before paidByFriendId was added.
     const friendPayer = transaction?.paidByFriendId?._id ?? transaction?.split?.paidBy;
     setWhoPaid((friendPayer && friendPayer !== 'user') ? friendPayer : 'user');
+    setWhoPaidExpanded(false);
     setReceivedFrom(transaction?.receivedFromFriendId?._id ?? '');
 
     const split = transaction?.split;
@@ -1419,7 +1423,7 @@ function TransactionModal({
       if (showReceivedFromFlow && receivedFrom) interacted.add(receivedFrom);
       if (splitActive) selectedFriends.forEach(id => interacted.add(id));
       interacted.forEach(id => recordInteraction(id));
-      reset(); setWhoPaid('user'); setReceivedFrom(''); setIsSplit(false); setSelectedFriends([]); setSplitAmounts({}); setAmountStr('0');
+      reset(); setWhoPaid('user'); setWhoPaidExpanded(false); setReceivedFrom(''); setIsSplit(false); setSelectedFriends([]); setSplitAmounts({}); setAmountStr('0');
       onClose();
     } catch { /* handled by store */ }
   };
@@ -1537,14 +1541,11 @@ function TransactionModal({
             {/* Friend flow */}
             {showFriendFlow && (
               <>
-                <div className="grid grid-cols-2 gap-3 items-start">
-                  <div>
+                <div className="flex items-start gap-4">
+                  <div className="flex-1 min-w-0">
                     <label className="block text-[10px] uppercase tracking-wider mb-1" style={{ color: 'var(--c-muted)' }}>Who paid?</label>
-                    <div
-                      ref={whoPaidDrag.ref}
-                      className="flex gap-2 overflow-x-auto py-1 -mx-1 px-1 no-scrollbar select-none cursor-grab active:cursor-grabbing"
-                    >
-                      <button type="button" onClick={() => setWhoPaid('user')}
+                    <div className="flex gap-2">
+                      <button type="button" onClick={() => { setWhoPaid('user'); setWhoPaidExpanded(false); }}
                         className="flex flex-col items-center gap-1 flex-shrink-0 w-12">
                         <span className="relative rounded-full transition-all"
                           style={{ boxShadow: whoPaid === 'user' ? '0 0 0 2px var(--c-surface), 0 0 0 4px var(--c-accent)' : 'none', opacity: whoPaid === 'user' ? 1 : 0.5 }}>
@@ -1552,40 +1553,70 @@ function TransactionModal({
                         </span>
                         <span className="text-[10px] truncate w-full text-center" style={{ color: whoPaid === 'user' ? 'var(--c-text)' : 'var(--c-muted)' }}>You</span>
                       </button>
-                      {sortedAllFriends.map(f => {
-                        const sel = whoPaid === f._id;
-                        return (
-                          <button key={f._id} type="button" onClick={() => setWhoPaid(f._id)}
-                            className="flex flex-col items-center gap-1 flex-shrink-0 w-12">
-                            <span className="relative rounded-full transition-all"
-                              style={{ boxShadow: sel ? '0 0 0 2px var(--c-surface), 0 0 0 4px var(--c-accent)' : 'none', opacity: sel ? 1 : 0.5 }}>
-                              <AvatarCircle label={initials[f._id]} color={avatarColor(f.name)} size={36} />
+
+                      {/* "Others" — shows the picked friend once chosen; tap toggles the picker below. */}
+                      <button type="button" onClick={() => setWhoPaidExpanded(v => !v)}
+                        className="flex flex-col items-center gap-1 flex-shrink-0 w-12">
+                        <span className="relative rounded-full transition-all"
+                          style={{ boxShadow: (friendPaid || whoPaidExpanded) ? '0 0 0 2px var(--c-surface), 0 0 0 4px var(--c-accent)' : 'none', opacity: (friendPaid || whoPaidExpanded) ? 1 : 0.5 }}>
+                          {friendPaid ? (
+                            <AvatarCircle label={initials[whoPaid]} color={avatarColor(friends.find(f => f._id === whoPaid)?.name ?? '')} size={36} />
+                          ) : (
+                            <span className="split-avatar flex items-center justify-center rounded-full flex-shrink-0"
+                              style={{ width: 36, height: 36, background: 'var(--c-surface2)', color: 'var(--c-muted)' }}>
+                              <svg viewBox="0 0 24 24" style={{ width: 18, height: 18 }} fill="none" stroke="currentColor" strokeWidth="2">
+                                <path d="M17 21v-2a4 4 0 00-3-3.87" /><path d="M13 3.13a4 4 0 010 7.75" />
+                                <path d="M2 21v-2a4 4 0 014-4h4a4 4 0 014 4v2" /><circle cx="8" cy="7" r="4" />
+                              </svg>
                             </span>
-                            <span className="text-[10px] truncate w-full text-center" style={{ color: sel ? 'var(--c-text)' : 'var(--c-muted)' }}>{f.name}</span>
-                          </button>
-                        );
-                      })}
+                          )}
+                        </span>
+                        <span className="text-[10px] truncate w-full text-center" style={{ color: (friendPaid || whoPaidExpanded) ? 'var(--c-text)' : 'var(--c-muted)' }}>
+                          {friendPaid ? friends.find(f => f._id === whoPaid)?.name : 'Others'}
+                        </span>
+                      </button>
                     </div>
+
+                    {whoPaidExpanded && (
+                      <div
+                        ref={whoPaidDrag.ref}
+                        className="flex gap-2 overflow-x-auto py-2 mt-2 -mx-1 px-1 no-scrollbar select-none cursor-grab active:cursor-grabbing"
+                        style={{ borderTop: '1px solid var(--c-border)' }}
+                      >
+                        {sortedAllFriends.map(f => {
+                          const sel = whoPaid === f._id;
+                          return (
+                            <button key={f._id} type="button" onClick={() => { setWhoPaid(f._id); setWhoPaidExpanded(false); }}
+                              className="flex flex-col items-center gap-1 flex-shrink-0 w-12">
+                              <span className="relative rounded-full transition-all"
+                                style={{ boxShadow: sel ? '0 0 0 2px var(--c-surface), 0 0 0 4px var(--c-accent)' : 'none', opacity: sel ? 1 : 0.5 }}>
+                                <AvatarCircle label={initials[f._id]} color={avatarColor(f.name)} size={36} />
+                              </span>
+                              <span className="text-[10px] truncate w-full text-center" style={{ color: sel ? 'var(--c-text)' : 'var(--c-muted)' }}>{f.name}</span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    )}
                   </div>
-                  <div>
+
+                  <div className="flex-shrink-0 flex flex-col items-center">
                     <label className="block text-[10px] uppercase tracking-wider mb-1" style={{ color: 'var(--c-muted)' }}>Split?</label>
                     <button
                       type="button"
+                      aria-label={isSplit ? 'Split on' : 'Split off'}
+                      title="Split"
                       onClick={() => {
                         const next = !isSplit;
                         setIsSplit(next);
+                        setWhoPaidExpanded(false);
                         if (!next) setSplitAmounts({});
                         if (next && splitCandidateFriends.length === 1 && selectedFriends.length === 0) setSelectedFriends([splitCandidateFriends[0]._id]);
                       }}
-                      className="w-full flex items-center justify-center gap-1.5 rounded-lg py-2.5 text-xs font-semibold"
-                      style={{ background: isSplit ? 'var(--c-accent)' : 'var(--c-surface2)', color: isSplit ? 'var(--c-accent-fg)' : 'var(--c-muted)' }}
+                      className="rounded-full flex items-center justify-center flex-shrink-0"
+                      style={{ width: 36, height: 36, background: isSplit ? 'var(--c-accent)' : 'var(--c-surface2)', color: isSplit ? 'var(--c-accent-fg)' : 'var(--c-muted)' }}
                     >
-                      {isSplit && (
-                        <svg viewBox="0 0 24 24" className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="3">
-                          <polyline points="20 6 9 17 4 12" />
-                        </svg>
-                      )}
-                      Split
+                      <span style={{ fontSize: 16, lineHeight: 1 }}>✂</span>
                     </button>
                   </div>
                 </div>

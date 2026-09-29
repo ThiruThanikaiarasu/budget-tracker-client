@@ -1336,6 +1336,7 @@ function TransactionModal({
   const showReceivedFromFlow = hasFriends && selectedType === 'income';
   const friendPaid = whoPaid !== 'user';
   const pickerDrag = useDragScroll();
+  const whoPaidDrag = useDragScroll();
   const recordInteraction = useFriendStore((s) => s.recordInteraction);
   // The payer can't also be a split recipient — splits are what OTHER
   // friends owe (the user's own share is always the implicit remainder).
@@ -1344,6 +1345,7 @@ function TransactionModal({
     [friends, friendPaid, whoPaid]
   );
   const sortedFriends = useMemo(() => sortByFrecency(splitCandidateFriends), [splitCandidateFriends]);
+  const sortedAllFriends = useMemo(() => sortByFrecency(friends), [friends]);
   const initials = useMemo(() => computeInitials(friends), [friends]);
 
   // If the payer changes to someone already picked as a split recipient,
@@ -1535,23 +1537,56 @@ function TransactionModal({
             {/* Friend flow */}
             {showFriendFlow && (
               <>
-                <div>
-                  <label className="block text-[10px] uppercase tracking-wider mb-1" style={{ color: 'var(--c-muted)' }}>Who paid?</label>
-                  <select value={whoPaid} onChange={e => setWhoPaid(e.target.value)} className="t-select">
-                    <option value="user">You</option>
-                    {friends.map(f => <option key={f._id} value={f._id}>{f.name}</option>)}
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-[10px] uppercase tracking-wider mb-1" style={{ color: 'var(--c-muted)' }}>Split?</label>
-                  <div className="flex gap-2">
-                    {[false, true].map(v => (
-                      <button key={String(v)} type="button" onClick={() => { setIsSplit(v); if (!v) { setSplitAmounts({}); } if (v && splitCandidateFriends.length === 1 && selectedFriends.length === 0) setSelectedFriends([splitCandidateFriends[0]._id]); }}
-                        className="flex-1 rounded-lg py-2 text-xs font-semibold"
-                        style={{ background: isSplit === v ? 'var(--c-accent)' : 'var(--c-surface2)', color: isSplit === v ? 'var(--c-accent-fg)' : 'var(--c-muted)' }}>
-                        {v ? 'Yes' : 'No'}
+                <div className="grid grid-cols-2 gap-3 items-start">
+                  <div>
+                    <label className="block text-[10px] uppercase tracking-wider mb-1" style={{ color: 'var(--c-muted)' }}>Who paid?</label>
+                    <div
+                      ref={whoPaidDrag.ref}
+                      className="flex gap-2 overflow-x-auto py-1 -mx-1 px-1 no-scrollbar select-none cursor-grab active:cursor-grabbing"
+                    >
+                      <button type="button" onClick={() => setWhoPaid('user')}
+                        className="flex flex-col items-center gap-1 flex-shrink-0 w-12">
+                        <span className="relative rounded-full transition-all"
+                          style={{ boxShadow: whoPaid === 'user' ? '0 0 0 2px var(--c-surface), 0 0 0 4px var(--c-accent)' : 'none', opacity: whoPaid === 'user' ? 1 : 0.5 }}>
+                          <AvatarCircle isUser size={36} />
+                        </span>
+                        <span className="text-[10px] truncate w-full text-center" style={{ color: whoPaid === 'user' ? 'var(--c-text)' : 'var(--c-muted)' }}>You</span>
                       </button>
-                    ))}
+                      {sortedAllFriends.map(f => {
+                        const sel = whoPaid === f._id;
+                        return (
+                          <button key={f._id} type="button" onClick={() => setWhoPaid(f._id)}
+                            className="flex flex-col items-center gap-1 flex-shrink-0 w-12">
+                            <span className="relative rounded-full transition-all"
+                              style={{ boxShadow: sel ? '0 0 0 2px var(--c-surface), 0 0 0 4px var(--c-accent)' : 'none', opacity: sel ? 1 : 0.5 }}>
+                              <AvatarCircle label={initials[f._id]} color={avatarColor(f.name)} size={36} />
+                            </span>
+                            <span className="text-[10px] truncate w-full text-center" style={{ color: sel ? 'var(--c-text)' : 'var(--c-muted)' }}>{f.name}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-[10px] uppercase tracking-wider mb-1" style={{ color: 'var(--c-muted)' }}>Split?</label>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const next = !isSplit;
+                        setIsSplit(next);
+                        if (!next) setSplitAmounts({});
+                        if (next && splitCandidateFriends.length === 1 && selectedFriends.length === 0) setSelectedFriends([splitCandidateFriends[0]._id]);
+                      }}
+                      className="w-full flex items-center justify-center gap-1.5 rounded-lg py-2.5 text-xs font-semibold"
+                      style={{ background: isSplit ? 'var(--c-accent)' : 'var(--c-surface2)', color: isSplit ? 'var(--c-accent-fg)' : 'var(--c-muted)' }}
+                    >
+                      {isSplit && (
+                        <svg viewBox="0 0 24 24" className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="3">
+                          <polyline points="20 6 9 17 4 12" />
+                        </svg>
+                      )}
+                      Split
+                    </button>
                   </div>
                 </div>
                 {isSplit && (

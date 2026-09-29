@@ -112,8 +112,7 @@ const SIDEBAR_NAV = [
   { to: '/accounts', label: 'Accounts', icon: Icons.accounts },
   { to: '/categories', label: 'Categories', icon: Icons.categories },
   { to: '/friends', label: 'Friends', icon: Icons.friends },
-  { to: '/investments', label: 'Investments', icon: Icons.investments },
-  { to: '/watchlist', label: 'Watchlist', icon: Icons.watchlist },
+  { to: '/investment', label: 'Investment', icon: Icons.investments },
   { to: '/personalization', label: 'Settings', icon: Icons.settings },
 ];
 

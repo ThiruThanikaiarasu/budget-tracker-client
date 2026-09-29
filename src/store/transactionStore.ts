@@ -17,6 +17,8 @@ export interface Transaction {
   toAccountId?: { _id: string; name: string };
   /** Populated when a friend paid on behalf of the user. */
   paidByFriendId?: { _id: string; name: string };
+  /** Populated when a friend sent this income directly (no tracked debt). */
+  receivedFromFriendId?: { _id: string; name: string };
   /** Balance-reconciliation entry ("Clean up · new journey"); excluded from totals. */
   isAdjustment?: boolean;
   note?: string;
@@ -43,6 +45,7 @@ export interface TransactionFilters {
   type?: string;
   categoryId?: string;
   accountId?: string;
+  search?: string;
   page?: number;
   append?: boolean;
 }
@@ -56,6 +59,7 @@ interface CreateTransactionData {
   note?: string;
   date: string;
   paidByFriendId?: string;
+  receivedFromFriendId?: string;
   splits?: { friendId: string; amount: number }[];
 }
 
@@ -73,7 +77,7 @@ interface TransactionState {
   summary: TransactionsSummary | null;
   fetchTransactions: (filters?: TransactionFilters) => Promise<void>;
   fetchTransactionsSummary: (
-    filters?: Pick<TransactionFilters, 'dateFrom' | 'dateTo' | 'type' | 'categoryId' | 'accountId'>
+    filters?: Pick<TransactionFilters, 'dateFrom' | 'dateTo' | 'type' | 'categoryId' | 'accountId' | 'search'>
   ) => Promise<void>;
   createTransaction: (data: CreateTransactionData) => Promise<void>;
   updateTransaction: (id: string, data: CreateTransactionData) => Promise<void>;
@@ -98,6 +102,7 @@ const useTransactionStore = create<TransactionState>((set) => ({
       if (filters?.type) params.set('type', filters.type);
       if (filters?.categoryId) params.set('categoryId', filters.categoryId);
       if (filters?.accountId) params.set('accountId', filters.accountId);
+      if (filters?.search) params.set('search', filters.search);
       if (filters?.page) params.set('page', String(filters.page));
 
       const { data } = await api.get(`/transactions?${params.toString()}`);
@@ -133,6 +138,7 @@ const useTransactionStore = create<TransactionState>((set) => ({
       if (filters?.type) params.set('type', filters.type);
       if (filters?.categoryId) params.set('categoryId', filters.categoryId);
       if (filters?.accountId) params.set('accountId', filters.accountId);
+      if (filters?.search) params.set('search', filters.search);
 
       const { data } = await api.get(`/transactions/summary?${params.toString()}`);
       set({ summary: data.summary });

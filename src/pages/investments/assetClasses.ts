@@ -16,7 +16,7 @@ export interface AssetClassMeta {
 }
 
 export const ASSET_CLASSES: AssetClassMeta[] = [
-  { value: 'stocks', label: 'Indian Stocks', icon: '\u{1F4C8}', mode: 'holdings', hasSector: true, route: '/investments/stocks' },
+  { value: 'stocks', label: 'Indian Stocks', icon: '\u{1F4C8}', mode: 'holdings', hasSector: true, route: '/investment/stocks' },
   { value: 'index_fund', label: 'Index Funds', icon: '\u{1F4CA}', mode: 'holdings', hasSector: false },
   { value: 'mutual_fund', label: 'Mutual Funds', icon: '\u{1F4B9}', mode: 'holdings', hasSector: false },
   { value: 'us_stock', label: 'US Stocks', icon: '\u{1F1FA}\u{1F1F8}', mode: 'holdings', hasSector: true },

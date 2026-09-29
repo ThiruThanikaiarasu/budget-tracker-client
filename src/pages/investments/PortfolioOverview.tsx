@@ -111,7 +111,7 @@ export default function PortfolioOverview() {
           <p className="mt-1 text-sm text-gray-500">Your investments across every asset class</p>
         </div>
         <Link
-          to="/investments/assets"
+          to="/investment/assets"
           className="inline-flex items-center gap-2 whitespace-nowrap rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
         >
           <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">

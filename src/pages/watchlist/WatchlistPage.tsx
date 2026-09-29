@@ -30,7 +30,7 @@ export default function WatchlistPage() {
   const [itemModal, setItemModal] = useState<{ listId: string; item?: WatchlistItem } | null>(null);
 
   const openDetail = (item: WatchlistItem) =>
-    navigate(`/stocks/${item.symbol}?exchange=${item.exchange}&name=${encodeURIComponent(item.name)}`);
+    navigate(`/investment/stocks/${item.symbol}?exchange=${item.exchange}&name=${encodeURIComponent(item.name)}`);
 
   useEffect(() => {
     fetchWatchlists();

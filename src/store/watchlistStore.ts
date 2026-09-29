@@ -14,6 +14,7 @@ export interface WatchlistItem {
   notes?: string;
   lastPrice?: number;
   lastPriceAt?: string;
+  domainIds?: string[];
 }
 
 export interface Watchlist {
@@ -39,6 +40,7 @@ export interface EditItemData {
   name?: string;
   targetBuyPrice?: number;
   notes?: string;
+  domainIds?: string[];
 }
 
 interface WatchlistState {

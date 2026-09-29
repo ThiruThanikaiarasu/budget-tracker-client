@@ -67,7 +67,7 @@ export default function StockDetailPage() {
     <div className="space-y-6 p-4 sm:p-6">
       {/* Header */}
       <div>
-        <Link to="/watchlist" className="text-sm text-blue-600 hover:underline">
+        <Link to="/investment/watchlist" className="text-sm text-blue-600 hover:underline">
           ← Watchlist
         </Link>
         <div className="mt-1 flex flex-wrap items-baseline gap-x-3 gap-y-1">

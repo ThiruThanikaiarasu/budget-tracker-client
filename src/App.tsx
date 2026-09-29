@@ -3,6 +3,7 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
 import useThemeStore from './store/themeStore';
 import MainLayout from './layouts/MainLayout';
+import InvestmentLayout from './layouts/InvestmentLayout';
 import Dashboard from './pages/Dashboard';
 import Accounts from './pages/Accounts';
 import Transactions from './pages/Transactions';
@@ -11,6 +12,7 @@ import PortfolioOverview from './pages/investments/PortfolioOverview';
 import AssetClassesPage from './pages/investments/AssetClassesPage';
 import StocksPage from './pages/investments/StocksPage';
 import WatchlistPage from './pages/watchlist/WatchlistPage';
+import WishlistDashboard from './pages/wishlist/WishlistDashboard';
 import StockDetailPage from './pages/stocks/StockDetailPage';
 import Categories from './pages/Categories';
 import Personalization from './pages/Personalization';
@@ -41,11 +43,14 @@ function App() {
             <Route path="/accounts" element={<Accounts />} />
             <Route path="/transactions" element={<Transactions />} />
             <Route path="/friends" element={<Friends />} />
-            <Route path="/investments" element={<PortfolioOverview />} />
-            <Route path="/investments/assets" element={<AssetClassesPage />} />
-            <Route path="/investments/stocks" element={<StocksPage />} />
-            <Route path="/watchlist" element={<WatchlistPage />} />
-            <Route path="/stocks/:symbol" element={<StockDetailPage />} />
+            <Route path="/investment" element={<InvestmentLayout />}>
+              <Route index element={<PortfolioOverview />} />
+              <Route path="assets" element={<AssetClassesPage />} />
+              <Route path="stocks" element={<StocksPage />} />
+              <Route path="stocks/:symbol" element={<StockDetailPage />} />
+              <Route path="watchlist" element={<WatchlistPage />} />
+              <Route path="wishlist" element={<WishlistDashboard />} />
+            </Route>
             <Route path="/budget" element={<Budget />} />
             <Route path="/categories" element={<Categories />} />
             <Route path="/personalization" element={<Personalization />} />

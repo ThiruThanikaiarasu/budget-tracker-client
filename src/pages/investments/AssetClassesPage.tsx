@@ -39,7 +39,7 @@ export default function AssetClassesPage() {
     <div className="space-y-6 p-4 sm:p-6">
       {/* Header */}
       <div>
-        <Link to="/investments" className="text-sm text-blue-600 hover:underline">
+        <Link to="/investment" className="text-sm text-blue-600 hover:underline">
           ← Portfolio
         </Link>
         <h1 className="mt-1 text-2xl font-bold text-gray-900">Asset Classes</h1>

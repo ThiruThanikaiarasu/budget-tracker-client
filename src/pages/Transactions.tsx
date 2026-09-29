@@ -42,8 +42,8 @@ function fmtPaymentTime(dateStr: string): string {
 }
 
 function paymentMonthLabel(dateStr: string): string {
-  const [year, month, day] = dateStr.split('-').map(Number);
-  return `${day} ${MONTHS[month - 1].slice(0, 3).toUpperCase()} '${String(year).slice(-2)}`;
+  const [, month, day] = dateStr.split('-').map(Number);
+  return `${day} ${MONTHS[month - 1].slice(0, 3).toUpperCase()}`;
 }
 
 const DETAIL_HEADER_COLOR: Record<string, string> = {
@@ -513,6 +513,11 @@ function Transactions() {
   const [categoryFilter, setCategoryFilter] = useState('');
   const [accountFilter, setAccountFilter] = useState('');
 
+  // Search (notes / category name / amount) — debounced so we don't refetch
+  // on every keystroke. Always scoped to the viewed month via dateFrom/dateTo.
+  const [searchQuery, setSearchQuery] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
+
   useEffect(() => {
     if (navState?.openCreate) {
       navigate(location.pathname, { replace: true, state: null });
@@ -526,6 +531,11 @@ function Transactions() {
     fetchFriends();
     fetchTodaySummary();
   }, [fetchCategories, fetchAccounts, fetchFriends, fetchTodaySummary]);
+
+  useEffect(() => {
+    const id = setTimeout(() => setDebouncedSearch(searchQuery.trim()), 300);
+    return () => clearTimeout(id);
+  }, [searchQuery]);
 
   // Derive dateFrom / dateTo from viewYear + viewMonth
   const dateFrom = `${viewYear}-${String(viewMonth + 1).padStart(2, '0')}-01`;
@@ -542,8 +552,9 @@ function Transactions() {
       type: typeFilter || undefined,
       categoryId: categoryFilter || undefined,
       accountId: accountFilter || undefined,
+      search: debouncedSearch || undefined,
     }),
-    [dateFrom, dateTo, typeFilter, categoryFilter, accountFilter]
+    [dateFrom, dateTo, typeFilter, categoryFilter, accountFilter, debouncedSearch]
   );
 
   const load = useCallback(
@@ -676,6 +687,38 @@ function Transactions() {
             </span>
           </div>
         </div>
+
+        {/* Search — notes, category or amount, within the viewed month */}
+        <div className="transactions-search mt-4">
+          <div className="transactions-search-field flex items-center gap-2 rounded-lg px-3" style={{ background: 'var(--c-surface)', border: '1px solid var(--c-border)' }}>
+            <svg viewBox="0 0 24 24" className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" strokeWidth="2" style={{ color: 'var(--c-muted)' }}>
+              <circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" />
+            </svg>
+            <input
+              type="search"
+              inputMode="search"
+              value={searchQuery}
+              onChange={e => setSearchQuery(e.target.value)}
+              placeholder="Search notes, category or amount"
+              aria-label="Search transactions this month"
+              className="w-full bg-transparent py-2 text-sm outline-none"
+              style={{ color: 'var(--c-text)' }}
+            />
+            {searchQuery && (
+              <button
+                type="button"
+                onClick={() => setSearchQuery('')}
+                aria-label="Clear search"
+                className="shrink-0 p-1"
+                style={{ color: 'var(--c-muted)' }}
+              >
+                <svg viewBox="0 0 24 24" className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2">
+                  <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
+                </svg>
+              </button>
+            )}
+          </div>
+        </div>
       </div>
 
       {/* ── Filter panel ──────────────────────────────────────────── */}
@@ -744,7 +787,9 @@ function Transactions() {
         ) : sortedDates.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-20 gap-3">
             <span className="text-4xl opacity-30">📋</span>
-            <p className="text-sm" style={{ color: 'var(--c-muted)' }}>No transactions this month</p>
+            <p className="text-sm" style={{ color: 'var(--c-muted)' }}>
+              {debouncedSearch ? 'No matching transactions this month' : 'No transactions this month'}
+            </p>
           </div>
         ) : (
           sortedDates.map(dateKey => (
@@ -818,6 +863,14 @@ function Transactions() {
                       {isSplit && (
                         <span className="text-[11px] leading-none" style={{ color: '#5080c0' }} title="Split">
                           ✂
+                        </span>
+                      )}
+                      {tx.type === 'income' && tx.receivedFromFriendId && (
+                        <span
+                          className="inline-flex items-center rounded px-1.5 py-0.5 text-[10px]"
+                          style={{ background: 'var(--c-surface2)', color: 'var(--c-muted)' }}
+                        >
+                          From {tx.receivedFromFriendId.name}
                         </span>
                       )}
                     </div>
@@ -956,6 +1009,18 @@ function Transactions() {
                     </span>
                   </div>
                 ) : null}
+                {detailTx.type === 'income' && detailTx.receivedFromFriendId && (
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm" style={{ color: 'var(--c-muted)' }}>Received from</span>
+                    <span
+                      className="transaction-detail-chip flex items-center gap-2 rounded-lg px-3 py-1.5"
+                      style={{ background: 'var(--c-surface2)', color: 'var(--c-text)' }}
+                    >
+                      <span className="text-sm">👤</span>
+                      <span className="text-sm font-medium">{detailTx.receivedFromFriendId.name}</span>
+                    </span>
+                  </div>
+                )}
                 {detailTx.type === 'transfer' && detailTx.toAccountId && (
                   <div className="flex items-center justify-between">
                     <span className="text-sm" style={{ color: 'var(--c-muted)' }}>To</span>
@@ -1236,6 +1301,7 @@ function TransactionModal({
   }, [isEdit, accounts, setValue]);
 
   const [whoPaid, setWhoPaid] = useState<'user' | string>('user');
+  const [receivedFrom, setReceivedFrom] = useState<'' | string>('');
   const [isSplit, setIsSplit] = useState(false);
   const [selectedFriends, setSelectedFriends] = useState<string[]>([]);
   const [splitAmounts, setSplitAmounts] = useState<Record<string, number>>({});
@@ -1247,6 +1313,7 @@ function TransactionModal({
     // split.paidBy is a fallback for records created before paidByFriendId was added.
     const friendPayer = transaction?.paidByFriendId?._id ?? transaction?.split?.paidBy;
     setWhoPaid((friendPayer && friendPayer !== 'user') ? friendPayer : 'user');
+    setReceivedFrom(transaction?.receivedFromFriendId?._id ?? '');
 
     const split = transaction?.split;
     if (split && split.splits.length > 0) {
@@ -1263,6 +1330,7 @@ function TransactionModal({
 
   const hasFriends = friends.length > 0;
   const showFriendFlow = hasFriends && selectedType === 'expense';
+  const showReceivedFromFlow = hasFriends && selectedType === 'income';
   const friendPaid = whoPaid !== 'user';
   const pickerDrag = useDragScroll();
   const recordInteraction = useFriendStore((s) => s.recordInteraction);
@@ -1307,6 +1375,7 @@ function TransactionModal({
       const payload: any = { type: data.type, amount: data.amount, categoryId: data.categoryId, date: data.date, note: data.note };
       if (friendPaid) payload.paidByFriendId = whoPaid;
       else payload.accountId = data.accountId;
+      if (showReceivedFromFlow && receivedFrom) payload.receivedFromFriendId = receivedFrom;
       if (splitActive) {
         if (!splitCalc.valid) return; // amounts must sum to the total
         payload.splits = selectedFriends.map(id => ({ friendId: id, amount: splitCalc.shares[id] ?? 0 }));
@@ -1315,9 +1384,10 @@ function TransactionModal({
       // Learn which friends get used together (frequent-first ordering).
       const interacted = new Set<string>();
       if (friendPaid) interacted.add(whoPaid);
+      if (showReceivedFromFlow && receivedFrom) interacted.add(receivedFrom);
       if (splitActive) selectedFriends.forEach(id => interacted.add(id));
       interacted.forEach(id => recordInteraction(id));
-      reset(); setWhoPaid('user'); setIsSplit(false); setSelectedFriends([]); setSplitAmounts({}); setAmountStr('0');
+      reset(); setWhoPaid('user'); setReceivedFrom(''); setIsSplit(false); setSelectedFriends([]); setSplitAmounts({}); setAmountStr('0');
       onClose();
     } catch { /* handled by store */ }
   };
@@ -1418,6 +1488,17 @@ function TransactionModal({
               <div className="rounded-lg p-3" style={{ background: 'rgba(201,167,47,0.12)', border: '1px solid rgba(201,167,47,0.3)' }}>
                 <p className="text-xs font-semibold" style={{ color: 'var(--c-accent)' }}>⚠ Budget alert</p>
                 {budgetWarning.map((w, i) => <p key={i} className="text-xs mt-0.5" style={{ color: 'var(--c-muted)' }}>{w}</p>)}
+              </div>
+            )}
+
+            {/* Received from friend (income only) */}
+            {showReceivedFromFlow && (
+              <div>
+                <label className="block text-[10px] uppercase tracking-wider mb-1" style={{ color: 'var(--c-muted)' }}>Received from</label>
+                <select value={receivedFrom} onChange={e => setReceivedFrom(e.target.value)} className="t-select">
+                  <option value="">Nobody / regular income</option>
+                  {friends.map(f => <option key={f._id} value={f._id}>{f.name}</option>)}
+                </select>
               </div>
             )}
 

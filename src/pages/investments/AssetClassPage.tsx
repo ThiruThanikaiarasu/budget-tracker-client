@@ -57,7 +57,7 @@ export default function AssetClassPage({ assetClass }: { assetClass: InvestmentT
       {/* Header */}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <Link to="/investments" className="text-sm text-blue-600 hover:underline">
+          <Link to="/investment" className="text-sm text-blue-600 hover:underline">
             ← Portfolio
           </Link>
           <h1 className="mt-1 flex items-center gap-2 text-2xl font-bold text-gray-900">

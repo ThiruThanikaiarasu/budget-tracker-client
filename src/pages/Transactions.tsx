@@ -1319,7 +1319,10 @@ function TransactionModal({
     if (split && split.splits.length > 0) {
       const idOf = (f: { _id: string } | string) => typeof f === 'string' ? f : f._id;
       setIsSplit(true);
-      setSelectedFriends(split.splits.map(s => idOf(s.friendId)));
+      // The payer's own share (when friend paid) is represented as a
+      // participant row automatically, not via the "other friends" picker.
+      const payerId = (friendPayer && friendPayer !== 'user') ? friendPayer : null;
+      setSelectedFriends(split.splits.map(s => idOf(s.friendId)).filter(id => id !== payerId));
       setSplitAmounts(Object.fromEntries(split.splits.map(s => [idOf(s.friendId), s.amount])));
     } else {
       setIsSplit(false);
@@ -1351,8 +1354,15 @@ function TransactionModal({
     setSelectedFriends(p => p.filter(id => id !== whoPaid));
     setSplitAmounts(p => { const { [whoPaid]: _drop, ...rest } = p; return rest; });
   }, [whoPaid, friendPaid]);
-  const participantKeys = useMemo(() => [USER_KEY, ...selectedFriends], [selectedFriends]);
-  const splitActive = showFriendFlow && isSplit && selectedFriends.length > 0;
+  // When a friend paid, they're always a participant too — their own share
+  // is what's NOT owed back, same as the user's share is when the user pays.
+  const participantKeys = useMemo(
+    () => friendPaid ? [USER_KEY, whoPaid, ...selectedFriends] : [USER_KEY, ...selectedFriends],
+    [friendPaid, whoPaid, selectedFriends]
+  );
+  // Splitting with just the payer (a straight 2-way split) is meaningful on
+  // its own — it doesn't require picking any other friend first.
+  const splitActive = showFriendFlow && isSplit && (friendPaid || selectedFriends.length > 0);
   const splitCalc = computeSplit(totalAmount || 0, participantKeys, splitAmounts);
   const splitValid = !splitActive || splitCalc.valid;
 
@@ -1393,7 +1403,12 @@ function TransactionModal({
       if (showReceivedFromFlow && receivedFrom) payload.receivedFromFriendId = receivedFrom;
       if (splitActive) {
         if (!splitCalc.valid) return; // amounts must sum to the total
-        payload.splits = selectedFriends.map(id => ({ friendId: id, amount: splitCalc.shares[id] ?? 0 }));
+        // Every non-user participant's share, including the payer's own (when
+        // a friend paid) — that's what lets the server compute the user's
+        // actual owed amount as less than the full bill.
+        payload.splits = participantKeys
+          .filter(id => id !== USER_KEY)
+          .map(id => ({ friendId: id, amount: splitCalc.shares[id] ?? 0 }));
       }
       await onSubmit(payload);
       // Learn which friends get used together (frequent-first ordering).

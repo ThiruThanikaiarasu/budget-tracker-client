@@ -1334,8 +1334,23 @@ function TransactionModal({
   const friendPaid = whoPaid !== 'user';
   const pickerDrag = useDragScroll();
   const recordInteraction = useFriendStore((s) => s.recordInteraction);
-  const sortedFriends = useMemo(() => sortByFrecency(friends), [friends]);
+  // The payer can't also be a split recipient — splits are what OTHER
+  // friends owe (the user's own share is always the implicit remainder).
+  const splitCandidateFriends = useMemo(
+    () => (friendPaid ? friends.filter(f => f._id !== whoPaid) : friends),
+    [friends, friendPaid, whoPaid]
+  );
+  const sortedFriends = useMemo(() => sortByFrecency(splitCandidateFriends), [splitCandidateFriends]);
   const initials = useMemo(() => computeInitials(friends), [friends]);
+
+  // If the payer changes to someone already picked as a split recipient,
+  // drop them from the split — they can't owe themselves.
+  useEffect(() => {
+    if (!friendPaid) return;
+    if (!selectedFriends.includes(whoPaid)) return;
+    setSelectedFriends(p => p.filter(id => id !== whoPaid));
+    setSplitAmounts(p => { const { [whoPaid]: _drop, ...rest } = p; return rest; });
+  }, [whoPaid, friendPaid]);
   const participantKeys = useMemo(() => [USER_KEY, ...selectedFriends], [selectedFriends]);
   const splitActive = showFriendFlow && isSplit && selectedFriends.length > 0;
   const splitCalc = computeSplit(totalAmount || 0, participantKeys, splitAmounts);
@@ -1516,7 +1531,7 @@ function TransactionModal({
                   <label className="block text-[10px] uppercase tracking-wider mb-1" style={{ color: 'var(--c-muted)' }}>Split?</label>
                   <div className="flex gap-2">
                     {[false, true].map(v => (
-                      <button key={String(v)} type="button" onClick={() => { setIsSplit(v); if (!v) { setSplitAmounts({}); } if (v && friends.length === 1 && selectedFriends.length === 0) setSelectedFriends([friends[0]._id]); }}
+                      <button key={String(v)} type="button" onClick={() => { setIsSplit(v); if (!v) { setSplitAmounts({}); } if (v && splitCandidateFriends.length === 1 && selectedFriends.length === 0) setSelectedFriends([splitCandidateFriends[0]._id]); }}
                         className="flex-1 rounded-lg py-2 text-xs font-semibold"
                         style={{ background: isSplit === v ? 'var(--c-accent)' : 'var(--c-surface2)', color: isSplit === v ? 'var(--c-accent-fg)' : 'var(--c-muted)' }}>
                         {v ? 'Yes' : 'No'}

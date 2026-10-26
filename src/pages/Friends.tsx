@@ -70,6 +70,35 @@ function balanceContribution(expense: SharedExpense, friendId: string): number {
   return 0;
 }
 
+// CSV of every shared expense and settlement with this friend (outstanding and settled).
+function downloadFriendCsv(friend: Friend, expenses: SharedExpense[]) {
+  const cell = (v: string) => `"${v.replace(/"/g, '""')}"`;
+  // Leading =,+,-,@ would run as a formula in Excel; applied to free-text columns only.
+  const text = (v: string) => (/^[=+\-@]/.test(v) ? `'${v}` : v);
+  const covered = new Set(expenses.flatMap((e) => (e.isSettlement ? e.coveredExpenseIds ?? [] : [])));
+  const rows = [['Date', 'Type', 'Description', 'Paid by', 'Total amount', 'Balance effect', 'Status', 'Settlement method']];
+  for (const e of [...expenses].sort((a, b) => +new Date(b.date) - +new Date(a.date))) {
+    rows.push([
+      new Date(e.date).toISOString().slice(0, 10),
+      e.isSettlement ? 'Settlement' : 'Expense',
+      e.isSettlement ? 'Settlement' : text(sharedExpenseLabel(e)),
+      e.paidBy === 'user' ? 'You' : text(getFriendName(e, friend)),
+      e.totalAmount.toFixed(2),
+      // + friend owes you, - you owe friend
+      balanceContribution(e, friend._id).toFixed(2),
+      e.isSettlement ? '' : covered.has(e._id) ? 'Settled' : 'Outstanding',
+      e.settlementMethod ?? '',
+    ]);
+  }
+  const csv = '\uFEFF' + rows.map((r) => r.map(cell).join(',')).join('\r\n');
+  const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }));
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `${friend.name.replace(/[^\w-]+/g, '_')}_${new Date().toISOString().slice(0, 10)}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
 // --- Main Page ---
 
 function Friends() {
@@ -718,12 +747,21 @@ function FriendDetail({ friend, onBack }: { friend: Friend; onBack: () => void }
     <div className="p-6 pb-24">
       {/* Header */}
       <div>
-        <button
-          onClick={onBack}
-          className="-ml-2 flex items-center gap-1 rounded-md px-2 py-1 text-sm font-medium text-[var(--c-muted)] hover:bg-[var(--c-surface2)]"
-        >
-          &larr; Back
-        </button>
+        <div className="flex items-center justify-between">
+          <button
+            onClick={onBack}
+            className="-ml-2 flex items-center gap-1 rounded-md px-2 py-1 text-sm font-medium text-[var(--c-muted)] hover:bg-[var(--c-surface2)]"
+          >
+            &larr; Back
+          </button>
+          <button
+            onClick={() => downloadFriendCsv(friend, expenses)}
+            disabled={isLoading || expenses.length === 0}
+            className="rounded-md px-2 py-1 text-sm font-medium text-[var(--c-accent)] hover:bg-[var(--c-surface2)] disabled:opacity-40"
+          >
+            Export CSV
+          </button>
+        </div>
 
         <div className="mt-3 flex flex-col items-center text-center">
           <div className="flex h-16 w-16 items-center justify-center rounded-full bg-[var(--c-surface2)] text-2xl font-bold text-[var(--c-accent)]">

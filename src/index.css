@@ -2380,3 +2380,8 @@ html, body { overscroll-behavior: none; }
   .cartoon-record .cartoon-record-amount { align-self: flex-start; }
   .cartoon-record.is-two-row .cartoon-record-amount { justify-content: flex-start; gap: 4px; }
 }
+
+/* Receipts: the buttons stay in reach while the receipt scrolls; TOTAL never gets squeezed */
+.rcpt-bar { position: sticky; top: 0; z-index: 3; margin: -16px -16px 14px; padding: 12px 16px; background: var(--c-cream); }
+.rcpt-line.is-total .rcpt-name { flex: none; overflow: visible; }
+.rcpt-line.is-total .rcpt-count { min-width: 0; white-space: normal; line-height: 1.1; }

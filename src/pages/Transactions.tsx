@@ -1193,7 +1193,7 @@ function Transactions() {
         <Dialog open onClose={() => setDetailTx(null)} className="relative z-50">
           <div className="fixed inset-0 bg-black/60" />
           <div className="fixed inset-0 flex items-center justify-center p-4">
-            <DialogPanel className="transaction-detail w-full max-w-sm rounded-2xl overflow-hidden shadow-2xl">
+            <DialogPanel className="transaction-detail w-full max-w-sm max-h-[92vh] overflow-y-auto overscroll-contain rounded-2xl shadow-2xl">
               <TransactionDetail
                 tx={detailTx}
                 isCredWhite={isCredWhite}

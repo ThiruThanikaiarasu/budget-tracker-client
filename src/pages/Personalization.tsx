@@ -4,6 +4,8 @@ import useThemeStore, { THEMES } from '../store/themeStore';
 import useAccountStore from '../store/accountStore';
 import useTransactionStore from '../store/transactionStore';
 import Amount from '../components/Amount';
+import CartoonIcon from '../components/CartoonIcon';
+import { CartoonHead, Sticker } from '../components/cartoon';
 
 function getOrdinalSuffix(n: number): string {
   const s = ['th', 'st', 'nd', 'rd'];
@@ -17,6 +19,16 @@ function getFinancialMonthPreview(startDay: number): string {
   return `${getOrdinalSuffix(startDay)} of prev month to ${getOrdinalSuffix(endDay)} of current month`;
 }
 
+// Mini "screen" swatches for the theme cards: [page, bar, input, accent].
+const THEME_SWATCH: Record<string, [string, string, string, string]> = {
+  cartoon: ['#FFF7EA', '#1E1B18', '#FFFFFF', '#FFC83D'],
+  light: ['#FFFFFF', '#1E1B18', '#F0F0F0', '#C4C4C4'],
+  'dark-olive': ['#3A3E2C', '#E4E0C4', '#4B5138', '#A5B075'],
+  'cred-white': ['#F5F5F3', '#111111', '#FFFFFF', '#111111'],
+  'cred-black': ['#0E0E0E', '#F2F2F2', '#1C1C1C', '#F2F2F2'],
+};
+const MONTH_NAMES = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+
 function Personalization() {
   const { user, updatePreferences } = useAuthStore();
   const { theme, setTheme } = useThemeStore();
@@ -28,6 +40,7 @@ function Personalization() {
     if (user) setStartDay(user.financialMonthStartDay);
   }, [user]);
 
+  const isCartoon = theme === 'cartoon';
   const hasChanges = startDay !== (user?.financialMonthStartDay ?? 1);
 
   const handleSave = async () => {
@@ -35,6 +48,89 @@ function Personalization() {
     try { await updatePreferences({ financialMonthStartDay: startDay }); } catch {}
     setIsSaving(false);
   };
+
+  if (isCartoon) {
+    const today = new Date();
+    // Day N of the current cycle, and how long the cycle is.
+    const cycleStart = new Date(today.getFullYear(), today.getMonth() - (today.getDate() < startDay ? 1 : 0), startDay);
+    const cycleEnd = new Date(cycleStart.getFullYear(), cycleStart.getMonth() + 1, startDay - 1);
+    const cycleDays = Math.round((cycleEnd.getTime() - cycleStart.getTime()) / 86400000) + 1;
+    const dayNo = Math.floor((new Date(today.getFullYear(), today.getMonth(), today.getDate()).getTime() - cycleStart.getTime()) / 86400000) + 1;
+    const fmt = (d: Date) => d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
+    const pct = startDay === 1 ? ((today.getDate() - 1) / Math.max(new Date(today.getFullYear(), today.getMonth() + 1, 0).getDate() - 1, 1)) * 100 : ((dayNo - 1) / Math.max(cycleDays - 1, 1)) * 100;
+    const exampleMonth = MONTH_NAMES[4];
+    return (
+      <div className="cartoon-page">
+        <CartoonHead kicker="Make it yours" title="Settings" />
+
+        <section className="cartoon-panel">
+          <h2 className="cartoon-section-title flex items-center gap-3"><CartoonIcon kind="palette" size={36} /> Theme</h2>
+          <div className="cartoon-themes">
+            {THEMES.map((t) => {
+              const [page, bar, input, accent] = THEME_SWATCH[t.id] ?? THEME_SWATCH.light;
+              const on = theme === t.id;
+              return (
+                <button key={t.id} type="button" aria-pressed={on} onClick={() => setTheme(t.id)} className={`cartoon-theme ${on ? 'is-on' : ''}`}>
+                  {t.id === 'cartoon' && <span className="cartoon-theme-new"><Sticker tone="earn" tilt={6}>New</Sticker></span>}
+                  <span className="cartoon-theme-screen" style={{ background: page }}>
+                    <i style={{ background: bar, width: '55%' }} />
+                    <i style={{ background: input, width: '100%', height: 26, border: `2px solid ${bar}`, opacity: 0.9 }} />
+                    <i style={{ background: accent, width: '30%' }} />
+                  </span>
+                  <span className="cartoon-theme-name">{t.label}</span>
+                </button>
+              );
+            })}
+          </div>
+        </section>
+
+        <section className="cartoon-panel">
+          <div>
+            <h2 className="cartoon-section-title flex items-center gap-3"><CartoonIcon kind="calendar" size={36} /> When does your month start?</h2>
+            <p className="cartoon-sub" style={{ color: 'var(--c-ink)', marginTop: 4 }}>Pick the day your salary lands. Budgets and analysis follow this cycle.</p>
+          </div>
+          <div className="cartoon-start">
+            <div className="set-days">
+              {Array.from({ length: 31 }, (_, i) => i + 1).map((d) => (
+                <button key={d} type="button" aria-pressed={startDay === d} onClick={() => setStartDay(d)} className={`set-day ${startDay === d ? 'is-on' : ''}`}>{d}</button>
+              ))}
+            </div>
+            <div className="flex flex-col gap-4 min-w-0 flex-1">
+              <div className="cartoon-cycle">
+                <p className="cartoon-card-title">
+                  {startDay === 1 ? '1st to the end of the month' : `${getOrdinalSuffix(startDay)} to the ${getOrdinalSuffix(startDay - 1)}`}
+                </p>
+                <div className="cartoon-track"><span style={{ width: `${Math.min(Math.max(pct, 0), 100)}%` }} /></div>
+                <div className="flex items-center justify-between gap-2 font-extrabold text-sm">
+                  <span>{fmt(cycleStart)}</span>
+                  <span className="cartoon-pill" style={{ background: 'var(--c-sky-tint)', padding: '1px 12px' }}>Today, day {dayNo}</span>
+                  <span>{fmt(cycleEnd)}</span>
+                </div>
+                {startDay !== 1 && (
+                  <p className="cartoon-sub">So "{exampleMonth} 2026" covers {getOrdinalSuffix(startDay)} April to {getOrdinalSuffix(startDay - 1)} May.</p>
+                )}
+              </div>
+              <div><button onClick={handleSave} disabled={!hasChanges || isSaving} className="cartoon-btn is-primary">{isSaving ? 'Saving...' : 'Save'}</button></div>
+            </div>
+          </div>
+        </section>
+
+        <section className="cartoon-banner">
+          <span className="cartoon-hero-tile"><CartoonIcon kind="reconcile" size={88} /></span>
+          <div className="min-w-0 flex-1">
+            <h2 className="cartoon-section-title">Clean up and start fresh <Sticker tone="grape" tilt={-3}>New journey</Sticker></h2>
+            <p className="cartoon-sub" style={{ color: 'var(--c-ink)', marginTop: 6 }}>
+              Balances drifted from real life? Type what each account really holds. We add one "Clean up" entry per account to match.
+              Your history stays, and clean-ups never count as spending.
+            </p>
+          </div>
+          <button onClick={() => setShowCleanup(true)} className="cartoon-btn">Reconcile balances</button>
+        </section>
+
+        {showCleanup && <CleanupModal onClose={() => setShowCleanup(false)} />}
+      </div>
+    );
+  }
 
   return (
     <div style={{ background: 'var(--c-bg)', minHeight: '100vh' }}>
@@ -169,7 +265,7 @@ function CleanupModal({ onClose }: { onClose: () => void }) {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: 'rgba(0,0,0,0.4)' }}>
-      <div className="w-full max-w-md rounded-xl p-5" style={{ background: 'var(--c-surface)', maxHeight: '85vh', overflowY: 'auto' }}>
+      <div className="cartoon-modal w-full max-w-md rounded-xl p-5" style={{ background: 'var(--c-surface)', maxHeight: '85vh', overflowY: 'auto' }}>
         <p className="cred-serif text-base font-semibold" style={{ color: 'var(--c-text)' }}>Clean up &amp; new journey</p>
         <p className="text-xs mt-1" style={{ color: 'var(--c-muted)' }}>
           Enter the real balance for any account that's off. Leave the rest blank.

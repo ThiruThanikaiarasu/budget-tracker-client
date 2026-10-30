@@ -1,6 +1,10 @@
 import { useState } from 'react';
+import { flushSync } from 'react-dom';
+import type { JSX } from 'react';
 import { NavLink, Outlet, useNavigate, useLocation } from 'react-router-dom';
 import useAuthStore from '../store/authStore';
+import useThemeStore from '../store/themeStore';
+import CartoonIcon from '../components/CartoonIcon';
 
 // ── SVG icon paths ────────────────────────────────────────────────────
 const Icons = {
@@ -39,6 +43,16 @@ const Icons = {
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5">
       <path d="M20.59 13.41l-7.17 7.17a2 2 0 01-2.83 0L2 12V2h10l8.59 8.59a2 2 0 010 2.82z" />
       <circle cx="7" cy="7" r="1" fill="currentColor" />
+    </svg>
+  ),
+  items: (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5">
+      <line x1="9" y1="6" x2="20" y2="6" />
+      <line x1="9" y1="12" x2="20" y2="12" />
+      <line x1="9" y1="18" x2="20" y2="18" />
+      <circle cx="4.5" cy="6" r="1" fill="currentColor" />
+      <circle cx="4.5" cy="12" r="1" fill="currentColor" />
+      <circle cx="4.5" cy="18" r="1" fill="currentColor" />
     </svg>
   ),
   friends: (
@@ -97,33 +111,64 @@ const Icons = {
 
 // ── Bottom nav (mobile): exactly 5 tabs ───────────────────────────────
 const BOTTOM_NAV = [
-  { to: '/dashboard', label: 'Analysis', icon: Icons.analysis },
-  { to: '/budget', label: 'Budgets', icon: Icons.budgets },
-  { to: '/transactions', label: 'Records', icon: Icons.records },
-  { to: '/accounts', label: 'Accounts', icon: Icons.accounts },
-  { to: '/categories', label: 'Categories', icon: Icons.categories },
+  { to: '/dashboard', label: 'Analysis', icon: Icons.analysis, kind: 'analysis' },
+  { to: '/budget', label: 'Budgets', icon: Icons.budgets, kind: 'budgets' },
+  { to: '/transactions', label: 'Records', icon: Icons.records, kind: 'records' },
+  { to: '/accounts', label: 'Accounts', icon: Icons.accounts, kind: 'wallet' },
+  { to: '/categories', label: 'Categories', icon: Icons.categories, kind: 'tag' },
 ];
 
 // ── Sidebar nav (desktop): all pages ─────────────────────────────────
 const SIDEBAR_NAV = [
-  { to: '/transactions', label: 'Records', icon: Icons.records },
-  { to: '/dashboard', label: 'Analysis', icon: Icons.analysis },
-  { to: '/budget', label: 'Budgets', icon: Icons.budgets },
-  { to: '/accounts', label: 'Accounts', icon: Icons.accounts },
-  { to: '/categories', label: 'Categories', icon: Icons.categories },
-  { to: '/friends', label: 'Friends', icon: Icons.friends },
-  { to: '/investment', label: 'Investment', icon: Icons.investments },
-  { to: '/personalization', label: 'Settings', icon: Icons.settings },
+  { to: '/transactions', label: 'Records', icon: Icons.records, kind: 'records' },
+  { to: '/dashboard', label: 'Analysis', icon: Icons.analysis, kind: 'analysis' },
+  { to: '/budget', label: 'Budgets', icon: Icons.budgets, kind: 'budgets' },
+  { to: '/accounts', label: 'Accounts', icon: Icons.accounts, kind: 'wallet' },
+  { to: '/categories', label: 'Categories', icon: Icons.categories, kind: 'tag' },
+  { to: '/items', label: 'Items', icon: Icons.items, kind: 'items' },
+  { to: '/friends', label: 'Friends', icon: Icons.friends, kind: 'friends' },
+  { to: '/investment', label: 'Investment', icon: Icons.investments, kind: 'investment' },
+  { to: '/personalization', label: 'Settings', icon: Icons.settings, kind: 'settings' },
 ];
 
 // ── Drawer nav: all pages (shown in mobile drawer) ────────────────────
 const DRAWER_NAV = SIDEBAR_NAV;
+
+/** Routes with a full-width desktop layout. */
+const WIDE_ROUTES = ['/transactions'];
 
 function MainLayout() {
   const { user, logout } = useAuthStore();
   const navigate = useNavigate();
   const location = useLocation();
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const isCartoon = useThemeStore((st) => st.theme === 'cartoon');
+  const navIcon = (item: { icon: JSX.Element; kind: string }) =>
+    isCartoon ? <CartoonIcon kind={item.kind} size={28} /> : item.icon;
+
+  // Which way the "page" moves: down the menu comes forward, up the menu folds back.
+  const navIndex = (path: string) => {
+    const p = path === '/' ? '/transactions' : path;
+    return SIDEBAR_NAV.findIndex((i) => p === i.to || p.startsWith(`${i.to}/`));
+  };
+  const markDirection = (to: string) => {
+    document.documentElement.dataset.navDir = navIndex(to) >= navIndex(location.pathname) ? 'fwd' : 'back';
+  };
+  // Page-turn between screens. <BrowserRouter> ignores NavLink's viewTransition
+  // prop, so run the navigation inside startViewTransition ourselves (flushSync
+  // so the new page is in the DOM before the browser snapshots it).
+  const turnTo = (e: React.MouseEvent, to: string) => {
+    const samePage = navIndex(to) === navIndex(location.pathname);
+    markDirection(to);
+    if (
+      !isCartoon || samePage || e.defaultPrevented || e.button !== 0 ||
+      e.metaKey || e.ctrlKey || e.shiftKey || e.altKey ||
+      !document.startViewTransition ||
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches
+    ) return; // plain NavLink navigation
+    e.preventDefault();
+    document.startViewTransition(() => { flushSync(() => navigate(to)); });
+  };
 
   const handleLogout = () => {
     logout();
@@ -132,7 +177,9 @@ function MainLayout() {
 
   return (
     <div
-      className="main-layout flex h-screen"
+      // Wide routes use the full desktop width (list + side panel); the rest
+      // keep the centred reading column until they get a desktop layout.
+      className={`main-layout flex h-screen ${WIDE_ROUTES.includes(location.pathname) ? 'wide-route' : ''}`}
       style={{ background: 'var(--c-bg)' }}
     >
       {/* ── Desktop sidebar ──────────────────────────────────────────── */}
@@ -144,15 +191,18 @@ function MainLayout() {
         }}
       >
         {/* Brand */}
-        <div className="px-5 py-6">
-          <h1 className="cred-serif text-lg font-bold" style={{ color: 'var(--c-accent)' }}>
-            Budget Tracker
-          </h1>
-          {user && (
-            <p className="mt-0.5 text-xs truncate" style={{ color: 'var(--c-muted)' }}>
-              {user.name}
-            </p>
-          )}
+        <div className="sidebar-brand px-5 py-6">
+          {isCartoon && <span className="sidebar-logo"><CartoonIcon kind="wallet" size={40} /></span>}
+          <div className="min-w-0">
+            <h1 className="cred-serif text-lg font-bold" style={{ color: 'var(--c-accent)' }}>
+              Budget Tracker
+            </h1>
+            {user && (
+              <p className="mt-0.5 text-xs truncate" style={{ color: 'var(--c-muted)' }}>
+                {user.name}
+              </p>
+            )}
+          </div>
         </div>
 
         {/* Nav links */}
@@ -161,6 +211,7 @@ function MainLayout() {
             <NavLink
               key={item.to}
               to={item.to}
+              onClick={(e) => turnTo(e, item.to)}
               className={({ isActive }) =>
                 `desktop-nav-link flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
                   isActive ? 'is-active font-semibold' : ''
@@ -171,11 +222,21 @@ function MainLayout() {
                 backgroundColor: 'transparent',
               })}
             >
-              <span className="nav-icon-shell">{item.icon}</span>
+              <span className="nav-icon-shell">{navIcon(item)}</span>
               <span>{item.label}</span>
             </NavLink>
           ))}
         </nav>
+
+        {isCartoon && (
+          <div className="sidebar-tip">
+            <span className="flex justify-center -space-x-1">
+              <CartoonIcon kind="tomato" size={30} /><CartoonIcon kind="potato" size={30} /><CartoonIcon kind="egg" size={30} />
+            </span>
+            <p className="sidebar-tip-title">Log the basket, not just the bill</p>
+            <p className="sidebar-tip-text">Tap items. We do the maths.</p>
+          </div>
+        )}
 
         {/* Logout */}
         <div className="p-3" style={{ borderTop: '1px solid var(--c-border)' }}>
@@ -221,10 +282,8 @@ function MainLayout() {
           </button>
         </header>
 
-        <main
-          className="flex-1 overflow-y-auto min-h-0"
-          style={{ paddingBottom: 'calc(64px + env(safe-area-inset-bottom))' }}
-        >
+        {/* Bottom padding clears the mobile bottom nav; desktop has none. */}
+        <main className="page-turn flex-1 overflow-y-auto min-h-0 pb-[calc(64px+env(safe-area-inset-bottom))] md:pb-0">
           <Outlet />
         </main>
 
@@ -244,10 +303,11 @@ function MainLayout() {
               <NavLink
                 key={item.to}
                 to={item.to}
+                onClick={(e) => turnTo(e, item.to)}
                 className={`mobile-nav-link ${item.to === '/transactions' ? 'mobile-nav-primary' : ''} ${isActive ? 'is-active' : ''} flex flex-1 flex-col items-center justify-center gap-0.5 py-2 min-w-0`}
                 style={{ color: isActive ? 'var(--c-active)' : 'var(--c-muted)' }}
               >
-                <span className="nav-icon-shell">{item.icon}</span>
+                <span className="nav-icon-shell">{navIcon(item)}</span>
                 <span className="text-[9px] font-medium leading-tight truncate w-full text-center">
                   {item.label}
                 </span>
@@ -305,14 +365,14 @@ function MainLayout() {
                   <NavLink
                     key={item.to}
                     to={item.to}
-                    onClick={() => setDrawerOpen(false)}
+                    onClick={(e) => { turnTo(e, item.to); setDrawerOpen(false); }}
                     className={`drawer-nav-link ${isActive ? 'is-active' : ''} flex items-center gap-3 px-3 py-3 rounded-lg text-sm font-medium`}
                     style={{
                       color: isActive ? 'var(--c-active)' : 'var(--c-muted)',
                       backgroundColor: 'transparent',
                     }}
                   >
-                    <span className="nav-icon-shell">{item.icon}</span>
+                    <span className="nav-icon-shell">{navIcon(item)}</span>
                     <span>{item.label}</span>
                   </NavLink>
                 );

@@ -1,13 +1,19 @@
 import { useEffect, useMemo, useState } from 'react';
-import { useForm } from 'react-hook-form';
+import { Controller, useForm } from 'react-hook-form';
+import DatePicker from '../components/DatePicker';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { Dialog, DialogPanel, DialogTitle } from '@headlessui/react';
+import useThemeStore from '../store/themeStore';
+import CartoonIcon from '../components/CartoonIcon';
+import { CartoonHead, FaceAvatar, Sticker } from '../components/cartoon';
 import useFriendStore, { type Friend } from '../store/friendStore';
 import useSplitStore, { type SharedExpense } from '../store/splitStore';
 import useAccountStore from '../store/accountStore';
 import { formatCurrency } from '../utils/format';
 import Amount from '../components/Amount';
+import ThemedSelect from '../components/ThemedSelect';
+import { renderAccountIcon } from '../utils/accountIcons';
 import { sortByFrecency } from '../utils/frecency';
 
 // --- Schemas ---
@@ -108,6 +114,7 @@ function Friends() {
   const [selectedFriend, setSelectedFriend] = useState<Friend | null>(null);
   const [showAddExpense, setShowAddExpense] = useState(false);
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
+  const isCartoon = useThemeStore((st) => st.theme === 'cartoon');
 
   useEffect(() => {
     fetchFriends();
@@ -137,6 +144,106 @@ function Friends() {
           fetchFriends();
         }}
       />
+    );
+  }
+
+  if (isCartoon) {
+    const topOwing = friends.filter((f) => f.netBalance > 0).sort((a, b) => b.netBalance - a.netBalance).slice(0, 3);
+    const maxOwed = topOwing[0]?.netBalance ?? 1;
+    return (
+      <div className="cartoon-page">
+        <CartoonHead
+          kicker="Shared bills and who owes whom"
+          title="Friends"
+          actions={
+            <>
+              <button onClick={() => setShowAddExpense(true)} disabled={friends.length === 0} className="cartoon-btn">
+                <CartoonIcon kind="pizza" size={22} /> Split an expense
+              </button>
+              <button onClick={() => setShowAddFriend(true)} className="cartoon-btn is-primary">+ Add friend</button>
+            </>
+          }
+        />
+
+        <div className="cartoon-tiles-3" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))' }}>
+          <div className="cartoon-stat is-earn flex items-center gap-4">
+            <CartoonIcon kind="social" size={56} />
+            <div>
+              <p className="cartoon-kicker">You are owed</p>
+              <p className="cartoon-stat-big friend-balance friend-balance-positive" style={{ color: 'var(--c-earn-text)', margin: 0 }}><Amount value={totalOwed} /></p>
+            </div>
+          </div>
+          <div className="cartoon-stat is-spend flex items-center gap-4">
+            <CartoonIcon kind="coins" size={56} />
+            <div>
+              <p className="cartoon-kicker">You owe</p>
+              <p className="cartoon-stat-big friend-balance friend-balance-negative" style={{ color: 'var(--c-spend-text)', margin: 0 }}><Amount value={totalOwe} /></p>
+            </div>
+          </div>
+        </div>
+
+        {topOwing.length > 0 && (
+          <section className="cartoon-panel">
+            <h2 className="cartoon-section-title">Who owes you most</h2>
+            <div className="flex flex-col gap-3">
+              {topOwing.map((f) => (
+                <div key={f._id} className="cartoon-owe-row">
+                  <FaceAvatar name={f.name} size={44} />
+                  <span className="cartoon-owe-name">{f.name}</span>
+                  <div className="cartoon-bar" style={{ margin: 0, height: 22 }}><span style={{ width: `${(f.netBalance / maxOwed) * 100}%`, background: 'var(--c-leaf)' }} /></div>
+                  <b className="cartoon-money" style={{ color: 'var(--c-earn-text)' }}><Amount value={f.netBalance} /></b>
+                </div>
+              ))}
+            </div>
+          </section>
+        )}
+
+        {isLoading ? (
+          <div className="flex justify-center py-12"><div className="cartoon-spinner" /></div>
+        ) : friends.length === 0 ? (
+          <p className="cartoon-empty">No friends added yet. Add a friend to start splitting expenses.</p>
+        ) : (
+          <div className="flex flex-col gap-4">
+            {sortByFrecency(friends).map((friend) => (
+              <div
+                key={friend._id}
+                role="button" tabIndex={0}
+                onClick={() => { recordInteraction(friend._id); setSelectedFriend(friend); }}
+                onKeyDown={(e) => { if (e.key === 'Enter') { recordInteraction(friend._id); setSelectedFriend(friend); } }}
+                className="cartoon-row cartoon-friend"
+              >
+                <FaceAvatar name={friend.name} size={60} />
+                <div className="min-w-0 flex-1">
+                  <p className="cartoon-card-title">{friend.name}</p>
+                  {friend.phone && <p className="cartoon-sub" style={{ fontSize: 12 }}>{friend.phone}</p>}
+                </div>
+                {friend.netBalance === 0 ? (
+                  <Sticker tone="earn" tilt={-2}>✓ All square</Sticker>
+                ) : friend.netBalance > 0 ? (
+                  <span className="cartoon-pill is-earn friend-balance friend-balance-positive">owes you <b><Amount value={friend.netBalance} /></b></span>
+                ) : (
+                  <span className="cartoon-pill is-spend friend-balance friend-balance-negative">you owe <b><Amount value={Math.abs(friend.netBalance)} /></b></span>
+                )}
+                <div className="relative">
+                  <button
+                    aria-label={`${friend.name} options`} className="cartoon-dots"
+                    onClick={(e) => { e.stopPropagation(); setOpenMenuId(openMenuId === friend._id ? null : friend._id); }}
+                  >···</button>
+                  {openMenuId === friend._id && (
+                    <div onClick={(e) => e.stopPropagation()} className="cartoon-menu">
+                      <button onClick={() => { setEditingFriend(friend); setOpenMenuId(null); }}>Edit</button>
+                    </div>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        <FriendModal open={showAddFriend} onClose={() => setShowAddFriend(false)} />
+        {editingFriend && <FriendModal open={true} onClose={() => setEditingFriend(null)} friend={editingFriend} />}
+        {showAddExpense && <AddExpenseModal friends={friends} onClose={() => { setShowAddExpense(false); fetchFriends(); }} />}
+      </div>
     );
   }
 
@@ -324,7 +431,7 @@ function FriendModal({
     <Dialog open={open} onClose={onClose} className="relative z-50">
       <div className="fixed inset-0 bg-black/30" aria-hidden="true" />
       <div className="fixed inset-0 flex items-center justify-center p-4">
-        <DialogPanel className="w-full max-w-md rounded-lg bg-[var(--c-surface)] p-6 shadow-xl">
+        <DialogPanel className="cartoon-modal w-full max-w-md rounded-lg bg-[var(--c-surface)] p-6 shadow-xl">
           <DialogTitle className="cred-serif text-lg font-semibold" style={{ color: 'var(--c-text)' }}>
             {friend ? 'Edit Friend' : 'Add Friend'}
           </DialogTitle>
@@ -401,6 +508,7 @@ function AddExpenseModal({
     register,
     handleSubmit,
     watch,
+    control,
     formState: { errors, isSubmitting },
   } = useForm<ExpenseFormData>({
     resolver: zodResolver(expenseSchema),
@@ -458,7 +566,7 @@ function AddExpenseModal({
     <Dialog open={true} onClose={onClose} className="relative z-50">
       <div className="fixed inset-0 bg-black/30" aria-hidden="true" />
       <div className="fixed inset-0 flex items-center justify-center p-4">
-        <DialogPanel className="w-full max-w-lg max-h-[90vh] overflow-y-auto rounded-lg bg-[var(--c-surface)] p-6 shadow-xl">
+        <DialogPanel className="cartoon-modal w-full max-w-lg max-h-[90vh] overflow-y-auto rounded-lg bg-[var(--c-surface)] p-6 shadow-xl">
           <DialogTitle className="cred-serif text-lg font-semibold" style={{ color: 'var(--c-text)' }}>
             Add Shared Expense
           </DialogTitle>
@@ -493,11 +601,19 @@ function AddExpenseModal({
 
             <div>
               <label className="block text-sm font-medium text-[var(--c-text)]">Date</label>
-              <input
-                type="date"
-                {...register('date')}
-                className="mt-1 block w-full rounded-md border border-[var(--c-border)] px-3 py-2 text-sm focus:border-[var(--c-accent)] focus:outline-none focus:ring-1 focus:ring-[var(--c-accent)]"
-              />
+              <div className="mt-1">
+                <Controller
+                  control={control}
+                  name="date"
+                  render={({ field }) => (
+                    <DatePicker
+                      value={field.value}
+                      onChange={field.onChange}
+                      className="block w-full rounded-md border border-[var(--c-border)] px-3 py-2 text-sm focus:border-[var(--c-accent)] focus:outline-none focus:ring-1 focus:ring-[var(--c-accent)]"
+                    />
+                  )}
+                />
+              </div>
             </div>
 
             <div>
@@ -1016,6 +1132,15 @@ function SettleModal({
   );
   const [accountId, setAccountId] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  // How much actually changed hands, and what happens to any rest.
+  const fullText = String(Math.round(amount * 100) / 100);
+  const [paidText, setPaidText] = useState(fullText);
+  const [rest, setRest] = useState<'keep' | 'waive'>('keep');
+  const paid = Math.round((parseFloat(paidText) || 0) * 100) / 100;
+  const left = Math.round((amount - paid) * 100) / 100;
+  const partial = paid > 0 && left > 0.004;
+  const tooMuch = paid > amount + 0.004;
+  const paidOk = paid > 0 && !tooMuch;
 
   useEffect(() => {
     if (accounts.length === 0) fetchAccounts();
@@ -1028,13 +1153,17 @@ function SettleModal({
   const submit = async (m: 'received' | 'paid' | 'waived') => {
     setSubmitting(true);
     try {
+      // A partial payment that keeps the rest owed can't tick off whole bills;
+      // paying in full, or paying and forgiving the rest, clears them all.
+      const clearsAll = m === 'waived' || !partial || rest === 'waive';
       await settleUp({
         friendId: friend._id,
-        amount,
+        amount: m === 'waived' ? amount : paid,
         method: m,
         friendOwes,
         accountId: m === 'waived' ? undefined : accountId,
-        coveredExpenseIds,
+        coveredExpenseIds: clearsAll ? coveredExpenseIds : [],
+        waivedAmount: m !== 'waived' && partial && rest === 'waive' ? left : undefined,
       });
       onDone();
     } catch {
@@ -1048,7 +1177,7 @@ function SettleModal({
     <Dialog open={true} onClose={onClose} className="relative z-50">
       <div className="fixed inset-0 bg-black/30" aria-hidden="true" />
       <div className="fixed inset-0 flex items-center justify-center p-4">
-        <DialogPanel className="w-full max-w-md rounded-lg bg-[var(--c-surface)] p-6 shadow-xl">
+        <DialogPanel className="cartoon-modal w-full max-w-md rounded-lg bg-[var(--c-surface)] p-6 shadow-xl">
           <DialogTitle className="cred-serif text-lg font-semibold" style={{ color: 'var(--c-text)' }}>
             Settle Up with {friend.name}
           </DialogTitle>
@@ -1101,19 +1230,49 @@ function SettleModal({
             <div className="mt-4 space-y-4">
               <div>
                 <label className="block text-sm font-medium text-[var(--c-text)]">
+                  {method === 'received' ? `How much did ${friend.name} pay?` : `How much did you pay ${friend.name}?`}
+                </label>
+                <div className="mt-1 flex items-center gap-2">
+                  <span className="text-sm text-[var(--c-muted)]">₹</span>
+                  <input
+                    type="text" inputMode="decimal" autoFocus value={paidText}
+                    onChange={(e) => setPaidText(e.target.value.replace(/[^0-9.]/g, ''))}
+                    onFocus={(e) => e.currentTarget.select()}
+                    className="t-input flex-1" placeholder={fullText} aria-label="Amount settled"
+                  />
+                  {paidText !== fullText && (
+                    <button type="button" className="text-xs font-semibold underline" onClick={() => setPaidText(fullText)}>Full</button>
+                  )}
+                </div>
+                {tooMuch && <p className="mt-1 text-sm text-[var(--c-expense)]">That's more than the <Amount value={amount} /> owed.</p>}
+              </div>
+
+              {partial && (
+                <div>
+                  <p className="text-sm font-medium text-[var(--c-text)]">The other <Amount value={left} /></p>
+                  <div className="mt-2 grid grid-cols-2 gap-2">
+                    <button type="button" onClick={() => setRest('keep')} className={`settle-opt ${rest === 'keep' ? 'is-on' : ''}`}>
+                      <span className="settle-opt-title">Keep it owed</span>
+                      <span className="settle-opt-sub">{friendOwes ? `${friend.name} still owes you this` : 'You still owe this'}</span>
+                    </button>
+                    <button type="button" onClick={() => setRest('waive')} className={`settle-opt ${rest === 'waive' ? 'is-on' : ''}`}>
+                      <span className="settle-opt-title">{friendOwes ? 'Waive it off' : 'They waive it'}</span>
+                      <span className="settle-opt-sub">{friendOwes ? 'Forgive it — counts as your expense' : 'Forgiven — just clears it'}</span>
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              <div>
+                <label className="block text-sm font-medium text-[var(--c-text)]">
                   {method === 'received' ? 'Deposit to account' : 'Pay from account'}
                 </label>
-                <select
+                <ThemedSelect
+                  className="mt-1"
                   value={accountId}
-                  onChange={(e) => setAccountId(e.target.value)}
-                  className="mt-1 block w-full rounded-md border border-[var(--c-border)] px-3 py-2 text-sm focus:border-[var(--c-accent)] focus:outline-none focus:ring-1 focus:ring-[var(--c-accent)]"
-                >
-                  {accounts.map((a) => (
-                    <option key={a._id} value={a._id}>
-                      {a.name} ({formatCurrency(a.balance)})
-                    </option>
-                  ))}
-                </select>
+                  onChange={setAccountId}
+                  options={accounts.map((a) => ({ value: a._id, label: a.name, hint: formatCurrency(a.balance), icon: renderAccountIcon(a.type, a.color, 22) }))}
+                />
                 {accounts.length === 0 && (
                   <p className="mt-1 text-sm text-[var(--c-expense)]">No accounts found. Add an account first.</p>
                 )}
@@ -1130,10 +1289,12 @@ function SettleModal({
                 <button
                   type="button"
                   onClick={() => submit(method)}
-                  disabled={submitting || !accountId}
+                  disabled={submitting || !accountId || !paidOk}
                   className="t-btn-primary px-4 py-2"
                 >
-                  {submitting ? 'Settling...' : <>Settle <Amount value={amount} /></>}
+                  {submitting ? 'Settling...' : partial && rest === 'waive'
+                    ? <>Settle <Amount value={paid} /> &amp; waive <Amount value={left} /></>
+                    : <>Settle <Amount value={paidOk ? paid : amount} /></>}
                 </button>
               </div>
             </div>

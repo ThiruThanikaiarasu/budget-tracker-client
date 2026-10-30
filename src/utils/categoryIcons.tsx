@@ -1,3 +1,6 @@
+import useThemeStore from '../store/themeStore';
+import { CartoonTile } from '../components/CartoonIcon';
+import { categoryKind } from '../utils/cartoonKinds';
 import type { JSX } from 'react';
 
 // Category icon registry — SVG icons with per-icon background colours.
@@ -286,6 +289,9 @@ export function renderCategoryIcon(
   name: string,
   size = 40
 ): JSX.Element {
+  if (useThemeStore.getState().theme === 'cartoon') {
+    return <CartoonTile kind={categoryKind(icon, name)} size={size} />;
+  }
   // Older categories were created before icon keys were stored. Reuse an
   // existing classic icon when their name matches a registry label (for
   // example Shopping → bag and Fruits → fruit).

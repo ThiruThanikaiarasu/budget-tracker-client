@@ -1,4 +1,4 @@
-import { useForm } from 'react-hook-form';
+import { Controller, useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { Dialog, DialogPanel, DialogTitle } from '@headlessui/react';
@@ -9,6 +9,7 @@ import useInvestmentStore, {
 } from '../../store/investmentStore';
 import { ASSET_CLASS_MAP, type AssetClassMeta } from './assetClasses';
 import { formatCurrency } from '../../utils/format';
+import DatePicker from '../../components/DatePicker';
 
 const EXCHANGES = ['NSE', 'BSE', 'NASDAQ', 'NYSE', 'other'] as const;
 
@@ -102,6 +103,7 @@ function HoldingsForm({
     handleSubmit,
     watch,
     reset,
+    control,
     formState: { errors, isSubmitting },
   } = useForm<FormData>({
     resolver: zodResolver(holdingsSchema),
@@ -244,7 +246,7 @@ function HoldingsForm({
 
       <div>
         <label className="block text-sm font-medium text-gray-700">Date invested</label>
-        <input type="date" {...register('dateInvested')} className={inputClass} />
+        <Controller control={control} name="dateInvested" render={({ field }) => <DatePicker value={field.value} onChange={field.onChange} className={inputClass} />} />
         {errors.dateInvested && <p className="mt-1 text-sm text-red-600">{errors.dateInvested.message}</p>}
       </div>
 
@@ -276,6 +278,7 @@ function LumpSumForm({
     register,
     handleSubmit,
     reset,
+    control,
     formState: { errors, isSubmitting },
   } = useForm<FormData>({
     resolver: zodResolver(lumpSumSchema),
@@ -344,7 +347,7 @@ function LumpSumForm({
 
       <div>
         <label className="block text-sm font-medium text-gray-700">Date invested</label>
-        <input type="date" {...register('dateInvested')} className={inputClass} />
+        <Controller control={control} name="dateInvested" render={({ field }) => <DatePicker value={field.value} onChange={field.onChange} className={inputClass} />} />
         {errors.dateInvested && <p className="mt-1 text-sm text-red-600">{errors.dateInvested.message}</p>}
       </div>
 

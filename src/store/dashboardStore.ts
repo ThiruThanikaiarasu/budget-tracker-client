@@ -2,10 +2,21 @@ import { create } from 'zustand';
 import api from '../api/axios';
 import type { Transaction } from './transactionStore';
 
+interface InHandAccount {
+  name: string;
+  balance: number;
+}
+
 interface Summary {
   totalIncome: number;
   totalExpense: number;
   net: number;
+  /** Money in hand right now: UPI = the bank accounts, plus cash. */
+  inHand?: {
+    upi: number;
+    cash: number;
+    accounts: { upi: InHandAccount[]; cash: InHandAccount[] };
+  };
 }
 
 interface CategoryBreakdownItem {

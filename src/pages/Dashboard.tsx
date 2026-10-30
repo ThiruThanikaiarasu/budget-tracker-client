@@ -18,6 +18,10 @@ import useBudgetStore from '../store/budgetStore';
 import useAuthStore from '../store/authStore';
 import useThemeStore from '../store/themeStore';
 import { renderCategoryIcon } from '../utils/categoryIcons';
+import Amount from '../components/Amount';
+import CartoonIcon from '../components/CartoonIcon';
+import { CartoonHead } from '../components/cartoon';
+import { categoryKind } from '../utils/cartoonKinds';
 
 function getCurrentFinancialMonth(startDay: number) {
   const now = new Date();
@@ -39,6 +43,7 @@ const PIE_COLORS = [
   '#3B82F6', '#EF4444', '#10B981', '#F59E0B', '#8B5CF6',
   '#EC4899', '#06B6D4', '#F97316', '#6366F1', '#14B8A6',
 ];
+const CARTOON_COLORS = ['#FFC83D', '#EF4B3C', '#4CB86A', '#6CC4F5', '#9B7BE0', '#F7A8C8', '#FF9F43'];
 const CRED_PIE_COLORS = ['#0a0a0a', '#343438', '#5d5d63', '#85858c', '#adadb3', '#d4d4d8'];
 
 function formatCurrency(amount: number) {
@@ -58,6 +63,7 @@ function formatMonth(monthStr: string) {
 
 function Dashboard() {
   const isCredWhite = useThemeStore((s) => s.theme === 'cred-white');
+  const isCartoon = useThemeStore((s) => s.theme === 'cartoon');
   const {
     summary,
     breakdown,
@@ -103,6 +109,177 @@ function Dashboard() {
     return (
       <div className="flex justify-center py-20">
         <div className="h-8 w-8 animate-spin rounded-full border-4 border-blue-600 border-t-transparent" />
+      </div>
+    );
+  }
+
+  if (isCartoon) {
+    const activeCount = accounts.filter((a) => a.isActive).length;
+    const net = summary?.net ?? 0;
+    const monthTotal = breakdown.reduce((sum, c) => sum + c.total, 0);
+    const spends = recentTransactions.filter((t) => t.type === 'expense').sort((a, b) => b.amount - a.amount).slice(0, 5);
+    const maxTrend = Math.max(1, ...trend.flatMap((t) => [t.income, t.expense]));
+    const R = 70, C = 2 * Math.PI * R;
+    let offset = 0;
+    const segs = breakdown.map((b, i) => {
+      const len = monthTotal > 0 ? (b.total / monthTotal) * C : 0;
+      const seg = { len, offset, color: CARTOON_COLORS[i % CARTOON_COLORS.length] };
+      offset += len;
+      return seg;
+    });
+    const topKind = breakdown[0] ? categoryKind(breakdown[0].categoryIcon, breakdown[0].categoryName) : 'wallet';
+    return (
+      <div className="cartoon-page">
+        <CartoonHead
+          kicker="Your money at a glance"
+          title="Analysis"
+          actions={
+            <>
+              <div className="cartoon-stepper">
+                <button className="cartoon-round-btn is-small" aria-label="Previous month" onClick={() => navigateCategoryMonth(-1)}>‹</button>
+                <p className="cartoon-stepper-title">{formatMonthLabel(categoryMonth)}</p>
+                <button className="cartoon-round-btn is-small" aria-label="Next month" onClick={() => navigateCategoryMonth(1)}>›</button>
+              </div>
+              <Link to="/transactions" state={{ openCreate: true, initialType: 'income' }} className="cartoon-btn is-earn">
+                <CartoonIcon kind="salary" size={24} /> Add income
+              </Link>
+              <Link to="/transactions" state={{ openCreate: true, initialType: 'expense' }} className="cartoon-btn is-spend">
+                <CartoonIcon kind="shopping" size={24} /> Add expense
+              </Link>
+            </>
+          }
+        />
+
+        <div className="cartoon-tiles-4">
+          <div className="cartoon-stat is-plain">
+            <div className="cartoon-stat-top"><span className="cartoon-kicker">Total balance</span><CartoonIcon kind="wallet" size={38} /></div>
+            <p className="cartoon-stat-big" style={totalBalance < 0 ? { color: 'var(--c-spend-text)' } : undefined}><Amount value={totalBalance} prefix={totalBalance < 0 ? '−' : ''} /></p>
+            <p className="cartoon-sub">across {activeCount} account{activeCount !== 1 ? 's' : ''}</p>
+          </div>
+          <div className="cartoon-stat is-earn">
+            <div className="cartoon-stat-top"><span className="cartoon-kicker">Income</span><CartoonIcon kind="salary" size={38} /></div>
+            <p className="cartoon-stat-big" style={{ color: 'var(--c-earn-text)' }}><Amount value={summary?.totalIncome ?? 0} /></p>
+            <p className="cartoon-sub">this cycle</p>
+          </div>
+          <div className="cartoon-stat is-spend">
+            <div className="cartoon-stat-top"><span className="cartoon-kicker">Expense</span><CartoonIcon kind="shopping" size={38} /></div>
+            <p className="cartoon-stat-big" style={{ color: 'var(--c-spend-text)' }}><Amount value={summary?.totalExpense ?? 0} /></p>
+            <p className="cartoon-sub">this cycle</p>
+          </div>
+          <div className="cartoon-stat is-sun">
+            <div className="cartoon-stat-top"><span className="cartoon-kicker">Net</span><CartoonIcon kind="budgets" size={38} /></div>
+            <p className="cartoon-stat-big" style={net < 0 ? { color: 'var(--c-spend-text)' } : { color: 'var(--c-earn-text)' }}><Amount value={Math.abs(net)} prefix={net < 0 ? '−' : ''} /></p>
+            <p className="cartoon-sub">income minus expense</p>
+          </div>
+        </div>
+
+        {todaySummary && (
+          <div className={`cartoon-alert ${todaySummary.isOver ? 'is-over' : ''}`}>
+            <CartoonIcon kind="budgets" size={44} />
+            <div className="min-w-0 flex-1">
+              <p className="cartoon-card-title" style={{ fontSize: 18 }}>{todaySummary.isOver ? "You've passed today's budget" : "Today's budget"}</p>
+              <p className="cartoon-sub" style={{ color: 'var(--c-ink)' }}>
+                Spent {formatCurrency(todaySummary.spent)}{todaySummary.dailyLimit ? ` of ${formatCurrency(todaySummary.dailyLimit)} daily limit` : ''}
+                {todaySummary.isOver && ' · think before you spend.'}
+              </p>
+              {todaySummary.categoryStatus.some((c) => c.isOver) && (
+                <p className="cartoon-sub" style={{ color: 'var(--c-spend-text)', fontSize: 13 }}>
+                  Over: {todaySummary.categoryStatus.filter((c) => c.isOver).map((c) => `${c.categoryId.name} ${formatCurrency(c.spent)} / ${formatCurrency(c.effectiveLimit)}`).join(' · ')}
+                </p>
+              )}
+            </div>
+            <Link to="/budget" className="cartoon-btn">View budget →</Link>
+          </div>
+        )}
+
+        <div className="cartoon-two">
+          <section className="cartoon-panel">
+            <h2 className="cartoon-section-title">Where it went</h2>
+            {breakdown.length === 0 ? (
+              <p className="cartoon-empty" style={{ padding: '30px 0' }}>No expenses in {formatMonthLabel(categoryMonth)}</p>
+            ) : (
+              <div className="cartoon-where">
+                <div className="cartoon-donut">
+                  <svg viewBox="0 0 200 200" width="100%" height="100%" style={{ transform: 'rotate(-90deg)' }}>
+                    <circle cx="100" cy="100" r={R} fill="none" stroke="#1E1B18" strokeWidth="46" />
+                    {segs.map((g, i) => (
+                      <circle key={i} cx="100" cy="100" r={R} fill="none" stroke={g.color} strokeWidth="38"
+                        strokeDasharray={`${Math.max(g.len - (segs.length > 1 ? 2.5 : 0), 0)} ${C}`} strokeDashoffset={-g.offset} />
+                    ))}
+                    <circle cx="100" cy="100" r="46" fill="#1E1B18" />
+                    <circle cx="100" cy="100" r="43" fill="#fff" />
+                  </svg>
+                  <span className="cartoon-donut-icon"><CartoonIcon kind={topKind} size={56} /></span>
+                </div>
+                <div className="cartoon-where-list">
+                  {breakdown.slice(0, 6).map((b, i) => {
+                    const pct = monthTotal > 0 ? (b.total / monthTotal) * 100 : 0;
+                    return (
+                      <div key={b.categoryId}>
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="flex items-center gap-2 font-extrabold"><i className="cartoon-swatch" style={{ background: CARTOON_COLORS[i % CARTOON_COLORS.length] }} />{b.categoryName}</span>
+                          <b className="cartoon-money"><Amount value={b.total} /></b>
+                        </div>
+                        <div className="cartoon-bar" style={{ height: 14 }}><span style={{ width: `${pct}%`, background: CARTOON_COLORS[i % CARTOON_COLORS.length] }} /></div>
+                        <p className="cartoon-sub" style={{ fontSize: 12 }}>{pct.toFixed(0)}% of spending</p>
+                      </div>
+                    );
+                  })}
+                  <p className="cartoon-sub" style={{ fontSize: 13 }}>{breakdown.length} categor{breakdown.length === 1 ? 'y' : 'ies'} so far this cycle</p>
+                </div>
+              </div>
+            )}
+          </section>
+
+          <section className="cartoon-panel">
+            <h2 className="cartoon-section-title">Biggest spends</h2>
+            {spends.length === 0 ? (
+              <p className="cartoon-empty" style={{ padding: '30px 0' }}>No spends yet</p>
+            ) : (
+              <div className="flex flex-col gap-3">
+                {spends.map((tx, i) => (
+                  <div key={tx._id} className="cartoon-row is-flat">
+                    <b className="cartoon-rank">{i + 1}</b>
+                    {renderCategoryIcon(tx.categoryId?.icon, tx.categoryId?.name ?? '?', 48)}
+                    <div className="min-w-0 flex-1">
+                      <p className="cartoon-card-title" style={{ fontSize: 18 }}>{tx.categoryId?.name ?? 'Uncategorized'}</p>
+                      <p className="cartoon-sub" style={{ fontSize: 13 }}>
+                        {new Date(tx.date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })} · {tx.note || 'no note'}
+                      </p>
+                    </div>
+                    <b className="cartoon-money" style={{ color: 'var(--c-spend-text)' }}><Amount value={tx.amount} /></b>
+                  </div>
+                ))}
+              </div>
+            )}
+            <Link to="/transactions" className="cartoon-note-card">See every record →</Link>
+          </section>
+        </div>
+
+        <section className="cartoon-panel">
+          <div className="flex items-center justify-between gap-3 flex-wrap">
+            <h2 className="cartoon-section-title">Money in vs money out</h2>
+            <div className="cartoon-legend">
+              <span><i style={{ background: 'var(--c-leaf)' }} /> In</span>
+              <span><i style={{ background: 'var(--c-tomato)' }} /> Out</span>
+            </div>
+          </div>
+          {trend.length === 0 ? (
+            <p className="cartoon-empty" style={{ padding: '30px 0' }}>No trend data yet</p>
+          ) : (
+            <div className="cartoon-bars">
+              {trend.map((t) => (
+                <div key={t.month} className="cartoon-bars-col">
+                  <div className="cartoon-bars-pair">
+                    <span className="cartoon-vbar" style={{ height: `${Math.max((t.income / maxTrend) * 100, 1)}%`, background: 'var(--c-leaf)' }} title={`In ${formatCurrency(t.income)}`} />
+                    <span className="cartoon-vbar" style={{ height: `${Math.max((t.expense / maxTrend) * 100, 1)}%`, background: 'var(--c-tomato)' }} title={`Out ${formatCurrency(t.expense)}`} />
+                  </div>
+                  <span className="cartoon-bars-label">{formatMonth(t.month)}</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </section>
       </div>
     );
   }

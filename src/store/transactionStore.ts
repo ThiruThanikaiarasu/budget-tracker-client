@@ -5,6 +5,32 @@ import useBudgetStore from './budgetStore';
 import useFriendStore from './friendStore';
 import useAccountStore from './accountStore';
 
+/** One priced line of an itemised bill (sub-category item). */
+export interface TransactionItem {
+  itemId?: string;
+  name: string;
+  quantity?: number;
+  unit?: string;
+  /** Unit within the item's unit group; baseQuantity = quantity × its factor. */
+  unitId?: string;
+  baseQuantity?: number;
+  amount: number;
+  /** Category of this line when it differs from the transaction's; absent = same. */
+  categoryId?: string;
+  /** Who shares this item when split by item: 'user' and/or friend ids. */
+  sharedWith?: string[];
+}
+
+/** Delivery fee / tax (positive) or discount (negative) on an itemised bill. */
+export interface TransactionCharge {
+  label: string;
+  amount: number;
+  /** Category it belongs to when it differs from the transaction's. */
+  categoryId?: string;
+  /** Applies to the whole bill (delivery, tax, coupon), spread across categories. */
+  bill?: boolean;
+}
+
 export interface Transaction {
   _id: string;
   userId: string;
@@ -21,6 +47,11 @@ export interface Transaction {
   receivedFromFriendId?: { _id: string; name: string };
   /** Balance-reconciliation entry ("Clean up · new journey"); excluded from totals. */
   isAdjustment?: boolean;
+  /** Itemised breakdown; when present amount = sum(items) + sum(charges). */
+  items?: TransactionItem[];
+  charges?: TransactionCharge[];
+  /** Where it was bought: Swiggy, Amazon, a hotel's name… */
+  merchant?: string;
   note?: string;
   date: string;
   createdAt: string;
@@ -61,6 +92,8 @@ interface CreateTransactionData {
   paidByFriendId?: string;
   receivedFromFriendId?: string;
   splits?: { friendId: string; amount: number }[];
+  items?: TransactionItem[];
+  charges?: TransactionCharge[];
 }
 
 export interface TransactionsSummary {

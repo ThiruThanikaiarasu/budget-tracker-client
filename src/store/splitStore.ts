@@ -31,6 +31,8 @@ export interface SettlePayload {
   friendOwes: boolean;
   accountId?: string;
   coveredExpenseIds?: string[];
+  /** Part of the debt forgiven in the same step (partial payment + waive the rest). */
+  waivedAmount?: number;
 }
 
 interface CreateExpenseData {

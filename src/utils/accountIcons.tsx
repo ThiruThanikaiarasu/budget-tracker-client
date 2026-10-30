@@ -1,5 +1,8 @@
 import type { JSX } from 'react';
 import type { Account } from '../store/accountStore';
+import useThemeStore from '../store/themeStore';
+import CartoonIcon from '../components/CartoonIcon';
+import { accountKind } from '../utils/cartoonKinds';
 
 // Same emoji-per-type mapping used on the Accounts page, shared so the
 // transaction form's account picker matches it.
@@ -22,6 +25,9 @@ const ACCOUNT_TYPE_PATHS: Record<Account['type'], string | string[]> = {
 };
 
 export function renderAccountIcon(type: Account['type'], color?: string, size = 40): JSX.Element {
+  if (useThemeStore.getState().theme === 'cartoon') {
+    return <CartoonIcon kind={accountKind(type)} size={size} />;
+  }
   return (
     <div
       className="account-icon rounded-full flex items-center justify-center flex-shrink-0"

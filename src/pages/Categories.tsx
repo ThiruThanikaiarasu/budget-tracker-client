@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
+import ThemedSelect from '../components/ThemedSelect';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { Dialog, DialogPanel, DialogTitle } from '@headlessui/react';
@@ -17,6 +18,7 @@ import {
 import {
   SortableContext,
   verticalListSortingStrategy,
+  rectSortingStrategy,
   useSortable,
   arrayMove,
 } from '@dnd-kit/sortable';
@@ -27,6 +29,13 @@ import useAccountStore from '../store/accountStore';
 import useThemeStore from '../store/themeStore';
 import Amount from '../components/Amount';
 import { CATEGORY_ICONS, renderCategoryIcon } from '../utils/categoryIcons';
+import CartoonIcon, { CartoonTile } from '../components/CartoonIcon';
+import { CartoonHead, Sticker } from '../components/cartoon';
+import { CATEGORY_KINDS, categoryKind } from '../utils/cartoonKinds';
+import useCategoryItemStore, { type CategoryItem } from '../store/categoryItemStore';
+import ItemFields from '../components/ItemFields';
+import EmptyState from '../components/EmptyState';
+import useUnitGroupStore, { defaultLabel } from '../store/unitGroupStore';
 
 
 function GripIcon() {
@@ -51,12 +60,15 @@ type CategoryFormData = z.infer<typeof categorySchema>;
 
 function Categories() {
   const isCredWhite = useThemeStore((s) => s.theme === 'cred-white');
+  const isCartoon = useThemeStore((s) => s.theme === 'cartoon');
   const { categories, isLoading, fetchCategories, createCategory, updateCategory, deleteCategory, reorderCategories } = useCategoryStore();
   const { summary, fetchSummary } = useDashboardStore();
   const { accounts, fetchAccounts } = useAccountStore();
+  const fetchItems = useCategoryItemStore((s) => s.fetchItems);
   const [showCreate, setShowCreate] = useState(false);
   const [editingCategory, setEditingCategory] = useState<Category | null>(null);
   const [deletingCategory, setDeletingCategory] = useState<Category | null>(null);
+  const [itemsCategory, setItemsCategory] = useState<Category | null>(null);
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [incomeItems, setIncomeItems] = useState<Category[]>([]);
@@ -66,7 +78,8 @@ function Categories() {
     fetchCategories();
     fetchSummary();
     fetchAccounts();
-  }, [fetchCategories, fetchSummary, fetchAccounts]);
+    fetchItems();
+  }, [fetchCategories, fetchSummary, fetchAccounts, fetchItems]);
 
   useEffect(() => {
     setIncomeItems(categories.filter(c => c.type === 'income'));
@@ -118,6 +131,74 @@ function Categories() {
   const activeItem = activeId ? allItems.find(c => c._id === activeId) : null;
   const totalBalance = accounts.filter(a => a.isActive).reduce((s, a) => s + a.balance, 0);
 
+  if (isCartoon) {
+    const section = (title: string, color: string, list: Category[]) => (
+      <section className="flex flex-col gap-3">
+        <h2 className="cartoon-section-title flex items-center gap-2">
+          <i className="cartoon-swatch" style={{ background: color }} /> {title}
+          <span className="cartoon-count">{list.length}</span>
+        </h2>
+        <SortableContext items={list.map(c => c._id)} strategy={rectSortingStrategy}>
+          <div className="cartoon-cat-grid">
+            {list.map(cat => (
+              <SortableCategoryRow
+                key={cat._id} category={cat} openMenuId={openMenuId} setOpenMenuId={setOpenMenuId}
+                onEdit={() => setEditingCategory(cat)} onDelete={() => setDeletingCategory(cat)} onItems={() => setItemsCategory(cat)}
+              />
+            ))}
+            {title === 'Money out' && (
+              <button className="cartoon-card cartoon-cat-add" onClick={() => setShowCreate(true)}>+ Add one</button>
+            )}
+          </div>
+        </SortableContext>
+      </section>
+    );
+    return (
+      <div className="cartoon-page">
+        <CartoonHead
+          kicker="Sort your spending"
+          title="Categories"
+          actions={<button onClick={() => setShowCreate(true)} className="cartoon-btn is-primary">+ New category</button>}
+        />
+        {isLoading ? (
+          <div className="flex justify-center py-16"><div className="cartoon-spinner" /></div>
+        ) : (
+          <DndContext sensors={sensors} collisionDetection={closestCenter} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
+            {section('Money out', 'var(--c-tomato)', expenseItems)}
+            {section('Money in', 'var(--c-leaf)', incomeItems)}
+            {categories.length === 0 && <EmptyState icon="🏷️" message="No categories yet" />}
+            <DragOverlay dropAnimation={null}>
+              {activeItem ? (
+                <CategoryRow category={activeItem} isOverlay openMenuId={null} setOpenMenuId={() => {}} onEdit={() => {}} onDelete={() => {}} />
+              ) : null}
+            </DragOverlay>
+          </DndContext>
+        )}
+
+        <CategoryModal
+          open={showCreate} onClose={() => setShowCreate(false)}
+          onSubmit={async (data) => { await createCategory(data); setShowCreate(false); }}
+          title="New category" submitLabel="Create"
+        />
+        {editingCategory && (
+          <CategoryModal
+            open onClose={() => setEditingCategory(null)}
+            onSubmit={async (data) => { await updateCategory(editingCategory._id, data); setEditingCategory(null); }}
+            title="Edit category" submitLabel="Save changes"
+            defaultValues={{ name: editingCategory.name, type: editingCategory.type as 'income' | 'expense', icon: editingCategory.icon || '' }}
+          />
+        )}
+        {itemsCategory && <CategoryItemsModal category={itemsCategory} onClose={() => setItemsCategory(null)} />}
+        {deletingCategory && (
+          <DeleteConfirmModal
+            category={deletingCategory} onClose={() => setDeletingCategory(null)}
+            onConfirm={async () => { await deleteCategory(deletingCategory._id); setDeletingCategory(null); }}
+          />
+        )}
+      </div>
+    );
+  }
+
   return (
     <div className="categories-page" style={{ background: 'var(--c-bg)', minHeight: '100vh' }}>
       {/* ── Summary header ─────────────────────────────────────────── */}
@@ -140,6 +221,18 @@ function Categories() {
             </p>
           </div>
         </div>
+      </div>
+
+      {/* ── Add new category — pinned to the top so it's reachable while scrolling ── */}
+      <div className="categories-add sticky top-0 z-10 px-4 py-3" style={{ background: 'var(--c-bg)' }}>
+        <button
+          onClick={() => setShowCreate(true)}
+          className="w-full py-3 rounded-xl text-sm font-bold uppercase tracking-wider flex items-center justify-center gap-2"
+          style={{ border: '1px solid var(--c-accent)', color: 'var(--c-accent)', background: 'var(--c-bg)' }}
+        >
+          <span className="text-lg leading-none">⊕</span>
+          Add New Category
+        </button>
       </div>
 
       {isLoading ? (
@@ -168,6 +261,7 @@ function Categories() {
                     setOpenMenuId={setOpenMenuId}
                     onEdit={() => setEditingCategory(cat)}
                     onDelete={() => setDeletingCategory(cat)}
+                    onItems={() => setItemsCategory(cat)}
                   />
                 ))}
               </SortableContext>
@@ -189,6 +283,7 @@ function Categories() {
                     setOpenMenuId={setOpenMenuId}
                     onEdit={() => setEditingCategory(cat)}
                     onDelete={() => setDeletingCategory(cat)}
+                    onItems={() => setItemsCategory(cat)}
                   />
                 ))}
               </SortableContext>
@@ -196,10 +291,7 @@ function Categories() {
           )}
 
           {categories.length === 0 && (
-            <div className="flex flex-col items-center py-16 gap-2">
-              <span className="text-4xl opacity-30">🏷️</span>
-              <p className="text-sm" style={{ color: 'var(--c-muted)' }}>No categories yet</p>
-            </div>
+            <EmptyState icon="🏷️" message="No categories yet" />
           )}
 
           <DragOverlay dropAnimation={null}>
@@ -216,18 +308,6 @@ function Categories() {
           </DragOverlay>
         </DndContext>
       )}
-
-      {/* ── Add new category button ──────────────────────────── */}
-      <div className="categories-add px-4 py-6">
-        <button
-          onClick={() => setShowCreate(true)}
-          className="w-full py-3 rounded-xl text-sm font-bold uppercase tracking-wider flex items-center justify-center gap-2"
-          style={{ border: '1px solid var(--c-accent)', color: 'var(--c-accent)' }}
-        >
-          <span className="text-lg leading-none">⊕</span>
-          Add New Category
-        </button>
-      </div>
 
       {/* Modals */}
       <CategoryModal
@@ -247,6 +327,9 @@ function Categories() {
           defaultValues={{ name: editingCategory.name, type: editingCategory.type as 'income' | 'expense', icon: editingCategory.icon || '' }}
         />
       )}
+      {itemsCategory && (
+        <CategoryItemsModal category={itemsCategory} onClose={() => setItemsCategory(null)} />
+      )}
       {deletingCategory && (
         <DeleteConfirmModal
           category={deletingCategory}
@@ -264,6 +347,8 @@ interface RowProps {
   setOpenMenuId: (id: string | null) => void;
   onEdit: () => void;
   onDelete: () => void;
+  /** Manage the category's sub-category items. */
+  onItems?: () => void;
   isOverlay?: boolean;
   dragListeners?: Record<string, unknown>;
 }
@@ -274,6 +359,7 @@ function SortableCategoryRow({
   setOpenMenuId,
   onEdit,
   onDelete,
+  onItems,
 }: Omit<RowProps, 'isOverlay' | 'dragListeners'>) {
   const {
     attributes,
@@ -300,13 +386,46 @@ function SortableCategoryRow({
         setOpenMenuId={setOpenMenuId}
         onEdit={onEdit}
         onDelete={onDelete}
+        onItems={onItems}
         dragListeners={listeners as Record<string, unknown>}
       />
     </div>
   );
 }
 
-function CategoryRow({ category, openMenuId, setOpenMenuId, onEdit, onDelete, isOverlay, dragListeners }: RowProps) {
+function CategoryRow({ category, openMenuId, setOpenMenuId, onEdit, onDelete, onItems, isOverlay, dragListeners }: RowProps) {
+  const items = useCategoryItemStore((s) => s.items).filter((i) => i.categoryId === category._id);
+  const preview = items.slice(0, 3).map((i) => i.name).join(', ') + (items.length > 3 ? ` +${items.length - 3}` : '');
+  const isCartoon = useThemeStore((s) => s.theme === 'cartoon');
+  if (isCartoon) {
+    const isSystem = ['settlement', 'waived', 'clean up'].includes(category.name.trim().toLowerCase());
+    return (
+      <div className={`cartoon-cat ${isOverlay ? 'is-overlay' : ''}`}>
+        <div className="cartoon-grip" style={{ touchAction: 'none' }} {...(dragListeners ?? {})} aria-label="Drag to reorder"><GripIcon /></div>
+        <CartoonTile kind={categoryKind(category.icon, category.name)} size={54} />
+        <button type="button" onClick={onItems} disabled={!onItems || isOverlay} className="min-w-0 flex-1 text-left">
+          <p className="cartoon-cat-name">{category.name}</p>
+          {isSystem ? <Sticker tone="grape" tilt={-2}>System</Sticker>
+            : items.length > 0 && <p className="cartoon-sub" style={{ fontSize: 12 }}>{preview}</p>}
+        </button>
+        {!isOverlay && (
+          <div className="relative">
+            <button
+              aria-label={`${category.name} options`} className="cartoon-dots" onPointerDown={e => e.stopPropagation()}
+              onClick={e => { e.stopPropagation(); setOpenMenuId(openMenuId === category._id ? null : category._id); }}
+            >···</button>
+            {openMenuId === category._id && (
+              <div onClick={e => e.stopPropagation()} className="cartoon-menu">
+                <button onClick={() => { onEdit(); setOpenMenuId(null); }}>Edit</button>
+                {onItems && <button onClick={() => { onItems(); setOpenMenuId(null); }}>Items</button>}
+                <button className="is-danger" onClick={() => { onDelete(); setOpenMenuId(null); }}>{category.userId ? 'Delete' : 'Remove'}</button>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+    );
+  }
   return (
     <div
       className={`category-row ${isOverlay ? 'is-overlay flex items-center gap-3 px-4 py-3' : 'cred-divider flex items-center gap-3 px-4 py-3'}`}
@@ -328,10 +447,18 @@ function CategoryRow({ category, openMenuId, setOpenMenuId, onEdit, onDelete, is
       {/* Icon circle */}
       <span className="category-row-icon">{renderCategoryIcon(category.icon, category.name, 40)}</span>
 
-      {/* Name */}
-      <p className="flex-1 text-sm font-medium truncate" style={{ color: 'var(--c-text)' }}>
-        {category.name}
-      </p>
+      {/* Name + items — tap to manage the category's items */}
+      <button
+        type="button"
+        onClick={onItems}
+        disabled={!onItems || isOverlay}
+        className="flex-1 min-w-0 text-left"
+      >
+        <p className="text-sm font-medium truncate" style={{ color: 'var(--c-text)' }}>{category.name}</p>
+        <p className="text-xs truncate" style={{ color: 'var(--c-muted)' }}>
+          {items.length > 0 ? preview : '+ Add items'}
+        </p>
+      </button>
 
       {/* Three-dot menu — all categories now */}
       {!isOverlay && (
@@ -357,6 +484,15 @@ function CategoryRow({ category, openMenuId, setOpenMenuId, onEdit, onDelete, is
               >
                 Edit
               </button>
+              {onItems && (
+                <button
+                  onClick={() => { onItems(); setOpenMenuId(null); }}
+                  className="block w-full px-4 py-2.5 text-left text-sm"
+                  style={{ color: 'var(--c-text)' }}
+                >
+                  Items
+                </button>
+              )}
               <button
                 onClick={() => { onDelete(); setOpenMenuId(null); }}
                 className="block w-full px-4 py-2.5 text-left text-sm"
@@ -377,7 +513,7 @@ function ModalWrap({ title, children, onClose }: { title: string; children: Reac
     <Dialog open onClose={onClose} className="relative z-50">
       <div className="fixed inset-0 bg-black/60" />
       <div className="fixed inset-0 flex items-end sm:items-center justify-center p-0 sm:p-4">
-        <DialogPanel className="category-modal w-full sm:max-w-md rounded-t-2xl sm:rounded-2xl p-5 shadow-2xl overflow-y-auto" style={{ background: 'var(--c-surface)', maxHeight: '90dvh' }}>
+        <DialogPanel className="cartoon-modal category-modal w-full sm:max-w-md rounded-t-2xl sm:rounded-2xl p-5 shadow-2xl overflow-y-auto" style={{ background: 'var(--c-surface)', maxHeight: '90dvh' }}>
           <DialogTitle className="cred-serif text-base font-semibold mb-4" style={{ color: 'var(--c-text)' }}>{title}</DialogTitle>
           {children}
         </DialogPanel>
@@ -397,6 +533,9 @@ function CategoryModal({ open, onClose, onSubmit, title, submitLabel, defaultVal
     defaultValues: defaultValues || { name: '', type: 'expense', icon: '' },
   });
   const selectedIcon = watch('icon');
+  const isCartoon = useThemeStore((s) => s.theme === 'cartoon');
+  const typeValue = watch('type');
+  const nameValue = watch('name');
 
   useEffect(() => { if (open) reset(defaultValues || { name: '', type: 'expense', icon: '' }); }, [open, reset, defaultValues]);
   const handleFormSubmit = async (data: CategoryFormData) => { try { await onSubmit(data); reset(); } catch {} };
@@ -404,6 +543,40 @@ function CategoryModal({ open, onClose, onSubmit, title, submitLabel, defaultVal
 
   return (
     <ModalWrap title={title} onClose={onClose}>
+      {isCartoon ? (
+        <form onSubmit={handleSubmit(handleFormSubmit)} className="flex flex-col gap-4">
+          <div className="flex items-center gap-4">
+            <CartoonTile kind={categoryKind(selectedIcon, nameValue || '')} size={84} className="is-big" />
+            <div className="flex-1 min-w-0">
+              <label className="cartoon-kicker">Name</label>
+              <input {...register('name')} className="t-input mt-1" placeholder="e.g. Groceries" />
+              {errors.name && <p className="text-xs mt-1" style={{ color: 'var(--c-expense)' }}>{errors.name.message}</p>}
+            </div>
+          </div>
+          <div className="cartoon-seg">
+            <button type="button" className={typeValue === 'expense' ? 'is-on is-spend' : ''} onClick={() => setValue('type', 'expense')}>Money out</button>
+            <button type="button" className={typeValue === 'income' ? 'is-on is-earn' : ''} onClick={() => setValue('type', 'income')}>Money in</button>
+          </div>
+          <div>
+            <p className="cartoon-kicker mb-2">Picture</p>
+            <div className="cartoon-pic-grid">
+              {CATEGORY_KINDS.map(kind => {
+                const on = categoryKind(selectedIcon, nameValue || '') === kind && !!selectedIcon?.startsWith('kind:');
+                return (
+                  <button key={kind} type="button" aria-label={kind} aria-pressed={on} className={`cartoon-pic ${on ? 'is-on' : ''}`}
+                    onClick={() => setValue('icon', on ? '' : `kind:${kind}`)}>
+                    <CartoonIcon kind={kind} size={40} />
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+          <div className="flex gap-3 pt-1">
+            <button type="button" onClick={onClose} className="cartoon-btn flex-1">Cancel</button>
+            <button type="submit" disabled={isSubmitting} className="cartoon-btn is-primary flex-1">{isSubmitting ? 'Saving...' : submitLabel}</button>
+          </div>
+        </form>
+      ) : (
       <form onSubmit={handleSubmit(handleFormSubmit)} className="space-y-4">
         <div>
           <label className="block text-xs font-medium mb-1" style={{ color: 'var(--c-muted)' }}>Name</label>
@@ -412,10 +585,11 @@ function CategoryModal({ open, onClose, onSubmit, title, submitLabel, defaultVal
         </div>
         <div>
           <label className="block text-xs font-medium mb-1" style={{ color: 'var(--c-muted)' }}>Type</label>
-          <select {...register('type')} className="t-select">
-            <option value="expense">Expense</option>
-            <option value="income">Income</option>
-          </select>
+          <ThemedSelect
+            value={watch('type')}
+            onChange={(v) => setValue('type', v as 'expense' | 'income', { shouldValidate: true })}
+            options={[{ value: 'expense', label: 'Expense' }, { value: 'income', label: 'Income' }]}
+          />
         </div>
 
         {/* ── Icon picker ──────────────────────────────────────────── */}
@@ -474,6 +648,65 @@ function CategoryModal({ open, onClose, onSubmit, title, submitLabel, defaultVal
           <button type="submit" disabled={isSubmitting} className="t-btn-primary flex-1">{isSubmitting ? 'Saving...' : submitLabel}</button>
         </div>
       </form>
+      )}
+    </ModalWrap>
+  );
+}
+
+function CategoryItemsModal({ category, onClose }: { category: Category; onClose: () => void }) {
+  const { items, loaded, fetchItems, createItem, updateItem, deleteItem } = useCategoryItemStore();
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const categoryItems = items.filter((i) => i.categoryId === category._id);
+  const { groups: unitGroups, loaded: unitsLoaded, fetchGroups } = useUnitGroupStore();
+  useEffect(() => { if (!unitsLoaded) fetchGroups(); }, [unitsLoaded, fetchGroups]);
+
+  useEffect(() => { if (!loaded) fetchItems(); }, [loaded, fetchItems]);
+
+  const remove = async (item: CategoryItem) => {
+    setDeletingId(item._id);
+    try { await deleteItem(item._id); } catch { /* toast shown by the store */ }
+    setDeletingId(null);
+  };
+
+  return (
+    <ModalWrap title={`${category.name} · Items`} onClose={onClose}>
+      <p className="text-xs mb-3" style={{ color: 'var(--c-muted)' }}>
+        Items you can pick when adding a {category.name} expense. The default quantity and unit are prefilled and can be changed per purchase.
+      </p>
+      <ItemFields
+        key={`add-${categoryItems.length}`}
+        categoryItems={categoryItems}
+        submitLabel="Add item"
+        onSubmit={async (data) => { await createItem(category._id, data); }}
+      />
+
+      <div className="mt-4 space-y-1">
+        {categoryItems.length === 0 && (
+          <EmptyState compact icon="🧺" message="No items yet — add one above" />
+        )}
+        {categoryItems.map((item) => editingId === item._id ? (
+          <div key={item._id} className="rounded-xl p-3" style={{ background: 'var(--c-bg)', border: '1px solid var(--c-border)' }}>
+            <ItemFields
+              categoryItems={categoryItems}
+              excludeId={item._id}
+              initial={item}
+              submitLabel="Save"
+              onSubmit={async (data) => { await updateItem(item._id, data); setEditingId(null); }}
+              onCancel={() => setEditingId(null)}
+            />
+          </div>
+        ) : (
+          <div key={item._id} className="cred-divider flex items-center gap-2 py-2">
+            <p className="flex-1 text-sm truncate" style={{ color: 'var(--c-text)' }}>{item.name}</p>
+            <span className="text-xs" style={{ color: 'var(--c-muted)' }}>{defaultLabel(item, unitGroups)}</span>
+            <button type="button" onClick={() => setEditingId(item._id)} className="text-xs font-semibold px-2" style={{ color: 'var(--c-accent)' }}>Edit</button>
+            <button type="button" onClick={() => remove(item)} disabled={deletingId === item._id} className="text-xs font-semibold px-2 disabled:opacity-40" style={{ color: 'var(--c-expense)' }}>Delete</button>
+          </div>
+        ))}
+      </div>
+
+      <button type="button" onClick={onClose} className="t-btn-ghost w-full mt-4">Done</button>
     </ModalWrap>
   );
 }

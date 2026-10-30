@@ -9,6 +9,9 @@ import { formatCurrency } from '../utils/format';
 import Amount from '../components/Amount';
 import { renderCategoryIcon } from '../utils/categoryIcons';
 import api from '../api/axios';
+import CartoonIcon from '../components/CartoonIcon';
+import { CartoonHead, Sticker } from '../components/cartoon';
+import ThemedSelect from '../components/ThemedSelect';
 
 function getCurrentFinancialMonth(startDay: number) {
   const now = new Date();
@@ -33,6 +36,7 @@ function parseDateStr(dateStr: string): Date {
 
 function Budget() {
   const isCredWhite = useThemeStore((s) => s.theme === 'cred-white');
+  const isCartoon = useThemeStore((s) => s.theme === 'cartoon');
   const { budget, monthlySummary, isLoading, fetchBudget, upsertBudget, fetchMonthlySummary } = useBudgetStore();
   const { categories, fetchCategories } = useCategoryStore();
   const { user } = useAuthStore();
@@ -149,6 +153,178 @@ function Budget() {
   const budgetedIds = new Set((monthlySummary?.categorySummary || []).map(c => c.categoryId._id));
   const unbudgetedCategories = expenseCategories.filter(c => !budgetedIds.has(c._id));
   const budgetedCategories = monthlySummary?.categorySummary || [];
+
+  if (isCartoon) {
+    const limit = monthlySummary?.overallLimit ?? null;
+    const spent = monthlySummary?.totalSpent ?? 0;
+    const fill = limit ? Math.min(spent / limit, 1) : 0;
+    const over = !!limit && spent > limit;
+    const today = new Date();
+    const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+    const blanks = monthlySummary ? parseDateStr(monthlySummary.periodStart).getDay() : 0;
+    const MONTHS = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'];
+    return (
+      <div className="cartoon-page">
+        <CartoonHead
+          kicker="Monthly budget"
+          title="Budgets"
+          actions={
+            <div className="cartoon-stepper">
+              <button className="cartoon-round-btn is-small" aria-label="Previous month" onClick={() => navigateMonth(-1)}>‹</button>
+              <div className="text-center">
+                <p className="cartoon-stepper-title">{formatMonthLabel(selectedMonth)}</p>
+                {periodLabel && <p className="cartoon-sub" style={{ fontSize: 12 }}>{periodLabel}</p>}
+              </div>
+              <button className="cartoon-round-btn is-small" aria-label="Next month" onClick={() => navigateMonth(1)}>›</button>
+            </div>
+          }
+        />
+
+        {isLoading ? (
+          <div className="flex justify-center py-16"><div className="cartoon-spinner" /></div>
+        ) : (
+          <>
+            <section className="cartoon-hero is-sun">
+              <span className="cartoon-hero-tile"><CartoonIcon kind="budgets" size={96} /></span>
+              <div className="min-w-0 flex-1">
+                <p className="cartoon-kicker">Spent this cycle</p>
+                <p className="cartoon-hero-amount" style={over ? { color: 'var(--c-spend-text)' } : undefined}>
+                  <Amount value={spent} />
+                </p>
+                <p className="cartoon-sub" style={{ color: 'var(--c-ink)', margin: '4px 0 12px' }}>
+                  {limit
+                    ? <>of <Amount value={limit} /> budgeted{monthlySummary?.dailyLimit != null && <> · daily allowance <Amount value={monthlySummary.dailyLimit} /></>}</>
+                    : 'No budget yet. Give the piggy a limit and watch it fill as you spend.'}
+                </p>
+                <div className="cartoon-head-actions">
+                  <button onClick={() => setShowForm(true)} className="cartoon-btn is-primary">{budget ? 'Edit budget' : '+ Set budget'}</button>
+                  {monthlySummary && <button onClick={() => setShowDetails(true)} className="cartoon-btn">View details</button>}
+                </div>
+              </div>
+              <div className="cartoon-jar-wrap">
+                <div className="cartoon-jar">
+                  <span className="cartoon-jar-line" />
+                  <span className="cartoon-jar-fill" style={{ height: `${Math.max(fill * 100, 6)}%`, background: over ? 'var(--c-tomato)' : 'var(--c-sun)' }} />
+                </div>
+                <p className="cartoon-sub" style={{ fontSize: 12 }}>{limit ? `${Math.round((spent / limit) * 100)}% of limit` : 'limit line goes here'}</p>
+              </div>
+            </section>
+
+            {budgetedCategories.length > 0 && (
+              <>
+                <h2 className="cartoon-section-title">Budgeted categories</h2>
+                <div className="flex flex-col gap-4">
+                  {budgetedCategories.map(cat => {
+                    const pot = cat.pot;
+                    const denom = cat.carryForward ? Math.max(cat.limit, Math.abs(pot ?? 0)) : cat.limit;
+                    const pct = denom > 0 ? Math.min((cat.totalSpent / denom) * 100, 100) : 0;
+                    const isOver = cat.carryForward ? (pot !== null && pot < 0) : cat.totalSpent > cat.limit;
+                    return (
+                      <div key={cat.categoryId._id} className="cartoon-row">
+                        {renderCategoryIcon(cat.categoryId.icon, cat.categoryId.name, 56)}
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center justify-between gap-2 flex-wrap">
+                            <p className="cartoon-card-title" style={{ fontSize: 20 }}>
+                              {cat.categoryId.name} {cat.carryForward && <Sticker tone="sun" tilt={3}>Saving</Sticker>}
+                            </p>
+                            <p className="cartoon-sub" style={{ color: isOver ? 'var(--c-spend-text)' : undefined }}>
+                              <Amount value={cat.totalSpent} /> of <Amount value={cat.limit} />
+                            </p>
+                          </div>
+                          <div className="cartoon-bar"><span style={{ width: `${pct}%`, background: isOver ? 'var(--c-tomato)' : pct > 80 ? 'var(--c-orange, #FF9F43)' : 'var(--c-leaf)' }} /></div>
+                          <p className="cartoon-sub" style={{ fontSize: 12, marginTop: 4 }}>
+                            {cat.carryForward && pot !== null
+                              ? <>{isOver ? 'Pot overdrawn by ' : 'Saved up: '}<Amount value={Math.abs(pot)} />{!isOver && ' available'}</>
+                              : cat.frequency === 'daily' && cat.adaptiveDaily !== null
+                                ? <>Today's pace: <Amount value={cat.adaptiveDaily} /> / day</>
+                                : 'Monthly budget'}
+                          </p>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </>
+            )}
+
+            {monthlySummary && (
+              <section className="cartoon-panel">
+                <div className="flex items-center justify-between gap-3 flex-wrap">
+                  <h2 className="cartoon-section-title flex items-center gap-2"><CartoonIcon kind="calendar" size={34} /> Day by day</h2>
+                  <div className="cartoon-legend">
+                    <span><i className="is-spent" /> Spent</span>
+                    <span><i className="is-zero" /> Nothing spent</span>
+                    <span><i className="is-future" /> Coming up</span>
+                  </div>
+                </div>
+                <div className="bud-cal">
+                  {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(d => <div key={d} className="bud-cal-head">{d}</div>)}
+                  {Array.from({ length: blanks }, (_, i) => <div key={`b${i}`} />)}
+                  {monthlySummary.days.map((day, i) => {
+                    const d = parseDateStr(day.date);
+                    const isToday = day.date === todayStr;
+                    const future = day.date > todayStr;
+                    const cls = isToday ? 'is-today' : future ? 'is-future' : day.spent > 0 ? 'is-spent' : 'is-zero';
+                    return (
+                      <div key={day.date} className={`bud-cal-day ${cls} ${!future && day.isOver ? 'is-over' : ''}`} title={day.spent > 0 ? formatCurrency(day.spent) : 'No spending'}>
+                        <b>{d.getDate()}</b>
+                        {(i === 0 || d.getDate() === 1) && future && <small>{MONTHS[d.getMonth()]}</small>}
+                        {isToday ? <small>TODAY</small> : !future && <small>₹{Math.round(day.spent)}</small>}
+                      </div>
+                    );
+                  })}
+                </div>
+              </section>
+            )}
+
+            {unbudgetedCategories.length > 0 && (
+              <>
+                <div className="flex items-center justify-between gap-3 flex-wrap">
+                  <h2 className="cartoon-section-title">Not budgeted yet</h2>
+                  <span className="cartoon-pill">Tap a jar to give it a limit</span>
+                </div>
+                <div className="flex flex-col gap-4">
+                  {unbudgetedCategories.map(cat => (
+                    <div key={cat._id} className="cartoon-row">
+                      {renderCategoryIcon(cat.icon, cat.name, 56)}
+                      <div className="min-w-0 flex-1">
+                        <p className="cartoon-card-title" style={{ fontSize: 20 }}>{cat.name}</p>
+                        <p className="cartoon-sub" style={{ fontSize: 13 }}>No limit yet</p>
+                      </div>
+                      <span className="cartoon-dash-bar" />
+                      <button onClick={() => handleSetBudgetForCategory(cat._id)} className="cartoon-btn">+ Set budget</button>
+                    </div>
+                  ))}
+                </div>
+                <button onClick={handleSetFromPreviousMonth} className="cartoon-btn" style={{ alignSelf: 'flex-start' }}>↺ Set from previous month</button>
+              </>
+            )}
+          </>
+        )}
+
+        <BudgetModal
+          open={showForm} onClose={() => setShowForm(false)} month={selectedMonth}
+          overallLimit={overallLimit} setOverallLimit={setOverallLimit} categoryBudgets={categoryBudgets}
+          expenseCategories={expenseCategories} onAdd={addCategoryBudget} onRemove={removeCategoryBudget}
+          onUpdate={updateCategoryBudget} onToggleCarryForward={toggleCategoryCarryForward} onSave={handleSave}
+        />
+        {focusedCategoryId && (() => {
+          const cat = expenseCategories.find(c => c._id === focusedCategoryId);
+          const existing = categoryBudgets.find(cb => cb.categoryId === focusedCategoryId);
+          if (!cat) return null;
+          return (
+            <SingleCategoryModal
+              open category={cat}
+              initialLimit={existing?.limit ?? ''} initialFrequency={existing?.frequency ?? 'monthly'}
+              initialCarryForward={existing?.carryForward ?? false}
+              onClose={() => setFocusedCategoryId(null)}
+              onSave={(limit, freq, cf) => handleSaveSingleCategory(focusedCategoryId, limit, freq, cf)}
+            />
+          );
+        })()}
+      </div>
+    );
+  }
 
   return (
     <div className="budget-page" style={{ background: 'var(--c-bg)', minHeight: '100vh' }}>
@@ -432,7 +608,7 @@ function BudgetModal({
       <div className="fixed inset-0 bg-black/60" />
       <div className="fixed inset-0 flex items-end sm:items-center justify-center p-0 sm:p-4">
         <DialogPanel
-          className="flex flex-col w-full sm:max-w-md rounded-t-2xl sm:rounded-2xl shadow-2xl overflow-hidden"
+          className="cartoon-modal flex flex-col w-full sm:max-w-md rounded-t-2xl sm:rounded-2xl shadow-2xl overflow-hidden"
           style={{ background: 'var(--c-surface)', maxHeight: '85dvh' }}
         >
           {/* Header */}
@@ -498,16 +674,13 @@ function BudgetModal({
                   >
                     {/* Category row */}
                     <div className="flex items-center gap-2">
-                      <select
+                      <ThemedSelect
+                        className="flex-1 font-medium"
                         value={cb.categoryId}
-                        onChange={e => onUpdate(i, 'categoryId', e.target.value)}
-                        className="t-select flex-1 font-medium"
-                      >
-                        <option value="">Select category</option>
-                        {expenseCategories.map(c => (
-                          <option key={c._id} value={c._id}>{c.icon} {c.name}</option>
-                        ))}
-                      </select>
+                        onChange={v => onUpdate(i, 'categoryId', v)}
+                        placeholder="Select category"
+                        options={expenseCategories.map(c => ({ value: c._id, label: c.name, icon: renderCategoryIcon(c.icon, c.name, 22) }))}
+                      />
                       <button
                         onClick={() => onRemove(i)}
                         className="flex-shrink-0 w-7 h-7 flex items-center justify-center rounded-lg font-bold text-base"
@@ -641,7 +814,7 @@ function SingleCategoryModal({
       <div className="fixed inset-0 bg-black/60" />
       <div className="fixed inset-0 flex items-end sm:items-center justify-center p-0 sm:p-4">
         <DialogPanel
-          className="flex flex-col w-full sm:max-w-sm rounded-t-2xl sm:rounded-2xl shadow-2xl overflow-hidden"
+          className="cartoon-modal flex flex-col w-full sm:max-w-sm rounded-t-2xl sm:rounded-2xl shadow-2xl overflow-hidden"
           style={{ background: 'var(--c-surface)', maxHeight: '90dvh' }}
         >
           {/* Header */}

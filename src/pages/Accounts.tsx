@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useForm } from 'react-hook-form';
+import { Controller, useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { Dialog, DialogPanel, DialogTitle } from '@headlessui/react';
@@ -8,6 +8,12 @@ import useDashboardStore from '../store/dashboardStore';
 import { formatCurrency } from '../utils/format';
 import Amount from '../components/Amount';
 import { renderAccountIcon } from '../utils/accountIcons';
+import CartoonIcon from '../components/CartoonIcon';
+import ThemedSelect from '../components/ThemedSelect';
+import DatePicker from '../components/DatePicker';
+import { todayLocal } from '../utils/localDate';
+import { CartoonHead, Sticker, useIsCartoon } from '../components/cartoon';
+import { accountKind, kindTint } from '../utils/cartoonKinds';
 
 const ACCOUNT_TYPES = [
   { value: 'cash', label: 'Cash' },
@@ -17,6 +23,11 @@ const ACCOUNT_TYPES = [
   { value: 'investment', label: 'Investment' },
   { value: 'other', label: 'Other' },
 ] as const;
+
+const ACCOUNT_SUBTITLE: Record<string, string> = {
+  cash: 'Cash in hand', bank_account: 'Bank account', credit_card: 'Credit card',
+  upi_wallet: 'Wallet', investment: 'Investments', other: 'Other',
+};
 
 const COLORS = ['#3B82F6','#10B981','#F59E0B','#EF4444','#8B5CF6','#EC4899','#06B6D4','#F97316'];
 
@@ -38,6 +49,7 @@ const transferSchema = z.object({
   toAccountId: z.string().min(1),
   amount: z.number().positive('Amount must be positive'),
   note: z.string().optional(),
+  date: z.string().min(1, 'Pick a date'),
 });
 
 type CreateFormData = z.infer<typeof createSchema>;
@@ -56,6 +68,8 @@ function Accounts() {
     fetchAccounts();
     fetchSummary();
   }, [fetchAccounts, fetchSummary]);
+  // Balances move (transfers, edits): keep the "in hand" figures in step.
+  useEffect(() => { if (accounts.length > 0) fetchSummary(); }, [accounts, fetchSummary]);
 
   useEffect(() => {
     const close = () => setOpenMenuId(null);
@@ -63,8 +77,116 @@ function Accounts() {
     return () => document.removeEventListener('click', close);
   }, []);
 
+  const isCartoon = useIsCartoon();
   const activeAccounts = accounts.filter(a => a.isActive);
   const totalBalance = activeAccounts.reduce((s, a) => s + a.balance, 0);
+
+  if (isCartoon) {
+    return (
+      <div className="cartoon-page">
+        <CartoonHead
+          kicker="Where your money lives"
+          title="Accounts"
+          actions={
+            <>
+              <button onClick={() => setShowTransfer(true)} className="cartoon-btn">
+                <CartoonIcon kind="coins" size={22} /> Transfer
+              </button>
+              <button onClick={() => setShowCreate(true)} className="cartoon-btn is-primary">+ Add account</button>
+            </>
+          }
+        />
+
+        <section className="cartoon-hero">
+          <span className="cartoon-hero-art">
+            <CartoonIcon kind="card" size={84} /><CartoonIcon kind="wallet" size={96} style={{ marginLeft: -26 }} /><CartoonIcon kind="bank" size={84} style={{ marginLeft: -26 }} />
+          </span>
+          <div className="min-w-0">
+            <p className="cartoon-kicker">All accounts together</p>
+            <p className="cartoon-hero-amount"><Amount value={totalBalance} /></p>
+            <div className="cartoon-chips mt-2">
+              <span className="cartoon-pill is-spend"><CartoonIcon kind="shopping" size={20} /> Spent so far <b>{summary ? <Amount value={summary.totalExpense} /> : '—'}</b></span>
+              <span className="cartoon-pill is-earn"><CartoonIcon kind="salary" size={20} /> Earned so far <b>{summary ? <Amount value={summary.totalIncome} /> : '—'}</b></span>
+            </div>
+          </div>
+          <div className="cartoon-inhand">
+            <p className="cartoon-kicker">In hand right now</p>
+            <div className="cartoon-inhand-tiles">
+              <div className="cartoon-inhand-tile">
+                <CartoonIcon kind="bank" size={44} />
+                <div className="min-w-0">
+                  <p className="cartoon-inhand-label">UPI</p>
+                  <p className="cartoon-inhand-amount">{summary?.inHand ? <Amount value={summary.inHand.upi} /> : '—'}</p>
+                  <p className="cartoon-inhand-sub">{summary?.inHand?.accounts.upi.map(a => a.name).join(' + ') || 'bank accounts'}</p>
+                </div>
+              </div>
+              <div className="cartoon-inhand-tile">
+                <CartoonIcon kind="cash" size={44} />
+                <div className="min-w-0">
+                  <p className="cartoon-inhand-label">Cash</p>
+                  <p className="cartoon-inhand-amount">{summary?.inHand ? <Amount value={summary.inHand.cash} /> : '—'}</p>
+                  <p className="cartoon-inhand-sub">{summary?.inHand?.accounts.cash.map(a => a.name).join(' + ') || 'cash in hand'}</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {isLoading ? (
+          <div className="flex justify-center py-16"><div className="cartoon-spinner" /></div>
+        ) : (
+          <div className="cartoon-grid">
+            {accounts.map(account => {
+              const kind = accountKind(account.type);
+              const dues = account.type === 'credit_card' && account.balance < 0;
+              return (
+                <div key={account._id} className="cartoon-card account-card" style={{ opacity: account.isActive ? 1 : 0.5 }}>
+                  <div className="flex items-start justify-between">
+                    <span className="cartoon-tile" style={{ width: 64, height: 64, background: kindTint(kind) }}>
+                      <CartoonIcon kind={kind} size={46} />
+                    </span>
+                    <div className="relative">
+                      <button
+                        aria-label={`${account.name} options`}
+                        onClick={e => { e.stopPropagation(); setOpenMenuId(openMenuId === account._id ? null : account._id); }}
+                        className="cartoon-dots"
+                      >···</button>
+                      {openMenuId === account._id && (
+                        <div onClick={e => e.stopPropagation()} className="cartoon-menu">
+                          <button onClick={() => { setEditingAccount(account); setOpenMenuId(null); }}>Edit</button>
+                          <button onClick={() => { toggleAccount(account._id); setOpenMenuId(null); }}>{account.isActive ? 'Disable' : 'Enable'}</button>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                  <div>
+                    <p className="cartoon-card-title">{account.name}{!account.isActive && <span className="cartoon-sub"> · disabled</span>}</p>
+                    <p className="cartoon-sub">{ACCOUNT_SUBTITLE[account.type]}</p>
+                  </div>
+                  <div className="flex items-end justify-between gap-2">
+                    <p className="cartoon-card-amount" style={{ color: account.balance < 0 ? 'var(--c-spend-text)' : undefined }}>
+                      {account.balance < 0 ? '−' : ''}<Amount value={Math.abs(account.balance)} />
+                    </p>
+                    {dues && <Sticker tone="spend" tilt={-4}>Card dues</Sticker>}
+                  </div>
+                </div>
+              );
+            })}
+            <button className="cartoon-card account-add" onClick={() => setShowCreate(true)}>
+              <span className="cartoon-round-btn">+</span>
+              <span>Add an account</span>
+            </button>
+          </div>
+        )}
+
+        <CreateModal open={showCreate} onClose={() => setShowCreate(false)} onCreate={createAccount} />
+        {editingAccount && (
+          <EditModal account={editingAccount} onClose={() => setEditingAccount(null)} onUpdate={updateAccount} />
+        )}
+        <TransferModal open={showTransfer} onClose={() => setShowTransfer(false)} onTransfer={transfer} accounts={activeAccounts} />
+      </div>
+    );
+  }
 
   return (
     <div style={{ background: 'var(--c-bg)', minHeight: '100vh' }}>
@@ -213,7 +335,7 @@ function ModalWrap({ title, children, onClose }: { title: string; children: Reac
       <div className="fixed inset-0 bg-black/60" />
       <div className="fixed inset-0 flex items-end sm:items-center justify-center p-0 sm:p-4">
         <DialogPanel
-          className="w-full sm:max-w-md rounded-t-2xl sm:rounded-2xl p-5 shadow-2xl overflow-y-auto"
+          className="cartoon-modal w-full sm:max-w-md rounded-t-2xl sm:rounded-2xl p-5 shadow-2xl overflow-y-auto"
           style={{ background: 'var(--c-surface)', maxHeight: '90dvh' }}
         >
           <DialogTitle className="cred-serif text-base font-semibold mb-4" style={{ color: 'var(--c-text)' }}>
@@ -260,9 +382,11 @@ function CreateModal({ open, onClose, onCreate }: { open: boolean; onClose: () =
         </div>
         <div>
           <label className="block text-xs font-medium mb-1" style={{ color: 'var(--c-muted)' }}>Type</label>
-          <select {...register('type')} className="t-select">
-            {ACCOUNT_TYPES.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
-          </select>
+          <ThemedSelect
+            value={watch('type')}
+            onChange={(v) => setValue('type', v as never, { shouldValidate: true })}
+            options={ACCOUNT_TYPES.map(t => ({ value: t.value, label: t.label, icon: renderAccountIcon(t.value as Account['type'], undefined, 22) }))}
+          />
         </div>
         <div>
           <label className="block text-xs font-medium mb-1" style={{ color: 'var(--c-muted)' }}>Initial Balance</label>
@@ -298,9 +422,11 @@ function EditModal({ account, onClose, onUpdate }: { account: Account; onClose: 
         </div>
         <div>
           <label className="block text-xs font-medium mb-1" style={{ color: 'var(--c-muted)' }}>Type</label>
-          <select {...register('type')} className="t-select">
-            {ACCOUNT_TYPES.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
-          </select>
+          <ThemedSelect
+            value={watch('type')}
+            onChange={(v) => setValue('type', v as never, { shouldValidate: true })}
+            options={ACCOUNT_TYPES.map(t => ({ value: t.value, label: t.label, icon: renderAccountIcon(t.value as Account['type'], undefined, 22) }))}
+          />
         </div>
         <div>
           <label className="block text-xs font-medium mb-1" style={{ color: 'var(--c-muted)' }}>Color</label>
@@ -316,14 +442,15 @@ function EditModal({ account, onClose, onUpdate }: { account: Account; onClose: 
 }
 
 function TransferModal({ open, onClose, onTransfer, accounts }: { open: boolean; onClose: () => void; onTransfer: (d: TransferFormData) => Promise<void>; accounts: Account[] }) {
-  const { register, handleSubmit, reset, watch, formState: { errors, isSubmitting } } = useForm<TransferFormData>({
+  const { register, handleSubmit, reset, watch, setValue, control, formState: { errors, isSubmitting } } = useForm<TransferFormData>({
     resolver: zodResolver(transferSchema),
-    defaultValues: { fromAccountId: '', toAccountId: '', amount: undefined as unknown as number, note: '' },
+    defaultValues: { fromAccountId: '', toAccountId: '', amount: undefined as unknown as number, note: '', date: todayLocal() },
   });
   const fromId = watch('fromAccountId');
   const toId = watch('toAccountId');
   const amount = watch('amount');
   const source = accounts.find(a => a._id === fromId);
+  const accountItems = accounts.map(a => ({ value: a._id, label: a.name, hint: formatCurrency(a.balance), icon: renderAccountIcon(a.type, a.color, 22) }));
   const sameErr = fromId && toId && fromId === toId;
   const balanceErr = source && amount > 0 && amount > source.balance;
 
@@ -339,24 +466,33 @@ function TransferModal({ open, onClose, onTransfer, accounts }: { open: boolean;
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
         <div>
           <label className="block text-xs font-medium mb-1" style={{ color: 'var(--c-muted)' }}>From</label>
-          <select {...register('fromAccountId')} className="t-select">
-            <option value="">Select account</option>
-            {accounts.map(a => <option key={a._id} value={a._id}>{a.name} ({formatCurrency(a.balance)})</option>)}
-          </select>
+          <ThemedSelect
+            value={fromId}
+            onChange={(v) => setValue('fromAccountId', v, { shouldValidate: true })}
+            placeholder="Select account"
+            options={accountItems}
+          />
           {errors.fromAccountId && <p className="text-xs mt-1" style={{ color: 'var(--c-expense)' }}>{errors.fromAccountId.message}</p>}
         </div>
         <div>
           <label className="block text-xs font-medium mb-1" style={{ color: 'var(--c-muted)' }}>To</label>
-          <select {...register('toAccountId')} className="t-select">
-            <option value="">Select account</option>
-            {accounts.map(a => <option key={a._id} value={a._id}>{a.name} ({formatCurrency(a.balance)})</option>)}
-          </select>
+          <ThemedSelect
+            value={toId}
+            onChange={(v) => setValue('toAccountId', v, { shouldValidate: true })}
+            placeholder="Select account"
+            options={accountItems}
+          />
           {sameErr && <p className="text-xs mt-1" style={{ color: 'var(--c-expense)' }}>Must be different accounts</p>}
         </div>
         <div>
           <label className="block text-xs font-medium mb-1" style={{ color: 'var(--c-muted)' }}>Amount</label>
           <input type="number" step="any" {...register('amount', { valueAsNumber: true })} onWheel={e => e.currentTarget.blur()} className="t-input" placeholder="0.00" />
           {balanceErr && <p className="text-xs mt-1" style={{ color: 'var(--c-expense)' }}>Insufficient balance ({formatCurrency(source!.balance)})</p>}
+        </div>
+        <div>
+          <label className="block text-xs font-medium mb-1" style={{ color: 'var(--c-muted)' }}>Date</label>
+          <Controller control={control} name="date" render={({ field }) => <DatePicker value={field.value} onChange={field.onChange} inline />} />
+          {errors.date && <p className="text-xs mt-1" style={{ color: 'var(--c-expense)' }}>{errors.date.message}</p>}
         </div>
         <div>
           <label className="block text-xs font-medium mb-1" style={{ color: 'var(--c-muted)' }}>Note (optional)</label>

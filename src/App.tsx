@@ -15,6 +15,7 @@ import WatchlistPage from './pages/watchlist/WatchlistPage';
 import WishlistDashboard from './pages/wishlist/WishlistDashboard';
 import StockDetailPage from './pages/stocks/StockDetailPage';
 import Categories from './pages/Categories';
+import Items from './pages/Items';
 import Personalization from './pages/Personalization';
 import Budget from './pages/Budget';
 import Login from './pages/Login';
@@ -53,6 +54,7 @@ function App() {
             </Route>
             <Route path="/budget" element={<Budget />} />
             <Route path="/categories" element={<Categories />} />
+            <Route path="/items" element={<Items />} />
             <Route path="/personalization" element={<Personalization />} />
           </Route>
         </Route>

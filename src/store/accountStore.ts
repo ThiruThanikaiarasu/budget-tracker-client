@@ -31,6 +31,8 @@ interface TransferData {
   toAccountId: string;
   amount: number;
   note?: string;
+  /** YYYY-MM-DD; the server uses today when left out. */
+  date?: string;
 }
 
 interface AccountState {

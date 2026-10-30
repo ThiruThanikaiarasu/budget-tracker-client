@@ -3987,7 +3987,7 @@ function TransactionModal({
                 </button>
               </div>
             ) : (
-              <Numpad value={amountStr} onChange={setAmountStr} collapsed={keyboardOpen} locked={itemSplitMode || multi} />
+              <Numpad value={amountStr} onChange={setAmountStr} collapsed={keyboardOpen || itemSplitMode || multi} locked={itemSplitMode || multi} />
             )}
           </div>
         </>

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Dialog, DialogPanel, DialogTitle } from '@headlessui/react';
 import toast from 'react-hot-toast';
+import useSessionState from '../hooks/useSessionState';
 import useBudgetStore, { type DaySummary, type MonthlySummary } from '../store/budgetStore';
 import useCategoryStore from '../store/categoryStore';
 import useAuthStore from '../store/authStore';
@@ -11,6 +12,8 @@ import { renderCategoryIcon } from '../utils/categoryIcons';
 import api from '../api/axios';
 import CartoonIcon from '../components/CartoonIcon';
 import { CartoonHead, Sticker } from '../components/cartoon';
+import PiggyMood from '../components/PiggyMood';
+import { piggyMood } from '../utils/piggy';
 import ThemedSelect from '../components/ThemedSelect';
 
 function getCurrentFinancialMonth(startDay: number) {
@@ -42,7 +45,7 @@ function Budget() {
   const { user } = useAuthStore();
 
   const startDay = user?.financialMonthStartDay ?? 1;
-  const [selectedMonth, setSelectedMonth] = useState(getCurrentFinancialMonth(startDay));
+  const [selectedMonth, setSelectedMonth] = useSessionState('budget.selectedMonth', getCurrentFinancialMonth(startDay));
   const [showForm, setShowForm] = useState(false);
   const [showDetails, setShowDetails] = useState(false);
   const [focusedCategoryId, setFocusedCategoryId] = useState<string | null>(null);
@@ -185,7 +188,12 @@ function Budget() {
         ) : (
           <>
             <section className="cartoon-hero is-sun">
-              <span className="cartoon-hero-tile"><CartoonIcon kind="budgets" size={96} /></span>
+              <span className="cartoon-hero-tile">
+                <PiggyMood
+                  size={96}
+                  mood={piggyMood(spent, limit, !!monthlySummary && parseDateStr(monthlySummary.periodStart).getTime() + monthlySummary.daysInPeriod * 86400000 <= new Date().setHours(0, 0, 0, 0))}
+                />
+              </span>
               <div className="min-w-0 flex-1">
                 <p className="cartoon-kicker">Spent this cycle</p>
                 <p className="cartoon-hero-amount" style={over ? { color: 'var(--c-spend-text)' } : undefined}>

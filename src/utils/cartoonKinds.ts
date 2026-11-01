@@ -17,7 +17,7 @@ const KEY_TO_KIND: Record<string, string> = {
 };
 
 const NAME_TO_KIND: Record<string, string> = {
-  groceries: 'groceries', grocery: 'groceries', vegetables: 'groceries',
+  groceries: 'groceries', grocery: 'groceries', vegetables: 'carrot',
   food: 'food', breakfast: 'breakfast', lunch: 'lunch', dinner: 'dinner', snacks: 'snacks', tea: 'tea', dining: 'food',
   transport: 'transport', travel: 'travel', petrol: 'fuel', fuel: 'fuel',
   rent: 'rent', bills: 'bills', broadband: 'bills', 'mobile recharge': 'recharge',
@@ -28,7 +28,7 @@ const NAME_TO_KIND: Record<string, string> = {
   'clean up': 'cleanup',
   fruits: 'banana', other: 'other', 'bank charges': 'bank', investment: 'investment', 'cred reward': 'reward',
   rentomojo: 'rent', emi: 'card',
-  juice: 'juice', sweet: 'sweet', sweets: 'sweet', 'gadget & accessories': 'gadget', 'personal care': 'personalcare', workspace: 'workspace',
+  juice: 'juice', sweet: 'sweet', sweets: 'sweet', 'gadget & accessories': 'gadget', 'personal care': 'personalcare', workspace: 'workspace', household: 'household',
   subscriptions: 'subscription', subscription: 'subscription', 'accesories repair': 'repair', 'accessories repair': 'repair', repair: 'repair',
 };
 
@@ -43,13 +43,13 @@ const KIND_TINT: Record<string, string> = {
   freelance: 'var(--c-earn-tint)', interest: 'var(--c-earn-tint)', reward: 'var(--c-grape-tint)', social: 'var(--c-sky-tint)', transfer: 'var(--c-sky-tint)', reconcile: 'var(--c-grape-tint)',
   settlement: 'var(--c-sky-tint)', cleanup: 'var(--c-grape-tint)', tag: 'var(--c-sun-tint)',
   juice: 'var(--c-sun-tint)', sweet: 'var(--c-spend-tint)', gadget: 'var(--c-sky-tint)', personalcare: 'var(--c-grape-tint)',
-  workspace: 'var(--c-sky-tint)', subscription: 'var(--c-grape-tint)', repair: 'var(--c-sun-tint)',
+  workspace: 'var(--c-sky-tint)', household: 'var(--c-earn-tint)', carrot: 'var(--c-earn-tint)', subscription: 'var(--c-grape-tint)', repair: 'var(--c-sun-tint)',
 };
 
 const SPECIFIC_NAME_KINDS = new Set([
   'breakfast', 'lunch', 'dinner', 'tea', 'snacks', 'freelance', 'interest', 'reward', 'rewards', 'social',
   'fruits', 'other', 'bank charges', 'investment', 'cred reward', 'rentomojo', 'emi',
-  'juice', 'sweet', 'sweets', 'gadget & accessories', 'personal care', 'workspace', 'subscriptions', 'subscription',
+  'vegetables', 'juice', 'sweet', 'sweets', 'gadget & accessories', 'personal care', 'workspace', 'household', 'subscriptions', 'subscription',
   'accesories repair', 'accessories repair', 'repair',
 ]);
 
@@ -58,7 +58,7 @@ export const CATEGORY_KINDS = [
   'groceries', 'breakfast', 'lunch', 'dinner', 'tea', 'snacks', 'food', 'coffee', 'pizza', 'banana', 'milk',
   'transport', 'fuel', 'travel', 'shopping', 'clothing', 'bills', 'rent', 'recharge', 'health', 'education', 'fun',
   'gift', 'salary', 'freelance', 'interest', 'investment', 'reward', 'social', 'cash', 'bank', 'coins',
-  'juice', 'sweet', 'gadget', 'personalcare', 'workspace', 'subscription', 'repair',
+  'carrot', 'juice', 'sweet', 'gadget', 'personalcare', 'workspace', 'household', 'subscription', 'repair',
   'receipt', 'settlement', 'cleanup', 'tag',
 ];
 
@@ -99,4 +99,12 @@ const ITEM_KEYWORDS: [string, string][] = [
   ['trimmer', 'trimmer'], ['shampoo', 'shampoo'], ['dryer', 'dryer'], ['shoe rack', 'shoerack'], ['rasagulla', 'sweet'], ['rasgulla', 'sweet'],
   ['chana', 'chickpeas'], ['chickpea', 'chickpeas'], ['bean', 'bean'], ['rava', 'rava'], ['sugar', 'sugar'],
   ['cherrinet', 'router'], ['router', 'router'],
+  ['dal', 'dal'], ['gram', 'dal'], ['rajma', 'dal'], ['peas', 'dal'],
+  ['masala', 'spice'], ['pepper', 'spice'], ['chilli', 'spice'], ['turmeric', 'spice'], ['cumin', 'spice'], ['clove', 'spice'],
+  ['cardamom', 'spice'], ['coriander', 'spice'], ['fenugreek', 'spice'], ['mustard', 'spice'],
+  [' oil', 'oil'], ['maggi', 'noodles'], ['noodle', 'noodles'], ['musel', 'cereal'], ['muesli', 'cereal'], ['cereal', 'cereal'],
+  ['chocolate', 'chocolate'], ['dairy milk', 'chocolate'], ['biscuit', 'biscuit'], ['lays', 'chips'], ['chips', 'chips'], ['pudding', 'pudding'],
+  ['candle', 'candle'], ['soap', 'soap'], ['hand wash', 'soap'], ['tooth', 'toothpaste'],
+  ['detergent', 'detergent'], ['washing', 'detergent'], ['harpic', 'detergent'], ['vim', 'detergent'],
+  ['brush', 'brush'], ['bulb', 'bulb'], ['lunch box', 'lunchbox'], ['knife', 'kitchenware'], ['spoon', 'kitchenware'],
 ];

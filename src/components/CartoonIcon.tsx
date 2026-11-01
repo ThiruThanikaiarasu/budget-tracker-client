@@ -7,6 +7,9 @@ const ICONS: Record<string, string> = Object.fromEntries(
   Object.entries(ICON_URLS).map(([path, url]) => [path.split('/').pop()!.replace('.svg', ''), url]),
 );
 
+/** The image URL of a drawn icon (for effects that need their own copy of it). */
+export const iconUrl = (kind: string) => ICONS[kind] ?? ICONS.tag;
+
 /** One drawn icon from the cartoon kit. Unknown kinds fall back to the tag. */
 export default function CartoonIcon({ kind, size = 28, className, style, label }: {
   kind: string;

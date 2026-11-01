@@ -13,6 +13,7 @@ import useAccountStore from '../store/accountStore';
 import { formatCurrency } from '../utils/format';
 import Amount from '../components/Amount';
 import ThemedSelect from '../components/ThemedSelect';
+import StampBurst from '../components/StampBurst';
 import { renderAccountIcon } from '../utils/accountIcons';
 import { sortByFrecency } from '../utils/frecency';
 
@@ -832,7 +833,10 @@ function FriendDetail({ friend, onBack }: { friend: Friend; onBack: () => void }
     });
   };
 
-  const afterSettle = () => {
+  // The "ALL SQUARE" stamp lands when a debt is cleared (not on a part payment).
+  const [stamped, setStamped] = useState(false);
+  const afterSettle = (settledFully: boolean) => {
+    if (settledFully && useThemeStore.getState().theme === 'cartoon') setStamped(true);
     setSettleTarget(null);
     exitSelection();
     fetchExpenses(friend._id);
@@ -1092,6 +1096,7 @@ function FriendDetail({ friend, onBack }: { friend: Friend; onBack: () => void }
           onDone={afterSettle}
         />
       )}
+      {stamped && <StampBurst onDone={() => setStamped(false)} />}
     </div>
   );
 }
@@ -1122,7 +1127,8 @@ function SettleModal({
   friendOwes: boolean;
   coveredExpenseIds: string[];
   onClose: () => void;
-  onDone: () => void;
+  /** `settledFully`: the whole debt is cleared (paid in full, or paid and waived). */
+  onDone: (settledFully: boolean) => void;
 }) {
   const { settleUp } = useSplitStore();
   const { accounts, fetchAccounts } = useAccountStore();
@@ -1165,7 +1171,7 @@ function SettleModal({
         coveredExpenseIds: clearsAll ? coveredExpenseIds : [],
         waivedAmount: m !== 'waived' && partial && rest === 'waive' ? left : undefined,
       });
-      onDone();
+      onDone(clearsAll);
     } catch {
       // handled by store
     } finally {

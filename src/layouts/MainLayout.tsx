@@ -184,7 +184,7 @@ function MainLayout() {
     >
       {/* ── Desktop sidebar ──────────────────────────────────────────── */}
       <aside
-        className="hidden md:flex md:flex-col md:w-60 flex-shrink-0"
+        className="app-sidebar hidden md:flex md:flex-col md:w-60 flex-shrink-0"
         style={{
           background: 'var(--c-nav-bg)',
           borderRight: '1px solid var(--c-border)',
@@ -193,7 +193,7 @@ function MainLayout() {
         {/* Brand */}
         <div className="sidebar-brand px-5 py-6">
           {isCartoon && <span className="sidebar-logo"><CartoonIcon kind="wallet" size={40} /></span>}
-          <div className="min-w-0">
+          <div className="sidebar-brand-text min-w-0">
             <h1 className="cred-serif text-lg font-bold" style={{ color: 'var(--c-accent)' }}>
               Budget Tracker
             </h1>
@@ -211,6 +211,7 @@ function MainLayout() {
             <NavLink
               key={item.to}
               to={item.to}
+              title={item.label}
               onClick={(e) => turnTo(e, item.to)}
               className={({ isActive }) =>
                 `desktop-nav-link flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
@@ -223,7 +224,7 @@ function MainLayout() {
               })}
             >
               <span className="nav-icon-shell">{navIcon(item)}</span>
-              <span>{item.label}</span>
+              <span className="nav-label">{item.label}</span>
             </NavLink>
           ))}
         </nav>
@@ -248,7 +249,7 @@ function MainLayout() {
             onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
           >
             {Icons.logout}
-            <span>Logout</span>
+            <span className="nav-label">Logout</span>
           </button>
         </div>
       </aside>

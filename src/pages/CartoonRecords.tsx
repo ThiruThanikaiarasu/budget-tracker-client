@@ -8,6 +8,11 @@ import CartoonIcon, { CartoonTile } from '../components/CartoonIcon';
 import ThemedSelect from '../components/ThemedSelect';
 import { accountKind, categoryKind, itemKind, kindTint } from '../utils/cartoonKinds';
 import { categoryGroups } from '../utils/txCategories';
+import { DayMixBar } from '../components/CartoonDayView';
+import { summariseDay } from '../utils/daySummary';
+import { motion } from 'motion/react';
+import { reactionFor } from '../utils/amountReaction';
+import { prefersReducedMotion } from '../utils/motion';
 
 const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
 const DAYS = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
@@ -48,7 +53,7 @@ export default function CartoonRecords({
   categories, accounts, categoryFilter, onCategoryFilter, accountFilter, onAccountFilter,
   totalExpense, totalIncome, recordCount,
   transactions, sortedDates, grouped, isLoading, isLoadingMore, sentinelRef,
-  selectedId, onOpen, onOpenDay,
+  selectedId, onOpen, onOpenDay, openDayKey,
 }: {
   viewYear: number; viewMonth: number; onPrev: () => void; onNext: () => void;
   searchQuery: string; onSearch: (q: string) => void; debouncedSearch: string;
@@ -58,7 +63,7 @@ export default function CartoonRecords({
   totalExpense: number; totalIncome: number; recordCount: number;
   transactions: Transaction[]; sortedDates: string[]; grouped: Record<string, Transaction[]>;
   isLoading: boolean; isLoadingMore: boolean; sentinelRef: RefObject<HTMLDivElement | null>;
-  selectedId?: string; onOpen: (tx: Transaction) => void; onOpenDay: (dateKey: string) => void;
+  selectedId?: string; onOpen: (tx: Transaction) => void; onOpenDay: (dateKey: string) => void; openDayKey?: string | null;
 }) {
   const net = totalIncome - totalExpense;
   const accountTypes = useMemo(() => new Map(accounts.map(a => [a._id, a.type])), [accounts]);
@@ -81,6 +86,29 @@ export default function CartoonRecords({
     { key: 'records', label: 'Records', kind: 'records', node: <>{recordCount}</> },
   ];
 
+  // Records that just appeared (a save) get a flash and a little slide-in; the first load doesn't.
+  const seenIds = useRef<Set<string> | null>(null);
+  const [freshIds, setFreshIds] = useState<Set<string>>(new Set());
+  useEffect(() => {
+    const ids = transactions.map(t => t._id);
+    if (seenIds.current === null) { if (ids.length) seenIds.current = new Set(ids); return; }
+    const added = ids.filter(id => !seenIds.current!.has(id));
+    ids.forEach(id => seenIds.current!.add(id));
+    if (added.length === 0 || added.length > 3) return;
+    setFreshIds(new Set(added));
+    const timer = window.setTimeout(() => setFreshIds(new Set()), 1500);
+    return () => window.clearTimeout(timer);
+  }, [transactions]);
+
+  // What a normal spend looks like per category (own amounts, newest first), for the amount stickers.
+  const usualByCategory = useMemo(() => {
+    const map = new Map<string, { id: string; amount: number }[]>();
+    [...transactions].filter(t => t.type === 'expense' && !t.isAdjustment && t.categoryId)
+      .sort((a, b) => +new Date(b.date) - +new Date(a.date))
+      .forEach(t => { const k = t.categoryId!._id; map.set(k, [...(map.get(k) ?? []), { id: t._id, amount: ownAmount(t) }]); });
+    return map;
+  }, [transactions]);
+
   // Header content for a day, shared by the in-flow header and the pinned bar.
   const dayMeta = (dateKey: string) => {
     const [y, m, d] = dateKey.split('-').map(Number);
@@ -91,6 +119,31 @@ export default function CartoonRecords({
     if (dayIn) parts.push(`in ₹${dayIn.toLocaleString('en-IN', { maximumFractionDigits: 2 })}`);
     if (dayOut) parts.push(`out ₹${dayOut.toLocaleString('en-IN', { maximumFractionDigits: 2 })}`);
     return { month: MONTHS[m - 1].slice(0, 3).toUpperCase(), day: d, name: DAYS[new Date(y, m - 1, d).getDay()], meta: parts.join(' · ') };
+  };
+
+  // A whole day as one button: date badge, name, a dotted line, the day's mix and its total pill.
+  const renderDayRow = (dateKey: string) => {
+    const head = dayMeta(dateKey);
+    const rows = grouped[dateKey] ?? [];
+    const sum = summariseDay(rows, categories);
+    const income = rows.filter(t => t.type === 'income' && !t.isAdjustment).reduce((a, t) => a + t.amount, 0);
+    const open = openDayKey === dateKey;
+    const money = (n: number) => `₹${n.toLocaleString('en-IN', { maximumFractionDigits: 2 })}`;
+    return (
+      <button type="button" className={`cartoon-day-row ${open ? 'is-open' : ''}`} onClick={() => onOpenDay(dateKey)} aria-expanded={open}>
+        <CalendarBadge month={head.month} day={head.day} />
+        <span className="cartoon-day-text">
+          <span className="cartoon-day-name">{head.name}</span>
+          <span className="cartoon-day-meta">{rows.length} record{rows.length === 1 ? '' : 's'}</span>
+        </span>
+        <span className="cartoon-day-rule" />
+        {sum.catRows.length > 0 && <DayMixBar rows={sum.catRows} />}
+        <span className="cartoon-day-pill">
+          {sum.yourSpend > 0 ? money(sum.yourSpend) : income > 0 ? `+${money(income)}` : money(0)}
+          <b aria-hidden>{open ? '‹' : '›'}</b>
+        </span>
+      </button>
+    );
   };
 
   // Pinned day bar. It shows the day of the first record still visible under the
@@ -228,18 +281,7 @@ export default function CartoonRecords({
       {/* Pinned day bar (zero-height sticky anchor) */}
       <div className="cartoon-pin" aria-hidden={!pinMeta}>
         <div ref={pinRef} className={`cartoon-day-head cartoon-pin-bar ${pinMeta ? 'is-on' : ''}`}>
-          {pinMeta && (
-            <>
-              <button type="button" className="cartoon-day-open" onClick={() => pinned && onOpenDay(pinned)} title="Open this day">
-                <CalendarBadge month={pinMeta.month} day={pinMeta.day} />
-                <div>
-                  <p className="cartoon-day-name">{pinMeta.name}</p>
-                  <p className="cartoon-day-meta">{pinMeta.meta}</p>
-                </div>
-              </button>
-              <span className="cartoon-day-rule" />
-            </>
-          )}
+          {pinMeta && pinned && renderDayRow(pinned)}
         </div>
       </div>
 
@@ -255,19 +297,9 @@ export default function CartoonRecords({
         </div>
       ) : sortedDates.map(dateKey => {
         const rows = grouped[dateKey];
-        const head = dayMeta(dateKey);
         return (
           <section key={dateKey} className="cartoon-day" data-date={dateKey}>
-            <div className="cartoon-day-head">
-              <button type="button" className="cartoon-day-open" onClick={() => onOpenDay(dateKey)} title="Open this day">
-                <CalendarBadge month={head.month} day={head.day} />
-                <div>
-                  <p className="cartoon-day-name">{head.name}</p>
-                  <p className="cartoon-day-meta">{head.meta}</p>
-                </div>
-              </button>
-              <span className="cartoon-day-rule" />
-            </div>
+            <div className="cartoon-day-head">{renderDayRow(dateKey)}</div>
 
             {rows.map(tx => {
               const isSplit = tx.personalShare != null && tx.personalShare !== tx.amount;
@@ -299,13 +331,17 @@ export default function CartoonRecords({
                   )}
                 </>
               );
+              const usual = tx.type === 'expense' && !tx.isAdjustment && tx.categoryId
+                ? (usualByCategory.get(tx.categoryId._id) ?? []).filter(x => x.id !== tx._id).map(x => x.amount)
+                : [];
+              const reaction = tx.type === 'expense' && !tx.isAdjustment ? reactionFor(ownAmount(tx), usual) : null;
               const tone = tx.type === 'income' ? 'earn' : tx.type === 'expense' ? 'spend' : 'move';
               return (
                 <button
                   key={tx._id}
                   type="button"
                   onClick={() => onOpen(tx)}
-                  className={`cartoon-record ${multiCat ? '' : 'is-two-row'} ${tx._id === selectedId ? 'is-selected' : ''}`}
+                  className={`cartoon-record ${multiCat ? '' : 'is-two-row'} ${tx._id === selectedId ? 'is-selected' : ''} ${freshIds.has(tx._id) ? 'is-fresh' : ''}`}
                 >
                   {multiCat ? (
                     <span className="cartoon-tile cartoon-stack" style={{ width: 64, height: 64, background: '#fff' }} aria-hidden>
@@ -354,7 +390,20 @@ export default function CartoonRecords({
                     {multiCat && <div className="cartoon-record-line cartoon-record-sub cartoon-record-tags">{tags}</div>}
                   </div>
                   <div className="cartoon-record-amount">
-                    <span className={`cartoon-amount is-${tone}`}>
+                    {reaction && (
+                      <motion.span
+                        className={`cartoon-reaction is-${reaction}`}
+                        initial={reaction === 'ouch' || reaction === 'sweat' ? { rotate: 0 } : false}
+                        animate={(reaction === 'ouch' || reaction === 'sweat') && !prefersReducedMotion() ? { rotate: [0, -6, 6, 0] } : {}}
+                        transition={{ duration: 0.5, delay: 0.2 }}
+                        title={reaction === 'calm' ? 'Less than usual for this' : 'More than usual for this'}
+                      >
+                        <CartoonIcon kind={reaction === 'calm' ? 'tomato' : 'wallet'} size={18} />
+                        {reaction === 'calm' ? 'calm' : reaction === 'ouch' ? 'ouch' : 'ouch!!'}
+                        {reaction === 'sweat' && <i aria-hidden>💦</i>}
+                      </motion.span>
+                    )}
+                    <span className={`cartoon-amount is-${tone}${reaction === 'sweat' ? ' is-shake' : ''}`}>
                       <Amount value={ownAmount(tx)} prefix={tx.type === 'expense' ? '−' : tx.type === 'income' ? '+' : ''} />
                     </span>
                     {isSplit && (

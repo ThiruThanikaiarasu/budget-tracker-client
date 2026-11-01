@@ -26,13 +26,20 @@ import DatePicker from '../components/DatePicker';
 import { normalizeName } from '../utils/normalizeName';
 import Amount from '../components/Amount';
 import { sortByFrecency } from '../utils/frecency';
+import useSessionState from '../hooks/useSessionState';
 import { renderCategoryIcon } from '../utils/categoryIcons';
 import { renderAccountIcon } from '../utils/accountIcons';
 import CartoonRecords from './CartoonRecords';
 import CartoonIcon from '../components/CartoonIcon';
 import { itemKind, categoryKind } from '../utils/cartoonKinds';
-import { categoryGroups } from '../utils/txCategories';
+import CartoonDayView from '../components/CartoonDayView';
+import RemindButton from '../components/RemindButton';
+import ExportBillSheet from '../components/ExportBillSheet';
+import type { BillModel } from '../utils/billExport';
+import { friendLines } from '../utils/shareLines';
 import { todayLocal } from '../utils/localDate';
+import { motion } from 'motion/react';
+import { flyIcon, pop, prefersReducedMotion } from '../utils/motion';
 import { FaceAvatar } from '../components/cartoon';
 
 // ── Constants ────────────────────────────────────────────────────────
@@ -203,6 +210,14 @@ function ChargeLabelSelect({ value, kind, onChange }: { value: string; kind: 'fe
 
 // ── Split helpers (Google-Pay-style avatars + amount splitting) ──────────
 const USER_KEY = 'user';
+/** A price this far above (or below) the usual per-unit price earns a sticker. */
+const PRICEY_RATIO = 1.15;
+/** Long bills fold: lists show this many lines, then "N more" / "Show all". */
+const PREVIEW_ROWS = 5;
+/** Runs after React has re-rendered and the browser has laid the page out. */
+const afterLayout = (fn: () => void) => requestAnimationFrame(() => requestAnimationFrame(fn));
+/** A bill with more lines than this gets the folding receipt and split views. */
+const LONG_BILL = 12;
 const TX_DRAFT_KEY = 'budget-tracker:tx-draft:v1';
 const TX_DRAFT_BACKUP_KEY = 'budget-tracker:tx-draft-cleared:v1';
 const AVATAR_COLORS = ['#ef4444', '#f59e0b', '#10b981', '#3b82f6', '#8b5cf6', '#ec4899', '#14b8a6', '#f97316'];
@@ -621,8 +636,8 @@ function Transactions() {
   const navState = location.state as { openCreate?: boolean; initialType?: 'income' | 'expense' } | null;
 
   const now = new Date();
-  const [viewYear, setViewYear] = useState(now.getFullYear());
-  const [viewMonth, setViewMonth] = useState(now.getMonth()); // 0-indexed
+  const [viewYear, setViewYear] = useSessionState('tx.viewYear', now.getFullYear());
+  const [viewMonth, setViewMonth] = useSessionState('tx.viewMonth', now.getMonth()); // 0-indexed
 
   const [showCreate, setShowCreate] = useState(!!navState?.openCreate);
   const [createInitialType] = useState<'income' | 'expense' | undefined>(navState?.initialType);
@@ -766,6 +781,11 @@ function Transactions() {
   const selectedId = isDesktop ? (editingTx?._id ?? detailTx?._id) : undefined;
   const openTx = (tx: Transaction) => { setEditingTx(null); setDayKey(null); setDetailTx(tx); };
   const openDay = (key: string) => { setEditingTx(null); setDetailTx(null); setDayKey(key); };
+  // Days with records, newest first: +1 = the next older day, -1 = the next newer one.
+  const dayNeighbour = (step: 1 | -1) => (dayKey ? sortedDates[sortedDates.indexOf(dayKey) + step] : undefined);
+  // "Add to Thursday": a fresh form with that date.
+  const [newFormDate, setNewFormDate] = useState<string | undefined>(undefined);
+  const addOnDay = (key: string) => { setNewFormDate(key); setDayKey(null); setCreateKey((k) => k + 1); setShowCreate(true); };
   const startNew = useCallback(() => {
     setEditingTx(null);
     setDetailTx(null);
@@ -800,7 +820,7 @@ function Transactions() {
           totalExpense={totalExpense} totalIncome={totalIncome} recordCount={pagination.total}
           transactions={transactions} sortedDates={sortedDates} grouped={grouped}
           isLoading={isLoading} isLoadingMore={isLoadingMore} sentinelRef={sentinelRef}
-          selectedId={selectedId} onOpen={openTx} onOpenDay={openDay}
+          selectedId={selectedId} onOpen={openTx} onOpenDay={openDay} openDayKey={dayKey}
         />
       ) : (<>
       {/* ── Sticky header ─────────────────────────────────────────── */}
@@ -1157,7 +1177,12 @@ function Transactions() {
             </div>
           ) : dayKey && grouped[dayKey] ? (
             <div className="transaction-detail h-full overflow-y-auto" style={{ background: 'var(--c-surface)' }}>
-              <CartoonDayReceipt dateKey={dayKey} txs={grouped[dayKey]} categories={categories} onClose={() => setDayKey(null)} onOpenTx={openTx} />
+              <CartoonDayView
+                dateKey={dayKey} txs={grouped[dayKey]} categories={categories} onClose={() => setDayKey(null)}
+                onPrev={dayNeighbour(1) ? () => openDay(dayNeighbour(1)!) : undefined}
+                onNext={dayNeighbour(-1) ? () => openDay(dayNeighbour(-1)!) : undefined}
+                onAdd={() => addOnDay(dayKey)}
+              />
             </div>
           ) : (
             <TransactionModal
@@ -1173,6 +1198,7 @@ function Transactions() {
               accounts={activeAccounts}
               friends={friends}
               initialType={createInitialType}
+              initialDate={newFormDate}
             />
           )}
         </aside>
@@ -1212,7 +1238,12 @@ function Transactions() {
           <div className="fixed inset-0 bg-black/60" />
           <div className="fixed inset-0 flex items-center justify-center p-4">
             <DialogPanel className="transaction-detail w-full max-w-sm max-h-[90vh] overflow-y-auto rounded-2xl shadow-2xl">
-              <CartoonDayReceipt dateKey={dayKey} txs={grouped[dayKey]} categories={categories} onClose={() => setDayKey(null)} onOpenTx={openTx} />
+              <CartoonDayView
+                dateKey={dayKey} txs={grouped[dayKey]} categories={categories} onClose={() => setDayKey(null)}
+                onPrev={dayNeighbour(1) ? () => openDay(dayNeighbour(1)!) : undefined}
+                onNext={dayNeighbour(-1) ? () => openDay(dayNeighbour(-1)!) : undefined}
+                onAdd={() => addOnDay(dayKey)}
+              />
             </DialogPanel>
           </div>
         </Dialog>
@@ -1455,7 +1486,7 @@ interface SplitBlock {
 /** Cartoon theme "Split it" panel — who's in, who shares each line, who pays what. */
 function CartoonSplitPanel({
   blocks, fees, calc, keys, candidates, friends, initials, selectedFriends, onToggleFriend, payerKey,
-  shared, onShared, locks, onLock, onReset, customized, total, onOff, onFocusChange,
+  shared, onShared, locks, onLock, onLineReset, onReset, customized, total, onOff, onFocusChange,
 }: {
   blocks: SplitBlock[];
   /** Fees and discounts, in the order the split calculation received them. */
@@ -1472,12 +1503,19 @@ function CartoonSplitPanel({
   onShared: (lineKey: string, people: string[] | undefined) => void;
   locks: Record<string, Record<string, number>>;
   onLock: (lineKey: string, person: string, value: number) => void;
+  /** Put one line back to an equal split among everyone. */
+  onLineReset: (lineKey: string) => void;
   onReset: () => void;
   customized: boolean;
   total: number;
   onOff: () => void;
   onFocusChange: (focused: boolean) => void;
 }) {
+  // Long bills fold: only what changed by default, categories open one at a time.
+  const [view, setView] = useState<'changed' | 'all'>('changed');
+  const [query, setQuery] = useState('');
+  const [openCats, setOpenCats] = useState<string[] | null>(null);
+  const [shownLines, setShownLines] = useState<Record<string, number>>({});
   const nameOf = (k: string) => (k === USER_KEY ? 'You' : friends.find((f) => f._id === k)?.name ?? '');
   const face = (k: string, size: number) => (
     <AvatarCircle name={nameOf(k)} isUser={k === USER_KEY} label={k === USER_KEY ? undefined : initials[k]} color={avatarColor(nameOf(k))} size={size} />
@@ -1523,6 +1561,165 @@ function CartoonSplitPanel({
     </div>
   );
 
+  const wholeRow = (b: SplitBlock) => (
+    <div className="sp-whole">
+      <span>Whole {b.name}</span>
+      <div className="flex gap-1.5">
+        {keys.map((k) => {
+          const lk = b.lines.map((l) => l.key);
+          const n = lk.filter((x) => peopleOf(x).includes(k)).length;
+          return (
+            <button key={k} type="button" className={`sp-mini ${n === 0 ? 'is-out' : ''}`} onClick={() => toggleWhole(lk, k)} aria-label={`${nameOf(k)} shares all of ${b.name}`}>
+              {face(k, 30)}{n > 0 && <span className="sp-check">{n === lk.length ? '✓' : '–'}</span>}
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+  const lineItem = (l: SplitBlock['lines'][number], backToEqual?: boolean) => (
+    <div key={l.key} className="sp-item">
+      <div className="sp-item-head"><span>{l.name}{l.qty && <em> · {l.qty}</em>}</span><b>₹{l.amount}</b></div>
+      {chips(l.key)}
+      {backToEqual && <button type="button" className="sp-back" onClick={() => onLineReset(l.key)}>Back to equal</button>}
+    </div>
+  );
+
+  // ── Long bills ──
+  const lineCount = blocks.reduce((n, b) => n + (b.lines.length || 1), 0);
+  const long = lineCount > LONG_BILL && keys.length >= 2 && total > 0;
+  const linesOf = (b: SplitBlock) => (b.lines.length ? b.lines.map((l) => l.key) : [b.key]);
+  // Changed = someone is left out or the amounts aren't equal. Judged by the result, not by
+  // which settings exist: a saved split loads with every line explicitly set.
+  const isChanged = (lk: string) => {
+    const people = peopleOf(lk);
+    if (people.length < keys.length) return true;
+    const amts = people.map((k) => calc.lineShares[lk]?.[k] ?? 0);
+    return Math.max(...amts) - Math.min(...amts) > 0.011;
+  };
+  const changedKeys = (b: SplitBlock) => linesOf(b).filter(isChanged);
+  const changedTotal = blocks.reduce((n, b) => n + changedKeys(b).length, 0);
+  const biggest = blocks.reduce((best, b) => (b.lines.length > (best?.lines.length ?? -1) ? b : best), blocks[0]);
+  const openList = openCats ?? (biggest ? [biggest.key] : []);
+  const toggleCat = (key: string) => {
+    const closing = openList.includes(key);
+    setOpenCats(closing ? openList.filter((x) => x !== key) : [...openList, key]);
+    // Folding leaves the panel scrolled past its end: bring the folded row back into view.
+    if (closing) afterLayout(() => document.getElementById(`sp-c-${key}`)?.scrollIntoView({ block: 'start' }));
+  };
+  const q = query.trim().toLowerCase();
+  const mode = q ? 'all' : view;
+  const chev = (open: boolean) => <span className="sp-chev" aria-hidden>{open ? '⌃' : '⌄'}</span>;
+
+  /** One category folded to a single row: who's in, how much changed. */
+  const foldedRow = (b: SplitBlock) => {
+    const lk = linesOf(b);
+    const ch = changedKeys(b).length;
+    return (
+      <button key={b.key} id={`sp-c-${b.key}`} type="button" className="sp-card sp-fold" aria-expanded={false} onClick={() => toggleCat(b.key)}>
+        {renderCategoryIcon(b.icon, b.name, 34)}
+        <span className="min-w-0 flex-1">
+          <span className="sp-fold-name">{b.name} · {lk.length}</span>
+          <span className={`sp-fold-sub ${ch ? 'is-changed' : ''}`}>{ch ? `${ch} changed` : 'all equal'}</span>
+        </span>
+        <span className="flex gap-1">
+          {keys.map((k) => {
+            const n = lk.filter((x) => peopleOf(x).includes(k)).length;
+            return <span key={k} className={`sp-mini ${n === 0 ? 'is-out' : ''}`}>{face(k, 26)}{n > 0 && <span className="sp-check">{n === lk.length ? '✓' : '–'}</span>}</span>;
+          })}
+        </span>
+        {chev(false)}
+      </button>
+    );
+  };
+
+  const longBlocks = !long ? [] : (() => {
+    const out: ReactNode[] = [];
+    const head = (b: SplitBlock, sub: string, toggle: boolean) => (
+      <div className={`sp-card-head ${toggle ? 'is-sticky is-toggle' : ''}`} role={toggle ? 'button' : undefined} tabIndex={toggle ? 0 : undefined}
+        onClick={toggle ? () => toggleCat(b.key) : undefined}
+        onKeyDown={toggle ? (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggleCat(b.key); } } : undefined}>
+        {renderCategoryIcon(b.icon, b.name, 36)}
+        <div className="min-w-0 flex-1">
+          <p className="sp-card-name">{b.name}</p>
+          <p className="sp-card-sub">{sub}</p>
+        </div>
+        {toggle && chev(true)}
+      </div>
+    );
+    if (mode === 'changed') {
+      const touched = blocks.filter((b) => changedKeys(b).length > 0);
+      const quiet = blocks.filter((b) => changedKeys(b).length === 0);
+      out.push(
+        <div key="ok" className="sp-ok">
+          <span className="sp-ok-tick" aria-hidden>✓</span>
+          {lineCount - changedTotal} lines split equally · {changedTotal} changed
+        </div>,
+      );
+      touched.forEach((b) => {
+        const ch = changedKeys(b);
+        out.push(
+          <div key={b.key} className="sp-card">
+            {head(b, `${ch.length} of ${linesOf(b).length}`, false)}
+            {b.lines.length === 0 ? (
+              <div className="sp-item">{chips(b.key)}<button type="button" className="sp-back" onClick={() => onLineReset(b.key)}>Back to equal</button></div>
+            ) : b.lines.filter((l) => ch.includes(l.key)).map((l) => lineItem(l, true))}
+          </div>,
+        );
+      });
+      if (touched.length === 0) {
+        out.push(
+          <div key="none" className="sp-empty">
+            <b>Every line is split equally.</b>
+            <span>Tap “All {lineCount}” to change who shares a line.</span>
+          </div>,
+        );
+      } else if (quiet.length > 0) {
+        out.push(
+          <button key="quiet" type="button" className="sp-card sp-fold" onClick={() => setView('all')}>
+            <span className="min-w-0 flex-1"><span className="sp-fold-name">{quiet.slice(0, 3).map((b) => b.name).join(', ')}{quiet.length > 3 ? ` + ${quiet.length - 3} more` : ''}</span></span>
+            <span className="sp-fold-sub">all equal</span>
+          </button>,
+        );
+      }
+      return out;
+    }
+    blocks.forEach((b) => {
+      const open = !!q || openList.includes(b.key);
+      const matches = q ? b.lines.filter((l) => l.name.toLowerCase().includes(q)) : b.lines;
+      if (q && matches.length === 0) return;
+      if (!open) { out.push(foldedRow(b)); return; }
+      const cap = q ? matches.length : shownLines[b.key] ?? PREVIEW_ROWS;
+      const listed = matches.slice(0, cap);
+      out.push(
+        <div key={b.key} id={`sp-c-${b.key}`} className="sp-card">
+          {head(b, b.lines.length ? `${b.lines.length} · ₹${b.total}${changedKeys(b).length ? ` · ${changedKeys(b).length} changed` : ''}` : 'Just an amount', !q)}
+          {b.lines.length === 0 ? chips(b.key) : (
+            <>
+              {!q && wholeRow(b)}
+              {listed.map((l) => lineItem(l, isChanged(l.key)))}
+              {!q && b.lines.length > PREVIEW_ROWS && (
+                <div className="sp-more">
+                  <span>{listed.length} of {b.lines.length}</span>
+                  {listed.length < b.lines.length ? (
+                    <>
+                      <button type="button" className="sp-more-btn" onClick={() => setShownLines((m) => ({ ...m, [b.key]: cap + PREVIEW_ROWS }))}>Show {Math.min(PREVIEW_ROWS, b.lines.length - listed.length)} more</button>
+                      <button type="button" className="sp-more-btn is-go" onClick={() => setShownLines((m) => ({ ...m, [b.key]: b.lines.length }))}>Show all {b.lines.length}</button>
+                    </>
+                  ) : (
+                    <button type="button" className="sp-more-btn is-go" onClick={() => { setShownLines((m) => ({ ...m, [b.key]: PREVIEW_ROWS })); toggleCat(b.key); }}>Collapse</button>
+                  )}
+                </div>
+              )}
+            </>
+          )}
+        </div>,
+      );
+    });
+    if (q && out.length === 0) out.push(<p key="nomatch" className="sp-hint">No line matches “{query.trim()}”.</p>);
+    return out;
+  })();
+
   const signed = (n: number) => `${n < 0 ? '−' : n > 0 ? '+' : ''}₹${Math.abs(round2(n))}`;
   const payerName = nameOf(payerKey);
   const others = keys.filter((k) => k !== payerKey);
@@ -1566,7 +1763,16 @@ function CartoonSplitPanel({
         <p className="sp-hint">Add an amount above, then choose who shares each part.</p>
       ) : (
         <>
-          {blocks.map((b) => (
+          {long && (
+            <div className="sp-tabs-row">
+              <div className="sp-tabs" role="tablist">
+                <button type="button" role="tab" aria-selected={mode === 'changed'} className={mode === 'changed' ? 'is-on' : ''} onClick={() => { setQuery(''); setView('changed'); }}>Only changed · {changedTotal}</button>
+                <button type="button" role="tab" aria-selected={mode === 'all'} className={mode === 'all' ? 'is-on' : ''} onClick={() => setView('all')}>All {lineCount}</button>
+              </div>
+              <input type="search" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Find a line" aria-label="Find a line" className="sp-find" />
+            </div>
+          )}
+          {long ? longBlocks : blocks.map((b) => (
             <div key={b.key} className="sp-card">
               <div className="sp-card-head">
                 {renderCategoryIcon(b.icon, b.name, 44)}
@@ -1578,26 +1784,8 @@ function CartoonSplitPanel({
               </div>
               {b.lines.length === 0 ? chips(b.key) : (
                 <>
-                  <div className="sp-whole">
-                    <span>Whole {b.name}</span>
-                    <div className="flex gap-1.5">
-                      {keys.map((k) => {
-                        const lk = b.lines.map((l) => l.key);
-                        const n = lk.filter((x) => peopleOf(x).includes(k)).length;
-                        return (
-                          <button key={k} type="button" className={`sp-mini ${n === 0 ? 'is-out' : ''}`} onClick={() => toggleWhole(lk, k)} aria-label={`${nameOf(k)} shares all of ${b.name}`}>
-                            {face(k, 30)}{n > 0 && <span className="sp-check">{n === lk.length ? '✓' : '–'}</span>}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-                  {b.lines.map((l) => (
-                    <div key={l.key} className="sp-item">
-                      <div className="sp-item-head"><span>{l.name}{l.qty && <em> · {l.qty}</em>}</span><b>₹{l.amount}</b></div>
-                      {chips(l.key)}
-                    </div>
-                  ))}
+                  {wholeRow(b)}
+                  {b.lines.map((l) => lineItem(l))}
                 </>
               )}
             </div>
@@ -1653,185 +1841,6 @@ function CartoonSplitPanel({
   );
 }
 
-const WEEKDAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-
-/**
- * Cartoon theme: one day as a paper receipt — where the money went, every
- * record of the day, the day's total, and who ends up owing whom.
- */
-function CartoonDayReceipt({ dateKey, txs, categories, onClose, onOpenTx }: {
-  dateKey: string;
-  txs: Transaction[];
-  categories: { _id: string; name: string; icon: string }[];
-  onClose: () => void;
-  onOpenTx: (tx: Transaction) => void;
-}) {
-  const navigate = useNavigate();
-  const [y, m, d] = dateKey.split('-').map(Number);
-  const dayDate = new Date(y, m - 1, d);
-  const heading = `${WEEKDAYS[dayDate.getDay()]}`.toUpperCase();
-  const dateLabel = dayDate.toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' });
-  const own = (tx: Transaction) => (tx.personalShare != null ? tx.personalShare : tx.amount);
-  const real = txs.filter((t) => !t.isAdjustment);
-  const spends = real.filter((t) => t.type === 'expense');
-  const incomes = real.filter((t) => t.type === 'income');
-  const out = round2(spends.reduce((sum, t) => sum + own(t), 0));
-  const inn = round2(incomes.reduce((sum, t) => sum + t.amount, 0));
-
-  // Where the money went: your share of every category the day's bills touched.
-  const spread = (list: Transaction[], mine: boolean) => {
-    const acc = new Map<string, { name: string; icon: string; total: number }>();
-    list.forEach((t) => {
-      const ratio = mine && t.amount > 0 ? own(t) / t.amount : 1;
-      categoryGroups(t, categories).forEach((g) => {
-        const key = g.id ?? g.name;
-        const row = acc.get(key) ?? { name: g.name, icon: g.icon, total: 0 };
-        row.total = round2(row.total + g.total * ratio);
-        acc.set(key, row);
-      });
-    });
-    return [...acc.values()].filter((g) => g.total > 0).sort((a, b) => b.total - a.total);
-  };
-  const outGroups = spread(spends, true);
-  const inGroups = spread(incomes, false);
-
-  const titleOf = (t: Transaction) => {
-    if (t.type === 'transfer') return 'Transfer';
-    const gs = categoryGroups(t, categories);
-    const base = gs.length > 1 ? (gs.length === 2 ? `${gs[0].name} + ${gs[1].name}` : `${gs[0].name} + ${gs.length - 1} more`) : (t.categoryId?.name ?? 'Record');
-    return t.merchant ? `${base} · ${t.merchant}` : base;
-  };
-  const timeOf = (t: Transaction) => new Date(t.date).toLocaleTimeString('en-IN', { hour: 'numeric', minute: '2-digit', hour12: true }).toLowerCase();
-
-  // Who ends up owing whom across the day's split bills (positive = they owe you).
-  const net: Record<string, { name: string; amount: number }> = {};
-  spends.forEach((t) => {
-    const parts = (t.split?.splits ?? []).map((sp) => ({
-      id: typeof sp.friendId === 'string' ? sp.friendId : sp.friendId._id,
-      name: typeof sp.friendId === 'string' ? 'Friend' : sp.friendId.name,
-      amount: sp.amount,
-    }));
-    const payer = t.paidByFriendId;
-    if (payer) {
-      // A friend paid: you owe them your own share (all of it when nothing was split).
-      const mine = round2(t.amount - parts.reduce((sum, p) => sum + p.amount, 0));
-      net[payer._id] = { name: payer.name, amount: round2((net[payer._id]?.amount ?? 0) - mine) };
-    } else {
-      parts.forEach((p) => { net[p.id] = { name: p.name, amount: round2((net[p.id]?.amount ?? 0) + p.amount) }; });
-    }
-  });
-  const nets = Object.entries(net).filter(([, v]) => Math.abs(v.amount) >= 0.005);
-
-  const roundBtn = (label: string, onClick: () => void, icon: ReactNode) => (
-    <button type="button" onClick={onClick} aria-label={label} title={label} className="rcpt-btn">{icon}</button>
-  );
-
-  return (
-    <div className="rcpt-wrap">
-      <div className="rcpt-bar">
-        {roundBtn('Close', onClose, <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>)}
-      </div>
-
-      <div className="rcpt">
-        <p className="rcpt-title">{heading}</p>
-        <div className="rcpt-chips">
-          <span className="rcpt-chip"><CartoonIcon kind="calendar" size={18} />{dateLabel}</span>
-          <span className="rcpt-chip">{txs.length} record{txs.length === 1 ? '' : 's'}</span>
-        </div>
-        <div className="rcpt-rule" />
-
-        {outGroups.length > 0 && (
-          <>
-            <p className="rcpt-count">Where it went</p>
-            {outGroups.map((g) => (
-              <div key={g.name} className="rcpt-group">
-                <div className="rcpt-line is-head">
-                  {renderCategoryIcon(g.icon, g.name, 30)}
-                  <span className="rcpt-name">{g.name}</span>
-                  <span className="rcpt-dots" />
-                  <span className="rcpt-amt">{formatCurrency(g.total)}</span>
-                </div>
-              </div>
-            ))}
-          </>
-        )}
-        {inGroups.length > 0 && (
-          <>
-            <p className="rcpt-count" style={{ marginTop: 10 }}>Money in</p>
-            {inGroups.map((g) => (
-              <div key={g.name} className="rcpt-group">
-                <div className="rcpt-line is-head">
-                  {renderCategoryIcon(g.icon, g.name, 30)}
-                  <span className="rcpt-name">{g.name}</span>
-                  <span className="rcpt-dots" />
-                  <span className="rcpt-amt">+{formatCurrency(g.total)}</span>
-                </div>
-              </div>
-            ))}
-          </>
-        )}
-
-        <div className="rcpt-rule is-dashed" />
-        <p className="rcpt-count">Records</p>
-        {txs.map((t) => (
-          <button key={t._id} type="button" className="rcpt-rec" onClick={() => onOpenTx(t)}>
-            <span className="rcpt-rec-time">{timeOf(t)}</span>
-            <span className="rcpt-name">{titleOf(t)}</span>
-            <span className="rcpt-dots" />
-            <span className="rcpt-amt">
-              {t.isAdjustment ? '' : t.type === 'expense' ? '−' : t.type === 'income' ? '+' : ''}{formatCurrency(t.isAdjustment ? t.amount : own(t))}
-            </span>
-          </button>
-        ))}
-
-        <div className="rcpt-rule is-dashed" />
-        {inn > 0 && (
-          <div className="rcpt-line is-item" style={{ paddingLeft: 0 }}>
-            <span className="rcpt-name">Money in</span><span className="rcpt-dots" /><span className="rcpt-amt">+{formatCurrency(inn)}</span>
-          </div>
-        )}
-        <div className="rcpt-line is-total">
-          <span className="rcpt-name">OUT</span>
-          <span className="rcpt-count">your share of the day</span>
-          <span className="rcpt-dots" />
-          <span className="rcpt-amt">{formatCurrency(out)}</span>
-        </div>
-      </div>
-      <svg className="rcpt-tear" width="100%" height="14" aria-hidden>
-        <defs>
-          <pattern id="rcpt-zz-day" width="20" height="14" patternUnits="userSpaceOnUse">
-            <path d="M0 0H20L10 12Z" fill="#fff" />
-            <path d="M0 0L10 12L20 0" fill="none" stroke="var(--c-ink)" strokeWidth="3" strokeLinejoin="round" />
-          </pattern>
-        </defs>
-        <rect width="100%" height="14" fill="url(#rcpt-zz-day)" />
-      </svg>
-
-      {nets.length > 0 && (
-        <div className="rcpt-split">
-          <div className="rcpt-split-top">
-            <CartoonIcon kind="pizza" size={44} />
-            <div className="min-w-0">
-              <p className="rcpt-split-title">Who owes whom</p>
-              <p className="rcpt-split-sub">Across the split bills of this day.</p>
-            </div>
-          </div>
-          {nets.map(([id, v]) => (
-            <div key={id} className="rcpt-owe">
-              <div className="flex items-center gap-2 min-w-0">
-                {v.amount > 0
-                  ? (<><FaceAvatar name={v.name} size={28} /><span className="rcpt-arrow">→</span><FaceAvatar name="You" size={28} /><span className="rcpt-owe-text">{v.name} owes you <b>{formatCurrency(v.amount)}</b></span></>)
-                  : (<><FaceAvatar name="You" size={28} /><span className="rcpt-arrow">→</span><FaceAvatar name={v.name} size={28} /><span className="rcpt-owe-text">You owe {v.name} <b style={{ color: 'var(--c-tomato)' }}>{formatCurrency(Math.abs(v.amount))}</b></span></>)}
-              </div>
-              <button type="button" className="rcpt-pill is-go" onClick={() => navigate('/friends')}>Settle up</button>
-            </div>
-          ))}
-        </div>
-      )}
-    </div>
-  );
-}
-
 /**
  * Cartoon theme: a saved transaction as a paper receipt — one payment,
  * grouped by category, each category with its items or a plain amount.
@@ -1844,6 +1853,11 @@ function CartoonReceipt({ tx, categories, onClose, onDelete, onEdit }: {
   onEdit: () => void;
 }) {
   const navigate = useNavigate();
+  // Long bills fold: categories open one at a time, five lines to start with.
+  const [openGroups, setOpenGroups] = useState<string[] | null>(null);
+  const [shownLines, setShownLines] = useState<Record<string, number>>({});
+  const [openPeople, setOpenPeople] = useState<string[]>([]);
+  const [exporting, setExporting] = useState(false);
   const mainId = tx.categoryId?._id;
   const lookup = (id?: string) => (id === mainId ? tx.categoryId : categories.find((c) => c._id === id));
   const items = tx.items ?? [];
@@ -1906,9 +1920,36 @@ function CartoonReceipt({ tx, categories, onClose, onDelete, onEdit }: {
   ) : null;
   const exact = !!derived && keys.every((k) => Math.abs((derived.shares[k] ?? 0) - (stored[k] ?? 0)) < 0.031);
 
+  const long = tx.type !== 'transfer' && allLines.length > LONG_BILL;
+  const gid = (g: { id?: string }) => String(g.id);
+  const biggest = shown.reduce((best, g) => (g.lines.length > (best?.lines.length ?? -1) ? g : best), shown[0]);
+  const openList = openGroups ?? (biggest ? [gid(biggest)] : []);
+  const isOpen = (g: { id?: string }) => !long || openList.includes(gid(g));
+  // Folding a long list leaves the panel scrolled past its end: bring the folded heading back into view.
+  const toTop = (id: string) => afterLayout(() => document.getElementById(`rcpt-g-${id}`)?.scrollIntoView({ block: 'start' }));
+  const toggleGroup = (id: string) => {
+    const closing = openList.includes(id);
+    setOpenGroups(closing ? openList.filter((x) => x !== id) : [...openList, id]);
+    if (closing) toTop(id);
+  };
+  const jumpTo = (id: string) => {
+    setOpenGroups(openList.includes(id) ? openList : [...openList, id]);
+    setTimeout(() => document.getElementById(`rcpt-g-${id}`)?.scrollIntoView({ behavior: prefersReducedMotion() ? 'auto' : 'smooth', block: 'start' }), 30);
+  };
+  const changedCount = (g: { lines: Line[] }) => g.lines.filter((l) => l.shared && l.shared.length < keys.length).length;
+
   const chipsFor = (l: Line) => {
     if (!split || !exact || !derived) return null;
     const people = (l.shared ?? keys).filter((k) => keys.includes(k));
+    if (long) {
+      const each = formatCurrency(derived.lineShares[l.key]?.[people[0]] ?? 0);
+      const faces = <span className="rcpt-faces">{people.map((k) => <FaceAvatar key={k} name={nameOf(k)} size={18} />)}</span>;
+      return people.length === keys.length ? (
+        <div className="rcpt-quiet">{faces}<span>{keys.length === 2 ? 'half each' : 'equal'} · {each}</span></div>
+      ) : (
+        <div className="rcpt-quiet"><span className={`rcpt-only ${people[0] === USER_KEY ? 'is-you' : 'is-friend'}`}>{faces}only {people.map(nameOf).join(' & ')}{people.length > 1 && ` · ${each} each`}</span></div>
+      );
+    }
     return (
       <div className="rcpt-shares">
         {keys.map((k) => people.includes(k) ? (
@@ -1932,10 +1973,6 @@ function CartoonReceipt({ tx, categories, onClose, onDelete, onEdit }: {
   const circ = 2 * Math.PI * 28;
   let offset = 0;
   const owes = keys.filter((k) => k !== payerKey && (stored[k] ?? 0) > 0);
-  const remind = async (k: string) => {
-    const text = `Hi ${nameOf(k)}, you owe me ${formatCurrency(stored[k])} for ${shown.map((g) => g.cat?.name).filter(Boolean).join(' + ')} on ${fmtDateTime(tx.date)}.`;
-    try { await navigator.clipboard.writeText(text); toast.success('Reminder copied — paste it in a message'); } catch { toast.error('Could not copy the reminder'); }
-  };
   const breakdown = (k: string) => {
     if (!exact || !derived) return null;
     const parts = allLines
@@ -1944,6 +1981,25 @@ function CartoonReceipt({ tx, categories, onClose, onDelete, onEdit }: {
     const feeShare = round2(charges.reduce((sum, _c, n) => sum + (derived.chargeShares[n]?.[k] ?? 0), 0));
     if (feeShare) parts.push(`Fees & discounts ${feeShare < 0 ? '−' : '+'}${formatCurrency(Math.abs(feeShare)).replace(/\.00$/, '')}`);
     return parts.length ? parts.join(' · ') : null;
+  };
+
+  const billModel: BillModel = {
+    title: tx.merchant || (split ? 'Shared bill' : shown[0]?.cat?.name ?? 'Bill'),
+    subtitle: `${split && tx.merchant ? 'Shared bill · ' : ''}${shown.length} ${shown.length === 1 ? 'category' : 'categories'} · ${allLines.length} ${allLines.length === 1 ? 'line' : 'lines'}${split ? ` · paid by ${nameOf(payerKey)}` : ''}`,
+    dateLabel: fmtDateTime(tx.date).split(' at ')[0],
+    total: tx.amount, youKey: USER_KEY, keys, names: { ...names }, payerKey, stored,
+    groups: shown.map((g) => ({
+      id: gid(g), name: g.cat?.name ?? 'Uncategorized', icon: g.cat?.icon ?? '', total: g.total, fees: g.fees,
+      lines: g.lines.map((l) => ({
+        key: l.key, name: l.name, qty: l.qty, amount: l.amount, plain: l.plain,
+        people: split ? (l.shared ?? keys).filter((k) => keys.includes(k)) : [USER_KEY],
+        shares: derived?.lineShares[l.key] ?? {},
+      })),
+    })),
+    billFees: billFees.map((c) => ({ label: c.label, amount: c.amount })),
+    note: tx.note || undefined,
+    split: !!split, detailed: !!split && exact && !!derived,
+    lineCount: allLines.length, categoryCount: shown.length,
   };
 
   const roundBtn = (label: string, onClick: () => void, icon: ReactNode) => (
@@ -1958,6 +2014,9 @@ function CartoonReceipt({ tx, categories, onClose, onDelete, onEdit }: {
       <div className="rcpt-bar">
         {roundBtn('Close', onClose, svg(<><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></>))}
         <div className="flex items-center gap-2">
+          {tx.type !== 'transfer' && (
+            <button type="button" className="rcpt-export" onClick={() => setExporting(true)}><CartoonIcon kind="receipt" size={20} />Export</button>
+          )}
           {roundBtn('Delete', onDelete, svg(<><polyline points="3 6 5 6 21 6" /><path d="M19 6l-1 14H6L5 6" /><path d="M10 11v6m4-6v6" /><path d="M9 6V4h6v2" /></>))}
           {tx.type !== 'transfer' && roundBtn('Edit', onEdit, svg(<><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7" /><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z" /></>))}
         </div>
@@ -1976,19 +2035,51 @@ function CartoonReceipt({ tx, categories, onClose, onDelete, onEdit }: {
         </div>
         <div className="rcpt-rule" />
 
+        {long && (
+          <div className="rcpt-jump">
+            <div className="rcpt-jump-chips">
+              {shown.map((g) => (
+                <button key={gid(g)} type="button" className={`rcpt-jump-chip ${openList.includes(gid(g)) ? 'is-on' : ''}`} onClick={() => jumpTo(gid(g))} aria-label={`Jump to ${g.cat?.name ?? 'Uncategorized'}`}>
+                  {g.cat ? renderCategoryIcon(g.cat.icon, g.cat.name, 22) : <CartoonIcon kind="coins" size={22} />}{g.lines.length}
+                </button>
+              ))}
+            </div>
+            <div className="rcpt-jump-foot">
+              <span>Tap a chip to jump</span>
+              <button type="button" className="rcpt-link" onClick={() => setOpenGroups(openList.length === shown.length ? [] : shown.map(gid))}>
+                {openList.length === shown.length ? 'Collapse all' : 'Expand all'}
+              </button>
+            </div>
+          </div>
+        )}
+
         {shown.map((g) => {
           const plainLine = g.lines.length === 1 && g.lines[0].plain ? g.lines[0] : null;
-          const listed = g.lines.filter((l) => !l.plain);
+          const allListed = g.lines.filter((l) => !l.plain);
+          const open = isOpen(g);
+          const cap = long ? shownLines[gid(g)] ?? PREVIEW_ROWS : allListed.length;
+          const listed = allListed.slice(0, cap);
+          const head = (
+            <>
+              {g.cat ? renderCategoryIcon(g.cat.icon, g.cat.name, 30) : <CartoonIcon kind="coins" size={30} />}
+              <span className="rcpt-name">{g.cat?.name ?? 'Uncategorized'}{long && allListed.length > 0 && <span className="rcpt-qty"> {allListed.length} {allListed.length === 1 ? 'item' : 'items'}</span>}</span>
+              <span className="rcpt-dots" />
+              <span className="rcpt-amt">{formatCurrency(g.total)}</span>
+              {long && (open ? <span className="rcpt-collapse">Collapse</span> : <span className="rcpt-chev" aria-hidden>⌄</span>)}
+            </>
+          );
           return (
-            <div key={g.id ?? 'none'} className="rcpt-group">
-              <div className="rcpt-line is-head">
-                {g.cat ? renderCategoryIcon(g.cat.icon, g.cat.name, 30) : <CartoonIcon kind="coins" size={30} />}
-                <span className="rcpt-name">{g.cat?.name ?? 'Uncategorized'}</span>
-                <span className="rcpt-dots" />
-                <span className="rcpt-amt">{formatCurrency(g.total)}</span>
-              </div>
-              {plainLine && chipsFor(plainLine)}
-              {listed.map((l) => (
+            <div key={g.id ?? 'none'} id={`rcpt-g-${gid(g)}`} className={`rcpt-group ${long && open ? 'is-open' : ''}`}>
+              {long ? (
+                <button type="button" className="rcpt-line is-head rcpt-toggle" aria-expanded={open} onClick={() => toggleGroup(gid(g))}>{head}</button>
+              ) : (
+                <div className="rcpt-line is-head">{head}</div>
+              )}
+              {long && !open && (
+                <p className="rcpt-folded">{split && exact ? (changedCount(g) ? `${changedCount(g)} changed` : 'all split equally') : `${g.lines.length} ${g.lines.length === 1 ? 'line' : 'lines'}`}</p>
+              )}
+              {open && plainLine && chipsFor(plainLine)}
+              {open && listed.map((l) => (
                 <div key={l.key}>
                   <div className="rcpt-line is-item">
                     <span className="rcpt-name">{l.name}{l.qty && <span className="rcpt-qty"> × {l.qty}</span>}</span>
@@ -1998,7 +2089,20 @@ function CartoonReceipt({ tx, categories, onClose, onDelete, onEdit }: {
                   {chipsFor(l)}
                 </div>
               ))}
-              {g.fees.map((c, i) => (
+              {open && long && allListed.length > PREVIEW_ROWS && (
+                <div className="rcpt-more">
+                  <span>{listed.length} of {allListed.length}</span>
+                  {listed.length < allListed.length ? (
+                    <>
+                      <button type="button" className="rcpt-more-btn" onClick={() => setShownLines((m) => ({ ...m, [gid(g)]: cap + PREVIEW_ROWS }))}>Show {Math.min(PREVIEW_ROWS, allListed.length - listed.length)} more</button>
+                      <button type="button" className="rcpt-more-btn is-go" onClick={() => setShownLines((m) => ({ ...m, [gid(g)]: allListed.length }))}>Show all {allListed.length}</button>
+                    </>
+                  ) : (
+                    <button type="button" className="rcpt-more-btn is-go" onClick={() => { setShownLines((m) => ({ ...m, [gid(g)]: PREVIEW_ROWS })); toTop(gid(g)); }}>Collapse</button>
+                  )}
+                </div>
+              )}
+              {open && g.fees.map((c, i) => (
                 <div key={`f${i}`} className="rcpt-line is-item">
                   <span className="rcpt-name">{c.label}</span>
                   <span className="rcpt-dots" />
@@ -2067,16 +2171,50 @@ function CartoonReceipt({ tx, categories, onClose, onDelete, onEdit }: {
               </p>
             </div>
           </div>
-          {keys.map((k) => (
-            <div key={k} className="rcpt-who">
-              <FaceAvatar name={nameOf(k)} size={34} />
-              <div className="min-w-0 flex-1">
-                <p className="rcpt-who-name">{nameOf(k)}</p>
-                {breakdown(k) && <p className="rcpt-who-sub">{breakdown(k)}</p>}
+          {keys.map((k) => {
+            const foldable = long && exact && !!derived;
+            const open = foldable && openPeople.includes(k);
+            const byCategory = foldable ? shown.map((g) => ({
+              g, n: g.lines.filter((l) => (derived!.lineShares[l.key]?.[k] ?? 0) > 0).length,
+              amt: round2(g.lines.reduce((sum, l) => sum + (derived!.lineShares[l.key]?.[k] ?? 0), 0)),
+            })).filter((r) => r.n > 0) : [];
+            const feeShare = foldable ? round2(charges.reduce((sum, _c, n) => sum + (derived!.chargeShares[n]?.[k] ?? 0), 0)) : 0;
+            const row = (
+              <>
+                <FaceAvatar name={nameOf(k)} size={34} />
+                <div className="min-w-0 flex-1">
+                  <p className="rcpt-who-name">{nameOf(k)}{foldable ? <span className="rcpt-qty"> · {allLines.filter((l) => (derived!.lineShares[l.key]?.[k] ?? 0) > 0).length} lines</span> : k === payerKey ? <span className="rcpt-qty"> · paid</span> : null}</p>
+                  {!foldable && breakdown(k) && <p className="rcpt-who-sub">{breakdown(k)}</p>}
+                </div>
+                <b className="rcpt-who-amt">{formatCurrency(stored[k] ?? 0)}</b>
+                {foldable && <span className="rcpt-chev" aria-hidden>{open ? '⌃' : '⌄'}</span>}
+              </>
+            );
+            return foldable ? (
+              <div key={k} className="rcpt-who-fold">
+                <button type="button" className="rcpt-who" aria-expanded={open} onClick={() => setOpenPeople((ids) => (ids.includes(k) ? ids.filter((x) => x !== k) : [...ids, k]))}>{row}</button>
+                {open && (
+                  <div className="rcpt-who-list">
+                    {byCategory.map(({ g, n, amt }) => (
+                      <div key={gid(g)} className="rcpt-who-row">
+                        {g.cat ? renderCategoryIcon(g.cat.icon, g.cat.name, 20) : <CartoonIcon kind="coins" size={20} />}
+                        <span className="rcpt-name">{g.cat?.name ?? 'Uncategorized'}<span className="rcpt-qty"> · {n} {n === 1 ? 'line' : 'lines'}</span></span>
+                        <b>{formatCurrency(amt)}</b>
+                      </div>
+                    ))}
+                    {feeShare !== 0 && (
+                      <div className="rcpt-who-row">
+                        <CartoonIcon kind="receipt" size={20} />
+                        <span className="rcpt-name">Fees &amp; discounts</span>
+                        <b>{feeShare < 0 ? '−' : '+'}{formatCurrency(Math.abs(feeShare))}</b>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
-              <b className="rcpt-who-amt">{formatCurrency(stored[k] ?? 0)}</b>
-            </div>
-          ))}
+            ) : <div key={k} className="rcpt-who">{row}</div>;
+          })}
+          {long && exact && <p className="rcpt-who-hint">Tap a person to see their lines by category.</p>}
           {youPaid ? owes.map((k) => (
             <div key={k} className="rcpt-owe">
               <div className="flex items-center gap-2 min-w-0">
@@ -2084,7 +2222,7 @@ function CartoonReceipt({ tx, categories, onClose, onDelete, onEdit }: {
                 <span className="rcpt-owe-text">{nameOf(k)} owes you <b>{formatCurrency(stored[k])}</b></span>
               </div>
               <div className="flex gap-2">
-                <button type="button" className="rcpt-pill" onClick={() => remind(k)}>Remind</button>
+                <RemindButton friend={nameOf(k)} amount={stored[k]} lines={friendLines([tx], k, stored[k])} dateLabel={fmtDateTime(tx.date).split(' at ')[0]} />
                 <button type="button" className="rcpt-pill is-go" onClick={() => navigate('/friends')}>Settle up</button>
               </div>
             </div>
@@ -2100,6 +2238,7 @@ function CartoonReceipt({ tx, categories, onClose, onDelete, onEdit }: {
         </div>
       )}
       {tx.note && <p className="rcpt-note">{tx.note}</p>}
+      {exporting && <ExportBillSheet model={billModel} onClose={() => setExporting(false)} />}
     </div>
   );
 }
@@ -2636,6 +2775,10 @@ function ItemsSection({
   const [creatingName, setCreatingName] = useState<string | null>(null);
   // Row whose price box should take focus once it mounts (just added).
   const [focusPriceKey, setFocusPriceKey] = useState<string | null>(null);
+  // Long lists fold: first few rows, plus any just added so what was typed stays visible.
+  const [limit, setLimit] = useState(PREVIEW_ROWS);
+  const [fresh, setFresh] = useState<string[]>([]);
+  const [find, setFind] = useState('');
   const { groups: unitGroups, loaded: unitsLoaded, fetchGroups } = useUnitGroupStore();
   useEffect(() => { if (!loaded) fetchItems(); }, [loaded, fetchItems]);
   useEffect(() => { if (!unitsLoaded) fetchGroups(); }, [unitsLoaded, fetchGroups]);
@@ -2679,6 +2822,12 @@ function ItemsSection({
       ...(unit ? measure(unit, item.defaultQuantity) : { quantity: item.defaultQuantity, unit: item.unit }),
     }]);
     setFocusPriceKey(key);
+    setFresh((f) => [...f, key]);
+    // The item drops into the basket: its icon flies to this card's running total, which pops.
+    const root = rootRef.current;
+    const from = root?.querySelector('input[placeholder="+ Add item"]')?.getBoundingClientRect();
+    const sum = root?.closest('.catcard')?.querySelector('.catcard-sum');
+    if (from && sum) flyIcon({ kind: itemKind(item.name) ?? 'items', from, to: sum, onLand: () => pop(sum) });
   };
   const updateRow = (key: string, patch: Partial<ItemRow>) =>
     onRowsChange(rows.map((r) => (r.key === key ? { ...r, ...patch } : r)));
@@ -2706,8 +2855,26 @@ function ItemsSection({
   const grid = narrow ? NESTED_ITEM_GRID : ITEM_GRID;
   const removeBtn = 'text-base leading-none justify-self-center w-5 h-5 rounded-full hover:bg-[var(--c-surface2)]';
 
+  // How a typed price compares with what this item usually costs per unit (same unit only).
+  const priceVerdict = (row: ItemRow): 'pricey' | 'deal' | null => {
+    if (!row.itemId || !(row.amount > 0) || !(row.quantity && row.quantity > 0)) return null;
+    const past = (histories[row.itemId] ?? [])
+      .filter((p) => p.transactionId !== currentTransactionId && p.quantity && p.quantity > 0 && p.amount > 0 && (p.unit ?? '') === (row.unit ?? ''))
+      .slice(0, 8).map((p) => p.amount / p.quantity!);
+    if (past.length < 2) return null;
+    const ratio = row.amount / row.quantity / (past.reduce((a, b) => a + b, 0) / past.length);
+    return ratio > PRICEY_RATIO ? 'pricey' : ratio < 1 / PRICEY_RATIO ? 'deal' : null;
+  };
+  const rootRef = useRef<HTMLDivElement>(null);
+  const folding = isCartoon && rows.length > PREVIEW_ROWS;
+  const needle = find.trim().toLowerCase();
+  const visibleRows = !folding ? rows
+    : needle ? rows.filter((r) => r.name.toLowerCase().includes(needle))
+    : rows.filter((r, n) => n < limit || fresh.includes(r.key));
+  const hiddenRows = rows.length - visibleRows.length;
+
   return (
-    <div onFocus={() => onFocusChange(true)} onBlur={() => onFocusChange(false)}>
+    <div ref={rootRef} onFocus={() => onFocusChange(true)} onBlur={() => onFocusChange(false)}>
       <div className={`flex items-center justify-between ${(hideLabel || narrow) && rows.length === 0 ? 'hidden' : 'mb-1'}`}>
         {hideLabel || narrow ? <span /> : <span className={label} style={{ color: 'var(--c-muted)' }}>Items</span>}
         {rows.length > 0 && (
@@ -2728,7 +2895,16 @@ function ItemsSection({
           </div>
         )}
 
-        {rows.map((row) => {
+        {folding && (
+          <div className="px-1.5 py-1.5">
+            <input type="search" value={find} onChange={(e) => setFind(e.target.value)} placeholder="Find in this list"
+              className="tx-find" aria-label="Find an item in this list" />
+          </div>
+        )}
+        {needle && visibleRows.length === 0 && (
+          <p className="px-3 py-2 text-xs" style={{ color: 'var(--c-muted)' }}>No item matches “{find.trim()}”.</p>
+        )}
+        {visibleRows.map((row) => {
           const item = catalogItem(row);
           const units = item ? unitsFor(item, unitGroups) : [];
           const sharers = splitKeys ? (row.sharedWith ?? splitKeys).filter((k) => splitKeys.includes(k)) : [];
@@ -2758,19 +2934,32 @@ function ItemsSection({
               <button type="button" aria-label={`Remove ${row.name}`} onClick={() => onRowsChange(rows.filter((r) => r.key !== row.key))}
                 className={removeBtn} style={{ color: 'var(--c-muted)' }}>×</button>
 
-              {prev && (
+              {(prev || priceVerdict(row)) && (
                 <div className="flex items-center gap-2 flex-wrap -mt-1.5 pb-1 px-2" style={{ gridColumn: '1 / -1' }}>
-                  {!(row.amount > 0) && prev.amount > 0 && (
+                  {priceVerdict(row) && (
+                    <motion.span
+                      key={priceVerdict(row)}
+                      className={`price-sticker ${priceVerdict(row) === 'deal' ? 'is-deal' : 'is-pricey'}`}
+                      initial={prefersReducedMotion() ? { opacity: 0 } : { opacity: 0, scale: 0.6, rotate: -10 }}
+                      animate={prefersReducedMotion() ? { opacity: 1 } : { opacity: 1, scale: 1, rotate: [-10, 7, -4, 0] }}
+                      transition={{ duration: 0.45 }}
+                    >
+                      {priceVerdict(row) === 'deal' ? 'Good deal' : 'Pricier than usual'}
+                    </motion.span>
+                  )}
+                  {prev && !(row.amount > 0) && prev.amount > 0 && (
                     <button type="button" className="use-last-price" onClick={() => updateRow(row.key, { amount: prev.amount })}
                       title={`Same as ${shortDate(prev.date)}`}>
                       Use last price ₹{prev.amount}
                     </button>
                   )}
-                  <span className="text-[10px] truncate" style={{ color: 'var(--c-muted)' }}
-                    title={`Previous purchase: ${shortDate(prev.date)}, ₹${prev.amount}`}>
-                    Last bought {shortDate(prev.date)} · ₹{prev.amount}
-                    {days > 0 ? ` · lasted ${days} day${days > 1 ? 's' : ''}` : ' · same day'}
-                  </span>
+                  {prev && (
+                    <span className="text-[10px] truncate" style={{ color: 'var(--c-muted)' }}
+                      title={`Previous purchase: ${shortDate(prev.date)}, ₹${prev.amount}`}>
+                      Last bought {shortDate(prev.date)} · ₹{prev.amount}
+                      {days > 0 ? ` · lasted ${days} day${days > 1 ? 's' : ''}` : ' · same day'}
+                    </span>
+                  )}
                 </div>
               )}
               {splitKeys && (
@@ -2823,6 +3012,19 @@ function ItemsSection({
             />
           </div>
         )}
+        {folding && !needle && (hiddenRows > 0 || limit > PREVIEW_ROWS) && (
+          <div className="tx-more">
+            <span className="tx-more-count">{visibleRows.length} of {rows.length}</span>
+            {hiddenRows > 0 ? (
+              <>
+                <button type="button" className="tx-more-btn" onClick={() => setLimit((n) => n + PREVIEW_ROWS)}>Show {Math.min(PREVIEW_ROWS, hiddenRows)} more</button>
+                <button type="button" className="tx-more-btn is-go" onClick={() => setLimit(rows.length)}>Show all {rows.length}</button>
+              </>
+            ) : (
+              <button type="button" className="tx-more-btn is-go" onClick={() => { setLimit(PREVIEW_ROWS); setFresh([]); }}>Collapse</button>
+            )}
+          </div>
+        )}
       </div>
 
       {creatingName !== null && (
@@ -2864,7 +3066,7 @@ function ItemsSection({
 }
 
 function TransactionModal({
-  open, onClose, onSubmit, categories, accounts, friends, transaction, initialType, panel,
+  open, onClose, onSubmit, categories, accounts, friends, transaction, initialType, panel, initialDate,
 }: {
   open: boolean;
   /** Render inline as the desktop side panel instead of a popup. */
@@ -2876,6 +3078,8 @@ function TransactionModal({
   friends: Friend[];
   transaction?: Transaction;
   initialType?: 'income' | 'expense';
+  /** Date to start a new transaction on (YYYY-MM-DD); today when absent. */
+  initialDate?: string;
 }) {
   const isEdit = !!transaction;
   const [amountStr, setAmountStr] = useState('0');
@@ -2932,7 +3136,7 @@ function TransactionModal({
             amount: undefined as unknown as number,
             categoryId: '',
             accountId: '',
-            date: todayLocal(),
+            date: initialDate ?? todayLocal(),
             note: '',
           },
     });
@@ -3257,6 +3461,8 @@ function TransactionModal({
   const usedCategoryIds = [selectedCategoryId, ...extraLines.map((l) => l.categoryId)].filter(Boolean);
   const unusedCategories = filteredCategories.filter((c) => !usedCategoryIds.includes(c._id));
   const [menuKey, setMenuKey] = useState<string | null>(null);
+  // Cards folded down to their header (only cards with items can fold).
+  const [foldedCards, setFoldedCards] = useState<string[]>([]);
   const [pickMore, setPickMore] = useState(false);
   const addCategoryLine = (id: string) => {
     if (!multi) setPrimaryAmt(itemized ? 0 : parseFloat(amountStr) || 0);
@@ -3270,6 +3476,12 @@ function TransactionModal({
   }) => {
     const cat = categories.find((c) => c._id === o.categoryId);
     const hasItems = o.rows.length > 0 || openItems.includes(o.key);
+    const folded = o.rows.length > 0 && foldedCards.includes(o.key);
+    const toggleFold = () => {
+      const folding = !foldedCards.includes(o.key);
+      setFoldedCards((ids) => (ids.includes(o.key) ? ids.filter((k) => k !== o.key) : [...ids, o.key]));
+      if (folding) afterLayout(() => document.getElementById(`cc-${o.key}`)?.scrollIntoView({ block: 'nearest' }));
+    };
     const itemsSum = round2(o.rows.reduce((sum, r) => sum + r.amount, 0) + chargesSum(o.charges));
     const closeItems = () => {
       o.onRows([]); o.onCharges([]);
@@ -3277,12 +3489,17 @@ function TransactionModal({
       if (itemsSum > 0) o.onAmount(itemsSum);
     };
     return (
-      <div key={o.key} className="catcard">
-        <div className="catcard-head">
+      <div key={o.key} id={`cc-${o.key}`} className="catcard">
+        <div className={`catcard-head ${!folded && o.rows.length > PREVIEW_ROWS ? 'is-sticky' : ''}`}>
           {cat ? renderCategoryIcon(cat.icon, cat.name, 52) : null}
           <div className="min-w-0 flex-1">
             <p className="catcard-name">{cat?.name}</p>
-            <p className="catcard-sub">{o.rows.length > 0 ? `${o.rows.length} item${o.rows.length === 1 ? '' : 's'}, adds up for you` : hasItems ? 'Add the items below' : 'Just an amount'}</p>
+            <p className="catcard-sub">{o.rows.length > 0 ? `${o.rows.length} item${o.rows.length === 1 ? '' : 's'}${folded ? '' : ', adds up for you'}` : hasItems ? 'Add the items below' : 'Just an amount'}</p>
+            {folded && (
+              <div className="catcard-minis" aria-hidden>
+                {[...new Set(o.rows.map((r) => itemKind(r.name) ?? 'items'))].slice(0, 4).map((k) => <CartoonIcon key={k} kind={k} size={22} />)}
+              </div>
+            )}
           </div>
           {o.rows.length > 0 ? (
             <div className="text-right">
@@ -3294,15 +3511,26 @@ function TransactionModal({
               <CalcAmountInput value={o.amount} onChange={o.onAmount} className="catcard-input" onFocusChange={setSplitFieldFocused} />
             </label>
           )}
-          <button type="button" className="catcard-menu" aria-label="More" onClick={() => setMenuKey(menuKey === o.key ? null : o.key)}>•••</button>
+          {folded ? (
+            <button type="button" className="catcard-open" onClick={toggleFold}>Open</button>
+          ) : (
+            <>
+              {o.rows.length > 0 && (
+                <button type="button" className="catcard-menu" aria-label={`Fold ${cat?.name}`} aria-expanded onClick={toggleFold}>
+                  <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="6 15 12 9 18 15" /></svg>
+                </button>
+              )}
+              <button type="button" className="catcard-menu" aria-label="More" onClick={() => setMenuKey(menuKey === o.key ? null : o.key)}>•••</button>
+            </>
+          )}
         </div>
-        {menuKey === o.key && (
+        {!folded && menuKey === o.key && (
           <div className="catcard-menu-panel">
             <CategorySelect categories={o.options} value={o.categoryId} onChange={(id) => { o.onCategory(id); setMenuKey(null); }} inline />
             {o.onRemove && <button type="button" className="catcard-remove" onClick={() => { setMenuKey(null); o.onRemove!(); }}>Remove this category</button>}
           </div>
         )}
-        {hasItems ? (
+        {folded ? null : hasItems ? (
           <div className="catcard-items">
             <ItemsSection categoryId={o.categoryId} rows={o.rows} onRowsChange={o.onRows} wide hideLabel
               charges={o.charges} onChargesChange={o.onCharges}
@@ -3376,7 +3604,17 @@ function TransactionModal({
   );
   const cartoonCategories = (
     <div>
-      <p className="tx-label block text-[10px] uppercase tracking-wider mb-2" style={{ color: 'var(--c-muted)' }}>What was it for?</p>
+      <div className="flex items-center justify-between mb-2">
+        <p className="tx-label block text-[10px] uppercase tracking-wider" style={{ color: 'var(--c-muted)' }}>What was it for?{extraLines.length > 0 ? ` · ${1 + extraLines.length} categories` : ''}</p>
+        {(() => {
+          const withItems = [itemRows.length > 0 && 'primary', ...extraLines.map((l) => l.rows.length > 0 && l.key)].filter((k): k is string => !!k);
+          if (!selectedCategoryId || withItems.length === 0 || (withItems.length < 2 && itemRows.length + extraLines.reduce((n, l) => n + l.rows.length, 0) <= PREVIEW_ROWS)) return null;
+          const allFolded = withItems.every((k) => foldedCards.includes(k));
+          return (
+            <button type="button" className="tx-fold-all" onClick={() => setFoldedCards(allFolded ? [] : withItems)}>{allFolded ? 'Expand all' : 'Collapse all'}</button>
+          );
+        })()}
+      </div>
       {!selectedCategoryId ? (
         <CategorySelect categories={filteredCategories} value="" onChange={(id) => setValue('categoryId', id, { shouldValidate: true })} onSearchFocusChange={setCategorySearchFocused} />
       ) : (
@@ -3587,7 +3825,16 @@ function TransactionModal({
           {/* Scrollable form body */}
           {/* scrollbar-gutter keeps the scrollbar's space reserved, so opening a
               dropdown that makes the body scrollable doesn't shift the layout. */}
-          <div className="flex-1 overflow-y-auto px-4 pt-3 space-y-3 pb-4 min-h-0" style={{ scrollbarGutter: 'stable' }}>
+          <div
+            className="flex-1 overflow-y-auto px-4 pt-3 space-y-3 pb-4 min-h-0"
+            style={{ scrollbarGutter: 'stable' }}
+            // Whatever gets focus (a tap, or Tab) is brought to the middle of the form,
+            // clear of the amount bar and the on-screen keyboard.
+            onFocusCapture={(e) => {
+              const el = e.target as HTMLElement;
+              window.setTimeout(() => el.scrollIntoView?.({ block: 'center', inline: 'nearest', behavior: 'smooth' }), 300);
+            }}
+          >
             {!isEdit && !draftDirty && backupDraft && (
               <button type="button" onClick={restoreBackup} className="draft-restore">↩ Restore the draft you cleared</button>
             )}
@@ -3880,6 +4127,7 @@ function TransactionModal({
                     selectedFriends={selectedFriends} onToggleFriend={toggleFriend} payerKey={friendPaid ? whoPaid : USER_KEY}
                     shared={sharedMap} onShared={(k, people) => setSharedMap(m => ({ ...m, [k]: people }))}
                     locks={lineLocks} onLock={(k, person, v) => setLineLocks(m => ({ ...m, [k]: { ...m[k], [person]: v } }))}
+                    onLineReset={(k) => { setSharedMap(m => { const n = { ...m }; delete n[k]; return n; }); setLineLocks(m => { const n = { ...m }; delete n[k]; return n; }); }}
                     onReset={() => { setSharedMap({}); setLineLocks({}); }}
                     customized={Object.keys(lineLocks).some(k => Object.keys(lineLocks[k] ?? {}).length > 0) || Object.values(sharedMap).some(Boolean)}
                     total={totalAmount || 0}

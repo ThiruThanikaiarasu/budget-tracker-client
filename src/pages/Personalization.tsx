@@ -6,6 +6,7 @@ import useTransactionStore from '../store/transactionStore';
 import Amount from '../components/Amount';
 import CartoonIcon from '../components/CartoonIcon';
 import { CartoonHead, Sticker } from '../components/cartoon';
+import { getUpiId, setUpiId } from '../utils/shareLines';
 
 function getOrdinalSuffix(n: number): string {
   const s = ['th', 'st', 'nd', 'rd'];
@@ -112,6 +113,20 @@ function Personalization() {
               </div>
               <div><button onClick={handleSave} disabled={!hasChanges || isSaving} className="cartoon-btn is-primary">{isSaving ? 'Saving...' : 'Save'}</button></div>
             </div>
+          </div>
+        </section>
+
+        <section className="cartoon-banner">
+          <span className="cartoon-hero-tile"><CartoonIcon kind="wallet" size={88} /></span>
+          <div className="min-w-0 flex-1">
+            <h2 className="cartoon-section-title">Your UPI ID</h2>
+            <p className="cartoon-sub" style={{ color: 'var(--c-ink)', marginTop: 6 }}>
+              Reminders to friends carry a "Pay on UPI" link to this ID. It stays on this device.
+            </p>
+            <input
+              className="t-input mt-2" style={{ maxWidth: '22rem' }} placeholder="yourname@bank" aria-label="Your UPI ID"
+              defaultValue={getUpiId()} onChange={(e) => setUpiId(e.target.value)}
+            />
           </div>
         </section>
 

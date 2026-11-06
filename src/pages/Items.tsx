@@ -6,6 +6,8 @@ import useCategoryItemStore, {
   type CategoryItem, type ItemStats, type ItemPurchase,
 } from '../store/categoryItemStore';
 import { formatCurrency } from '../utils/format';
+import useAccountStore from '../store/accountStore';
+import { recurringLine } from '../utils/recurring';
 import ItemFields from '../components/ItemFields';
 import CategorySelect from '../components/CategorySelect';
 import EmptyState from '../components/EmptyState';
@@ -16,7 +18,11 @@ import { normalizeName } from '../utils/normalizeName';
 import useThemeStore from '../store/themeStore';
 import CartoonIcon from '../components/CartoonIcon';
 import { CartoonHead } from '../components/cartoon';
-import { itemKind } from '../utils/cartoonKinds';
+import useSessionState from '../hooks/useSessionState';
+import CartoonItemsList from '../components/CartoonItemsList';
+import useDashboardStore from '../store/dashboardStore';
+import useAuthStore from '../store/authStore';
+import { getCurrentFinancialMonth } from '../utils/financialMonth';
 
 const ALL = ''; // CategorySelect's "All categories" value
 
@@ -38,6 +44,14 @@ function Items() {
   const { groups: unitGroups, fetchGroups } = useUnitGroupStore();
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
   const isCartoon = useThemeStore((st) => st.theme === 'cartoon');
+  // Category cards folded to just their header (kept across a refresh).
+  const [collapsedIds, setCollapsedIds] = useSessionState<string[]>('items.collapsed', []);
+  const [view, setView] = useSessionState<'list' | 'grid'>('items.view', 'list');
+  const [tipGone, setTipGone] = useSessionState('items.tipGone', false, 'local');
+  // What each category cost this month, for the folded cards.
+  const { breakdown, fetchCategoryBreakdown } = useDashboardStore();
+  const startDay = useAuthStore((st) => st.user?.financialMonthStartDay) ?? 1;
+  const spend = Object.fromEntries(breakdown.map((b) => [b.categoryId, b.total]));
 
   useEffect(() => {
     const close = () => setOpenMenuId(null);
@@ -51,6 +65,8 @@ function Items() {
     fetchGroups().then(fetchItems);
     fetchStats();
   }, [fetchCategories, fetchItems, fetchGroups, fetchStats]);
+
+  useEffect(() => { if (isCartoon) fetchCategoryBreakdown(getCurrentFinancialMonth(startDay)); }, [isCartoon, startDay, fetchCategoryBreakdown]);
 
   const term = normalizeName(search);
   const visibleItems = items.filter((i) => !term || normalizeName(i.name).includes(term));
@@ -66,6 +82,12 @@ function Items() {
     try { await deleteItem(item._id); } catch { /* toast shown by the store */ }
     setDeletingId(null);
   };
+
+  // A search always shows its matches, so folding only applies while the box is empty.
+  const isFolded = (id: string) => !term && collapsedIds.includes(id);
+  const toggleFold = (id: string) => setCollapsedIds((cur) => (cur.includes(id) ? cur.filter((x) => x !== id) : [...cur, id]));
+  const allFolded = groups.length > 0 && groups.every((g) => collapsedIds.includes(g.category._id));
+  const foldAll = () => setCollapsedIds(allFolded ? [] : groups.map((g) => g.category._id));
 
   if (isCartoon) {
     return (
@@ -90,54 +112,36 @@ function Items() {
               <label className="cartoon-search" style={{ flex: 1, minWidth: 180, height: 48, boxShadow: '3px 3px 0 var(--c-ink)' }}>
                 <span aria-hidden>🔍</span>
                 <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search items…" />
+                {search && <button type="button" aria-label="Clear search" className="fi-clear" onClick={() => setSearch('')}>✕</button>}
               </label>
+              <div className="fi-seg" role="group" aria-label="Layout">
+                <button type="button" aria-pressed={view === 'list'} title="List" className={view === 'list' ? 'is-on' : ''} onClick={() => setView('list')}>☰</button>
+                <button type="button" aria-pressed={view === 'grid'} title="Grid" className={view === 'grid' ? 'is-on' : ''} onClick={() => setView('grid')}>
+                  <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden><rect x="1" y="1" width="6" height="6" rx="1.5" fill="currentColor" /><rect x="9" y="1" width="6" height="6" rx="1.5" fill="currentColor" /><rect x="1" y="9" width="6" height="6" rx="1.5" fill="currentColor" /><rect x="9" y="9" width="6" height="6" rx="1.5" fill="currentColor" /></svg>
+                </button>
+              </div>
+              {groups.length > 1 && !term && (
+                <button type="button" className="fi-ib" title={allFolded ? 'Expand all' : 'Collapse all'} aria-label={allFolded ? 'Expand all' : 'Collapse all'} onClick={foldAll}>
+                  <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden><path d="M5 7l5-4 5 4M5 13l5 4 5-4" /></svg>
+                </button>
+              )}
               <button type="button" onClick={() => setShowAdd(true)} className="cartoon-btn is-primary">+ Add item</button>
             </div>
-            <div className="cartoon-info">
-              <span className="cartoon-switch-demo" aria-hidden />
-              Switched-on items show up as tiles when you add an expense. The rest still turn up in search.
-            </div>
+            {!tipGone && (
+              <div className="fi-tip">
+                <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden><rect x="1" y="1" width="6" height="6" rx="1.5" fill="currentColor" /><rect x="9" y="1" width="6" height="6" rx="1.5" fill="currentColor" /><rect x="1" y="9" width="6" height="6" rx="1.5" fill="currentColor" /><rect x="9" y="9" width="6" height="6" rx="1.5" fill="currentColor" /></svg>
+                <span>Tile on = shows in the add-expense picker. Off items still turn up in search.</span>
+                <button type="button" aria-label="Dismiss" onClick={() => setTipGone(true)}>✕</button>
+              </div>
+            )}
 
-            {groups.map(({ category, items: groupItems }) => {
-              const shownCount = groupItems.filter(isShownInPicker).length;
-              const allShown = groupItems.length > 0 && shownCount === groupItems.length;
-              return (
-                <section key={category._id} className="cartoon-panel">
-                  <div className="flex items-center gap-3">
-                    {renderCategoryIcon(category.icon, category.name, 48)}
-                    <h2 className="cartoon-section-title flex-1 truncate">{category.name}</h2>
-                    {groupItems.length > 0 && (
-                      <span className="flex items-center gap-3 cartoon-sub">
-                        {shownCount} of {groupItems.length} in the picker
-                        <Switch on={allShown} onChange={() => setShownInPicker(groupItems.map((i) => i._id), !allShown)} label={`Show all ${category.name} items in the picker`} />
-                      </span>
-                    )}
-                  </div>
-                  {groupItems.length === 0 && <p className="cartoon-sub">No items yet</p>}
-                  {groupItems.map((item) => editingId === item._id ? (
-                    <div key={item._id} className="cartoon-row is-flat" style={{ display: 'block' }}>
-                      <ItemFields
-                        categoryItems={items.filter((i) => i.categoryId === category._id)}
-                        excludeId={item._id} initial={item} submitLabel="Save"
-                        onSubmit={async (data) => { await updateItem(item._id, data); setEditingId(null); }}
-                        onCancel={() => setEditingId(null)}
-                      />
-                    </div>
-                  ) : (
-                    <ItemListRow
-                      key={item._id} item={item} unitGroups={unitGroups} stats={stats[item._id]}
-                      onHistory={() => { setHistoryItem(item); setOpenMenuId(null); }}
-                      menuOpen={openMenuId === item._id}
-                      onToggleMenu={() => setOpenMenuId(openMenuId === item._id ? null : item._id)}
-                      onTogglePicker={(on) => setShownInPicker([item._id], on)}
-                      onEdit={() => { setEditingId(item._id); setOpenMenuId(null); }}
-                      onDelete={() => { remove(item); setOpenMenuId(null); }}
-                      deleting={deletingId === item._id}
-                    />
-                  ))}
-                </section>
-              );
-            })}
+            <CartoonItemsList
+              groups={groups} allItems={items} term={term} search={search}
+              hiddenGroups={filter === ALL ? categories.length - groups.length : 0}
+              view={view} isFolded={isFolded} onToggleFold={toggleFold} spend={spend} stats={stats} unitGroups={unitGroups}
+              editingId={editingId} setEditingId={setEditingId} menuId={openMenuId} setMenuId={setOpenMenuId}
+              deletingId={deletingId} onDelete={remove} onHistory={setHistoryItem} onUpdate={updateItem} onSetPicker={setShownInPicker}
+            />
 
             {groups.length === 0 && (
               search
@@ -228,11 +232,12 @@ function Items() {
               )}
 
               {groupItems.map((item) => editingId === item._id ? (
-                <div key={item._id} className="rounded-xl p-4 my-2" style={{ background: 'var(--c-surface)', border: '1px solid var(--c-border)' }}>
+                <div key={item._id} className="my-3">
                   <ItemFields
                     categoryItems={items.filter((i) => i.categoryId === category._id)}
                     excludeId={item._id}
                     initial={item}
+                    card={{ meta: stats[item._id] ? `Last ${shortDate(stats[item._id].lastDate)} · ${formatCurrency(stats[item._id].lastAmount)}` : undefined }}
                     submitLabel="Save"
                     onSubmit={async (data) => { await updateItem(item._id, data); setEditingId(null); }}
                     onCancel={() => setEditingId(null)}
@@ -241,6 +246,7 @@ function Items() {
               ) : (
                 <ItemListRow
                   key={item._id}
+                  faded={!!editingId}
                   item={item}
                   unitGroups={unitGroups}
                   stats={stats[item._id]}
@@ -306,8 +312,10 @@ function Switch({ on, onChange, label }: { on: boolean; onChange: () => void; la
 }
 
 /** One item: initial avatar, name + measurement summary, picker switch, ⋯ menu. */
-function ItemListRow({ item, unitGroups, stats, onHistory, menuOpen, onToggleMenu, onTogglePicker, onEdit, onDelete, deleting }: {
+function ItemListRow({ item, unitGroups, stats, onHistory, menuOpen, onToggleMenu, onTogglePicker, onEdit, onDelete, deleting, faded }: {
   item: CategoryItem;
+  /** Another item is being edited: step back so the edit card stands out. */
+  faded?: boolean;
   unitGroups: UnitGroup[];
   stats?: ItemStats;
   onHistory: () => void;
@@ -322,48 +330,13 @@ function ItemListRow({ item, unitGroups, stats, onHistory, menuOpen, onToggleMen
   const group = groupOf(item, unitGroups);
   const units = unitsFor(item, unitGroups).map((u) => u.name).join(', ');
   const def = defaultLabel(item, unitGroups);
-  const summary = [group ? `${group.name} · ${units}` : 'Not measured', def && `default ${def}`].filter(Boolean).join(' · ');
-  const isCartoon = useThemeStore((st) => st.theme === 'cartoon');
-
-  if (isCartoon) {
-    const kind = itemKind(item.name);
-    return (
-      <div className={`cartoon-item ${shown ? '' : 'is-hidden'}`} style={{ opacity: deleting ? 0.4 : 1 }}>
-        <span className="cartoon-item-face">
-          {kind ? <CartoonIcon kind={kind} size={46} /> : <b>{item.name.charAt(0).toUpperCase()}</b>}
-        </span>
-        <button type="button" onClick={onEdit} className="min-w-0 flex-1 text-left">
-          <p className="cartoon-card-title" style={{ fontSize: 22 }}>{item.name}</p>
-          <div className="cartoon-chips" style={{ marginTop: 6, gap: 6 }}>
-            <span className="cartoon-badge"><CartoonIcon kind={group ? (group.name.toLowerCase().includes('vol') ? 'volume' : group.name.toLowerCase().includes('count') ? 'count' : 'weight') : 'note'} size={16} /> {group ? group.name : 'Not measured'}</span>
-            {group && units.split(', ').map((u) => <span key={u} className="cartoon-badge">{u}</span>)}
-            {def && <span className="cartoon-badge is-sun">Usual {def}</span>}
-          </div>
-          {stats && (
-            <p className="cartoon-sub" style={{ fontSize: 12, marginTop: 6 }}>
-              Last bought {shortDate(stats.lastDate)} · {formatCurrency(stats.lastAmount)}
-              {stats.avgIntervalDays !== null && ` · lasts ~${stats.avgIntervalDays} days`}
-              {stats.count > 1 && ` · ${stats.count}×`}
-            </p>
-          )}
-        </button>
-        <Switch on={shown} onChange={() => onTogglePicker(!shown)} label={`Show ${item.name} in the add-transaction picker`} />
-        <div className="relative">
-          <button type="button" onClick={(e) => { e.stopPropagation(); onToggleMenu(); }} aria-label={`${item.name} options`} className="cartoon-dots">···</button>
-          {menuOpen && (
-            <div onClick={(e) => e.stopPropagation()} className="cartoon-menu">
-              <button type="button" onClick={onEdit}>Edit</button>
-              <button type="button" onClick={onHistory}>History</button>
-              <button type="button" className="is-danger" onClick={onDelete} disabled={deleting}>Delete</button>
-            </div>
-          )}
-        </div>
-      </div>
-    );
-  }
+  const accounts = useAccountStore((st) => st.accounts);
+  const summary = item.recurring
+    ? recurringLine(item.recurring, accounts)
+    : [group ? `${group.name} · ${units}` : 'Not measured', def && `default ${def}`].filter(Boolean).join(' · ');
 
   return (
-    <div className="cred-divider flex items-center gap-3 py-3" style={{ opacity: deleting ? 0.4 : 1 }}>
+    <div className="cred-divider flex items-center gap-3 py-3" style={{ opacity: deleting ? 0.4 : faded ? 0.5 : 1 }}>
       <span
         className="flex items-center justify-center rounded-full flex-shrink-0 text-sm font-semibold"
         style={{ width: 40, height: 40, background: 'var(--c-surface2)', color: shown ? 'var(--c-text)' : 'var(--c-muted)', border: '1px solid var(--c-border)' }}

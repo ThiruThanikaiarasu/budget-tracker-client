@@ -30,6 +30,13 @@ import useSessionState from '../hooks/useSessionState';
 import { renderCategoryIcon } from '../utils/categoryIcons';
 import { renderAccountIcon } from '../utils/accountIcons';
 import CartoonRecords from './CartoonRecords';
+import TagChip from '../components/TagChip';
+import TagSection from '../components/TagSection';
+import { titleOf } from '../utils/recordLook';
+import AutopayRunner from '../components/AutopayRunner';
+import RecurringBadge from '../components/RecurringBadge';
+import useRecurringInfo from '../hooks/useRecurringInfo';
+import { FundTransferPanel } from '../components/FriendTransfers';
 import CartoonIcon from '../components/CartoonIcon';
 import { itemKind, categoryKind } from '../utils/cartoonKinds';
 import CartoonDayView from '../components/CartoonDayView';
@@ -489,51 +496,27 @@ function SelectOptions({ children }: { children: ReactNode }) {
   );
 }
 
-// ── Account select (with type icon, same dropdown panel as category) ───
+// ── Account select (with type icon and balance; search box focused on open) ───
 function AccountSelect({
   accounts, value, onChange,
 }: {
-  accounts: { _id: string; name: string; type: Account['type']; color?: string }[];
+  accounts: { _id: string; name: string; type: Account['type']; color?: string; balance?: number }[];
   value: string;
   onChange: (id: string) => void;
 }) {
-  const selected = accounts.find(a => a._id === value);
   return (
-    <Listbox value={value} onChange={onChange}>
-      <div className="relative">
-        <ListboxButton
-          className="t-select w-full"
-          style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.5rem' }}
-        >
-          {selected ? (
-            <span className="flex items-center gap-2 truncate">
-              <span className="transaction-select-icon">{renderAccountIcon(selected.type, selected.color, 22)}</span>
-              <span className="truncate">{selected.name}</span>
-            </span>
-          ) : (
-            <span style={{ color: 'var(--c-muted)' }}>Select</span>
-          )}
-          <svg viewBox="0 0 24 24" className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" strokeWidth="2">
-            <polyline points="6 9 12 15 18 9" />
-          </svg>
-        </ListboxButton>
-        <SelectOptions>
-          {accounts.map(a => (
-            <ListboxOption key={a._id} value={a._id}>
-              {({ focus, selected }) => (
-                <div
-                  className={`cartoon-select-opt ${focus ? 'is-active' : ''} ${selected ? 'is-on' : ''} flex items-center gap-2 px-3 py-2 rounded-lg text-sm cursor-pointer`}
-                  style={{ background: focus ? 'var(--c-surface)' : 'transparent', color: 'var(--c-text)', fontWeight: selected ? 600 : 400 }}
-                >
-                  <span className="transaction-select-icon">{renderAccountIcon(a.type, a.color, 22)}</span>
-                  <span className="truncate">{a.name}</span>
-                </div>
-              )}
-            </ListboxOption>
-          ))}
-        </SelectOptions>
-      </div>
-    </Listbox>
+    <ThemedSelect
+      value={value}
+      onChange={onChange}
+      alwaysSearch
+      ariaLabel="Account"
+      options={accounts.map((a) => ({
+        value: a._id,
+        label: a.name,
+        icon: <span className="transaction-select-icon">{renderAccountIcon(a.type, a.color, 22)}</span>,
+        hint: a.balance != null ? formatCurrency(a.balance) : undefined,
+      }))}
+    />
   );
 }
 
@@ -697,6 +680,8 @@ function Transactions() {
     [dateFrom, dateTo, typeFilter, categoryFilter, accountFilter, debouncedSearch]
   );
 
+  const recurringInfo = useRecurringInfo();
+
   const load = useCallback(
     () => {
       fetchTransactions({ ...summaryFilters, page: 1 });
@@ -810,6 +795,7 @@ function Transactions() {
   return (
     <div className="transactions-page lg:flex lg:items-start" style={{ background: 'var(--c-bg)', minHeight: '100vh' }}>
       <div className="lg:flex-1 lg:min-w-0">
+      <AutopayRunner onChanged={load} />
       {isCartoon ? (
         <CartoonRecords
           viewYear={viewYear} viewMonth={viewMonth} onPrev={prevMonth} onNext={nextMonth}
@@ -1036,7 +1022,9 @@ function Transactions() {
                   {/* Name + account */}
                   <div className="flex-1 min-w-0">
                     <p className="transaction-name text-sm font-medium truncate" style={{ color: 'var(--c-text)' }}>
-                      {tx.isAdjustment ? 'Clean up' : tx.type === 'transfer' ? 'Transfer' : tx.categoryId?.name || 'Unknown'}
+                      {titleOf(tx)}
+                      {(() => { const rec = recurringInfo(tx); return rec ? <RecurringBadge autopay={rec.autopay} /> : null; })()}
+                      {tx.transferFriend && <span style={{ color: 'var(--c-muted)' }}> {tx.transferFriend.direction === 'sent' ? '→' : '←'} {tx.transferFriend.name}</span>}
                       {(() => {
                         const others = [...new Set((tx.items ?? []).map(i => i.categoryId).filter((id): id is string => !!id && id !== tx.categoryId?._id))]
                           .map(id => categories.find(c => c._id === id)?.name).filter(Boolean);
@@ -1155,6 +1143,7 @@ function Transactions() {
               panel
               open
               onClose={() => setEditingTx(null)}
+              onFundTransferDone={load}
               onSubmit={async (data) => {
                 await updateTransaction(editingTx._id, data);
                 fetchTransactionsSummary(summaryFilters);
@@ -1189,6 +1178,7 @@ function Transactions() {
               key={`new-${createKey}`}
               panel
               open
+              onFundTransferDone={load}
               onClose={() => { setCreateKey(k => k + 1); handleCloseCreate(); }}
               onSubmit={async (data) => {
                 await createTransaction(data);
@@ -1253,6 +1243,7 @@ function Transactions() {
       <TransactionModal
         open={showCreate}
         onClose={handleCloseCreate}
+        onFundTransferDone={load}
         onSubmit={async (data) => {
           await createTransaction(data);
           fetchTransactionsSummary(summaryFilters);
@@ -1268,6 +1259,7 @@ function Transactions() {
         <TransactionModal
           open
           onClose={() => setEditingTx(null)}
+          onFundTransferDone={load}
           onSubmit={async (data) => {
             await updateTransaction(editingTx._id, data);
             fetchTransactionsSummary(summaryFilters);
@@ -1400,6 +1392,16 @@ function TransactionDetail({ tx, isCredWhite, categories, onClose, onDelete, onE
           </span>
         </div>
       )}
+      <div className="flex items-center justify-between">
+        <span className="text-sm" style={{ color: 'var(--c-muted)' }}>Tag</span>
+        <TagChip
+          key={tx._id}
+          id={tx._id}
+          tag={tx.tagId}
+          date={tx.date}
+          className="transaction-detail-chip rounded-lg px-3 py-1.5 text-sm font-medium"
+        />
+      </div>
       {tx.categoryId && (
         <div className="flex items-center justify-between">
           <span className="text-sm" style={{ color: 'var(--c-muted)' }}>Category</span>
@@ -1852,6 +1854,7 @@ function CartoonReceipt({ tx, categories, onClose, onDelete, onEdit }: {
   onDelete: () => void;
   onEdit: () => void;
 }) {
+  const recInfo = useRecurringInfo()(tx);
   const navigate = useNavigate();
   // Long bills fold: categories open one at a time, five lines to start with.
   const [openGroups, setOpenGroups] = useState<string[] | null>(null);
@@ -1964,7 +1967,8 @@ function CartoonReceipt({ tx, categories, onClose, onDelete, onEdit }: {
   };
 
   const isShare = tx.personalShare != null && tx.personalShare !== tx.amount;
-  const heading = tx.type === 'income' ? 'MONEY IN' : tx.type === 'transfer' ? 'TRANSFER' : 'ONE PAYMENT';
+  const heading = tx.transferFriend ? titleOf(tx).toUpperCase()
+    : tx.type === 'income' ? 'MONEY IN' : tx.type === 'transfer' ? 'TRANSFER' : 'ONE PAYMENT';
   const who = tx.paidByFriendId ? `Paid by ${tx.paidByFriendId.name}` : tx.receivedFromFriendId ? `From ${tx.receivedFromFriendId.name}` : null;
   const youPaid = !!split && payerKey === USER_KEY;
 
@@ -2030,9 +2034,11 @@ function CartoonReceipt({ tx, categories, onClose, onDelete, onEdit }: {
           )}
           <span className="rcpt-chip"><CartoonIcon kind="calendar" size={18} />{fmtDateTime(tx.date)}</span>
           {tx.merchant && <span className="rcpt-chip"><CartoonIcon kind="shopping" size={18} />{tx.merchant}</span>}
+          {recInfo && <span className="rcpt-chip"><RecurringBadge autopay={recInfo.autopay} />Recurring{recInfo.autopay ? ' · Autopay' : ''}</span>}
           {youPaid && <span className="rcpt-chip is-you"><FaceAvatar name="You" size={20} />You paid</span>}
           {who && <span className="rcpt-chip"><CartoonIcon kind="face2" size={18} />{who}</span>}
         </div>
+        <TagSection key={tx._id} tx={tx} />
         <div className="rcpt-rule" />
 
         {long && (
@@ -3066,7 +3072,7 @@ function ItemsSection({
 }
 
 function TransactionModal({
-  open, onClose, onSubmit, categories, accounts, friends, transaction, initialType, panel, initialDate,
+  open, onClose, onSubmit, categories, accounts, friends, transaction, initialType, panel, initialDate, onFundTransferDone,
 }: {
   open: boolean;
   /** Render inline as the desktop side panel instead of a popup. */
@@ -3080,8 +3086,15 @@ function TransactionModal({
   initialType?: 'income' | 'expense';
   /** Date to start a new transaction on (YYYY-MM-DD); today when absent. */
   initialDate?: string;
+  /** A fund transfer with a friend was saved: refresh the list. */
+  onFundTransferDone?: () => void;
 }) {
   const isEdit = !!transaction;
+  // The "Fund transfer" tab: money to/from a friend, saved through its own panel instead of this form.
+  // Passed on / Sent home records belong to the Transfer tab, so editing one opens there.
+  const [fundMode, setFundMode] = useState(() =>
+    ['passed on', 'sent home'].includes(transaction?.categoryId?.name.trim().toLowerCase() ?? '')
+  );
   const [amountStr, setAmountStr] = useState('0');
 
   // Any field that opens the system keyboard (Notes, category search, a
@@ -3094,7 +3107,28 @@ function TransactionModal({
   // Only touch devices pop up an on-screen keyboard; on desktop the Numpad
   // stays visible while typing elsewhere.
   const [isTouch] = useState(() => window.matchMedia?.('(pointer: coarse), (max-width: 767px)').matches ?? false);
-  const keyboardOpen = isTouch && (notesFocused || categorySearchFocused || splitFieldFocused || itemFieldFocused);
+  // Safety net for fields not wired above (merchant, date, quantity, price…): on touch devices,
+  // focus in ANY field that opens the keyboard counts as the keyboard being open.
+  const [typing, setTyping] = useState(false);
+  useEffect(() => {
+    if (!isTouch) return;
+    const opensKeyboard = (el: EventTarget | null) => {
+      if (!(el instanceof HTMLElement)) return false;
+      if (el.isContentEditable) return true;
+      if (el.tagName === 'TEXTAREA') return true;
+      if (el.tagName !== 'INPUT') return false;
+      const input = el as HTMLInputElement;
+      return !input.readOnly && input.inputMode !== 'none'
+        && !['checkbox', 'radio', 'button', 'submit', 'range', 'file', 'color'].includes(input.type);
+    };
+    const onIn = (e: FocusEvent) => { if (opensKeyboard(e.target)) setTyping(true); };
+    // Moving straight to another text field keeps the keyboard up; anything else closes it.
+    const onOut = (e: FocusEvent) => { if (!opensKeyboard(e.relatedTarget)) setTyping(false); };
+    document.addEventListener('focusin', onIn);
+    document.addEventListener('focusout', onOut);
+    return () => { document.removeEventListener('focusin', onIn); document.removeEventListener('focusout', onOut); };
+  }, [isTouch]);
+  const keyboardOpen = isTouch && (typing || notesFocused || categorySearchFocused || splitFieldFocused || itemFieldFocused);
 
   // Itemised bill (sub-category items + fees/discounts). When there are item
   // rows, the total comes from them instead of the numpad.
@@ -3378,6 +3412,8 @@ function TransactionModal({
   const handleFormSubmit = async (data: TransactionFormData) => {
     try {
       const payload: any = { type: data.type, amount: data.amount, categoryId: data.categoryId, date: data.date, note: data.note, merchant: merchant.trim() || undefined };
+      // Saved as a plain income/expense: it's no longer a Passed on, so drop that link.
+      if (isEdit) { payload.passedToFriendId = ''; payload.passedFrom = ''; }
       if (friendPaid) payload.paidByFriendId = whoPaid;
       else payload.accountId = data.accountId;
       if (showReceivedFromFlow && receivedFrom) payload.receivedFromFriendId = receivedFrom;
@@ -3755,7 +3791,8 @@ function TransactionModal({
   };
 
   // "Where from?" suggestions: the user's own merchants from the database, best
-  // match first — same kind (income/expense), same category, same account type.
+  // match first — same kind (income/expense), then same category. Not the account:
+  // the same shop gets paid from different accounts.
   useEffect(() => {
     if (!open) return;
     let cancelled = false;
@@ -3765,7 +3802,6 @@ function TransactionModal({
           params: {
             type: selectedType,
             categoryId: selectedCategoryId || undefined,
-            accountId: friendPaid ? undefined : selectedAccountId || undefined,
             q: merchant.trim() || undefined,
           },
         });
@@ -3775,13 +3811,11 @@ function TransactionModal({
       }
     }, 200);
     return () => { cancelled = true; clearTimeout(timer); };
-  }, [open, selectedType, selectedCategoryId, selectedAccountId, friendPaid, merchant]);
+  }, [open, selectedType, selectedCategoryId, merchant]);
 
   const canSave = !isSubmitting && splitValid && itemsValid && linesValid;
 
-  const content = (
-        <>
-          {/* Top bar */}
+  const topBar = (
           <div className="tx-topbar flex items-center justify-between px-4 py-3 flex-shrink-0" style={{ borderBottom: '1px solid var(--c-border)' }}>
             <button type="button" onClick={discardDraft} aria-label={panel ? 'Clear form' : 'Go back'} title={panel ? (isEdit ? 'Cancel editing (Esc)' : 'Clear form (Esc)') : 'Go back'} className="transaction-form-icon-action flex items-center justify-center rounded-full">
               <svg viewBox="0 0 24 24" className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -3794,23 +3828,35 @@ function TransactionModal({
               {(['income', 'expense'] as const).map(t => (
                 <button
                   key={t}
-                  onClick={() => { setValue('type', t); setValue('categoryId', ''); setItemRows([]); setChargeRows([]); setExtraLines([]); }}
-                  className={`tx-type-tab is-${t} ${selectedType === t ? 'is-on' : ''} px-3 py-1 rounded-full transition-colors`}
+                  onClick={() => { setFundMode(false); setValue('type', t); setValue('categoryId', ''); setItemRows([]); setChargeRows([]); setExtraLines([]); }}
+                  className={`tx-type-tab is-${t} ${selectedType === t && !fundMode ? 'is-on' : ''} px-3 py-1 rounded-full transition-colors`}
                   style={{
-                    background: selectedType === t ? 'var(--c-accent)' : 'transparent',
-                    color: selectedType === t ? 'var(--c-accent-fg)' : 'var(--c-muted)',
+                    background: selectedType === t && !fundMode ? 'var(--c-accent)' : 'transparent',
+                    color: selectedType === t && !fundMode ? 'var(--c-accent-fg)' : 'var(--c-muted)',
                   }}
                 >
                   {t === 'income' ? 'INCOME' : 'EXPENSE'}
                 </button>
               ))}
+              <button
+                type="button"
+                onClick={() => setFundMode(true)}
+                title="Fund transfer with a friend"
+                className={`tx-type-tab is-fund ${fundMode ? 'is-on' : ''} px-3 py-1 rounded-full transition-colors`}
+                style={{
+                  background: fundMode ? 'var(--c-accent)' : 'transparent',
+                  color: fundMode ? 'var(--c-accent-fg)' : 'var(--c-muted)',
+                }}
+              >
+                TRANSFER
+              </button>
             </div>
             {panel ? (
               <span className="tx-mode-sticker text-xs font-semibold w-9 text-right" style={{ color: 'var(--c-muted)' }}>{isEdit ? 'Edit' : 'New'}</span>
             ) : (
             <button
               onClick={save}
-              disabled={!canSave}
+              disabled={!canSave || fundMode}
               aria-label="Save transaction"
               title="Save transaction"
               className="transaction-form-icon-action flex items-center justify-center rounded-full disabled:opacity-40"
@@ -3821,6 +3867,11 @@ function TransactionModal({
             </button>
             )}
           </div>
+  );
+
+  const formContent = (
+        <>
+          {topBar}
 
           {/* Scrollable form body */}
           {/* scrollbar-gutter keeps the scrollbar's space reserved, so opening a
@@ -4241,13 +4292,37 @@ function TransactionModal({
         </>
   );
 
+  const content = fundMode ? (
+    <>
+      {topBar}
+      <FundTransferPanel
+        friends={friends}
+        initialDate={initialDate}
+        onDone={() => { onFundTransferDone?.(); onClose(); }}
+        editing={transaction}
+        showShortcut={panel}
+        onPlainExpense={async (name, { amount, accountId, date, note, passedToFriendId, passedFrom }) => {
+          // A plain expense in its own category (Sent home, Passed on), created the first time it's used.
+          let cat = categories.find((c) => c.type === 'expense' && c.name.trim().toLowerCase() === name.toLowerCase());
+          if (!cat) {
+            const { data } = await api.post('/categories', { name, type: 'expense' });
+            cat = data.category;
+            useCategoryStore.getState().fetchCategories();
+          }
+          await onSubmit({ type: 'expense', amount, categoryId: cat!._id, accountId, date, note, passedToFriendId, passedFrom });
+        }}
+        renderAmount={(v, c) => panel ? <AmountField value={v} onChange={c} /> : <Numpad value={v} onChange={c} collapsed={false} locked={false} />}
+      />
+    </>
+  ) : formContent;
+
   if (panel) {
     return (
       <div
         className="tx-form flex flex-col h-full min-h-0"
         style={{ background: 'var(--c-bg)' }}
         onKeyDown={(e) => {
-          if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) { e.preventDefault(); if (canSave) save(); }
+          if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) { e.preventDefault(); if (canSave && !fundMode) save(); }
         }}
       >
         {content}

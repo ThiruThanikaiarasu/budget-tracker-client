@@ -31,6 +31,21 @@ export interface TransactionCharge {
   bill?: boolean;
 }
 
+/** A tag group: one name in one calendar month ("YYYY-MM"). */
+export interface TagRef {
+  _id: string;
+  name: string;
+  month: string;
+}
+
+export interface TagChoice {
+  /** Join this existing group. */
+  tagId?: string;
+  /** Or find/create the group with this name (in `month`, default the entry's month). */
+  name?: string;
+  month?: string;
+}
+
 export interface Transaction {
   _id: string;
   userId: string;
@@ -40,7 +55,8 @@ export interface Transaction {
   personalShare?: number;
   categoryId?: { _id: string; name: string; icon: string };
   accountId?: { _id: string; name: string };
-  toAccountId?: { _id: string; name: string };
+  /** `type` tells a credit-card bill payment (to a credit_card account) from other transfers. */
+  toAccountId?: { _id: string; name: string; type?: string };
   /** Populated when a friend paid on behalf of the user. */
   paidByFriendId?: { _id: string; name: string };
   /** Populated when a friend sent this income directly (no tracked debt). */
@@ -52,6 +68,15 @@ export interface Transaction {
   charges?: TransactionCharge[];
   /** Where it was bought: Swiggy, Amazon, a hotel's name… */
   merchant?: string;
+  /** Set on entries a recurring schedule added: "item:<id>" or "category:<id>". */
+  recurringKey?: string;
+  /** "Passed on": the friend it was forwarded to, and who it came from (free text). */
+  passedToFriendId?: { _id: string; name: string };
+  passedFrom?: string;
+  /** Set on a fund transfer with a friend: who it went to (sent) or came from (received). */
+  transferFriend?: { _id: string; name: string; direction: 'sent' | 'received'; repayment?: boolean } | null;
+  /** Tag group this entry belongs to (e.g. Rent · 2026-11); see the Tags page. */
+  tagId?: TagRef;
   note?: string;
   date: string;
   createdAt: string;
@@ -115,6 +140,8 @@ interface TransactionState {
   createTransaction: (data: CreateTransactionData) => Promise<void>;
   updateTransaction: (id: string, data: CreateTransactionData) => Promise<void>;
   deleteTransaction: (id: string) => Promise<void>;
+  /** Put a transaction in a tag group, or clear it (no choice). Returns the group. */
+  setTag: (id: string, choice: TagChoice) => Promise<TagRef | null>;
   cleanupAccounts: (balances: { accountId: string; newBalance: number }[]) => Promise<number>;
 }
 
@@ -209,6 +236,21 @@ const useTransactionStore = create<TransactionState>((set) => ({
       useFriendStore.getState().fetchFriends();
     } catch (error: any) {
       toast.error(error.response?.data?.message || 'Failed to update transaction');
+      throw error;
+    }
+  },
+
+  setTag: async (id, choice) => {
+    try {
+      const { data } = await api.patch(`/transactions/${id}/tag`, choice);
+      set((state) => ({
+        transactions: state.transactions.map((t) =>
+          t._id === id ? { ...t, tagId: data.tag ?? undefined } : t
+        ),
+      }));
+      return (data.tag as TagRef | null) ?? null;
+    } catch (error: any) {
+      toast.error(error.response?.data?.message || 'Failed to save tag');
       throw error;
     }
   },

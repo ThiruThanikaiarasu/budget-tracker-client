@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import toast from 'react-hot-toast';
 import api from '../api/axios';
+import type { RecurringConfig, RecurringInput } from '../utils/recurring';
 
 /** A sub-category under a Category, e.g. "Tomato" under Groceries. */
 export interface CategoryItem {
@@ -19,6 +20,8 @@ export interface CategoryItem {
   unit?: string;
   /** Listed in the transaction form's item picker; absent on older items = true. */
   showInPicker?: boolean;
+  /** Set when the item repeats (e.g. Apple Music). */
+  recurring?: RecurringConfig;
 }
 
 /** Purchase summary for an item, from transactions that list it. */
@@ -72,6 +75,8 @@ export interface CategoryItemFormData {
   defaultUnitId?: string;
   defaultQuantity?: number;
   presetOverrides?: { unitId: string; values: number[] }[];
+  /** `null` clears the schedule, absent leaves it. */
+  recurring?: RecurringInput | null;
 }
 
 interface CategoryItemState {

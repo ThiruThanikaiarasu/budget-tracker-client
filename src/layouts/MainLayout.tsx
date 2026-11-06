@@ -127,6 +127,7 @@ const SIDEBAR_NAV = [
   { to: '/categories', label: 'Categories', icon: Icons.categories, kind: 'tag' },
   { to: '/items', label: 'Items', icon: Icons.items, kind: 'items' },
   { to: '/friends', label: 'Friends', icon: Icons.friends, kind: 'friends' },
+  { to: '/tags', label: 'Tags', icon: Icons.categories, kind: 'tag' },
   { to: '/investment', label: 'Investment', icon: Icons.investments, kind: 'investment' },
   { to: '/personalization', label: 'Settings', icon: Icons.settings, kind: 'settings' },
 ];

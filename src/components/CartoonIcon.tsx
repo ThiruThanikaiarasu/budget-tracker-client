@@ -7,8 +7,15 @@ const ICONS: Record<string, string> = Object.fromEntries(
   Object.entries(ICON_URLS).map(([path, url]) => [path.split('/').pop()!.replace('.svg', ''), url]),
 );
 
+// New icons named before their files land: until then, show what they used to.
+const STAND_IN: Record<string, string> = {
+  lent: 'coins', borrowed: 'coins', 'paid-back': 'coins', 'got-back': 'coins',
+  'apple-music': 'subscription', netflix: 'subscription', other: 'tag',
+};
+const url = (kind: string) => ICONS[kind] ?? ICONS[STAND_IN[kind]] ?? ICONS.tag;
+
 /** The image URL of a drawn icon (for effects that need their own copy of it). */
-export const iconUrl = (kind: string) => ICONS[kind] ?? ICONS.tag;
+export const iconUrl = (kind: string) => url(kind);
 
 /** One drawn icon from the cartoon kit. Unknown kinds fall back to the tag. */
 export default function CartoonIcon({ kind, size = 28, className, style, label }: {
@@ -20,7 +27,7 @@ export default function CartoonIcon({ kind, size = 28, className, style, label }
 }) {
   return (
     <img
-      src={ICONS[kind] ?? ICONS.tag}
+      src={url(kind)}
       width={size}
       height={size}
       alt={label ?? ''}

@@ -12,6 +12,9 @@ export interface SharedExpense {
   transactionId?: {
     _id: string;
     categoryId?: { _id: string; name: string; icon: string } | null;
+    /** The bill's lines (name/qty/unit are snapshots taken when it was saved). */
+    items?: { name: string; quantity?: number; unit?: string; amount: number }[];
+    charges?: { label: string; amount: number }[];
   } | string;
   description: string;
   totalAmount: number;
@@ -21,7 +24,22 @@ export interface SharedExpense {
   isSettlement: boolean;
   coveredExpenseIds?: string[];
   settlementMethod?: 'received' | 'paid' | 'waived';
+  /** A direct "Send money" / "Got money" entry with a friend (always a settlement). */
+  isTransfer?: boolean;
+  /** On a transfer: the earlier opposite-direction transfer this one repays. */
+  repaysTransferId?: string;
   createdAt: string;
+}
+
+export interface TransferPayload {
+  friendId: string;
+  /** sent = you gave them money, received = they gave you money. */
+  direction: 'sent' | 'received';
+  amount: number;
+  accountId: string;
+  date?: string;
+  note?: string;
+  repaysTransferId?: string;
 }
 
 export interface SettlePayload {
@@ -49,6 +67,7 @@ interface SplitState {
   fetchExpenses: (friendId?: string) => Promise<void>;
   createExpense: (data: CreateExpenseData) => Promise<void>;
   settleUp: (payload: SettlePayload) => Promise<void>;
+  createTransfer: (payload: TransferPayload) => Promise<{ transactionId?: string } | null>;
   deleteExpense: (id: string) => Promise<void>;
 }
 
@@ -84,6 +103,17 @@ const useSplitStore = create<SplitState>((set) => ({
       toast.success('Settlement recorded');
     } catch (error: any) {
       toast.error(error.response?.data?.message || 'Settlement failed');
+      throw error;
+    }
+  },
+
+  createTransfer: async (payload) => {
+    try {
+      const { data } = await api.post('/splits/transfer', payload);
+      toast.success(payload.direction === 'sent' ? 'Money sent recorded' : 'Money received recorded');
+      return data.transfer ?? null;
+    } catch (error: any) {
+      toast.error(error.response?.data?.message || 'Failed to record transfer');
       throw error;
     }
   },

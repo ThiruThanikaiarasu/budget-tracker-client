@@ -20,7 +20,7 @@ const SEARCH_FROM = 5;
  * Same look as the account and category pickers in the transaction form.
  */
 export default function ThemedSelect({
-  value, onChange, options, placeholder = 'Select', disabled, className = '', ariaLabel, triggerClassName = 't-select w-full',
+  value, onChange, options, placeholder = 'Select', disabled, className = '', ariaLabel, triggerClassName = 't-select w-full', alwaysSearch,
 }: {
   value: string;
   onChange: (value: string) => void;
@@ -31,6 +31,8 @@ export default function ThemedSelect({
   ariaLabel?: string;
   /** Classes for the button (default: the form-field look; pass a chip class for chips). */
   triggerClassName?: string;
+  /** Show the search box even for a short list. */
+  alwaysSearch?: boolean;
 }) {
   const selected = options.find((o) => o.value === value);
   return (
@@ -60,7 +62,7 @@ export default function ThemedSelect({
             className="cartoon-select-panel themed-select-panel z-[70] mt-2 w-max min-w-[var(--button-width)] max-w-[20rem] rounded-xl shadow-lg outline-none focus:outline-none"
             style={{ background: 'var(--c-surface2)', border: '1px solid var(--c-border)', '--anchor-max-height': '22rem' } as CSSProperties}
           >
-            <Options options={options} value={value} onPick={(v) => { onChange(v); close(); }} />
+            <Options options={options} value={value} alwaysSearch={alwaysSearch} onPick={(v) => { onChange(v); close(); }} />
           </PopoverPanel>
         </>
       )}
@@ -69,14 +71,14 @@ export default function ThemedSelect({
 }
 
 /** The open list: a search box (long lists) and the options, arrow keys + Enter. */
-function Options({ options, value, onPick }: { options: SelectItem[]; value: string; onPick: (v: string) => void }) {
+function Options({ options, value, onPick, alwaysSearch }: { options: SelectItem[]; value: string; onPick: (v: string) => void; alwaysSearch?: boolean }) {
   const [query, setQuery] = useState('');
   const term = normalizeName(query);
   const shown = term ? options.filter((o) => normalizeName(o.label).includes(term)) : options;
   const [active, setActive] = useState(() => Math.max(0, options.findIndex((o) => o.value === value)));
   const current = Math.min(active, shown.length - 1);
   const listRef = useRef<HTMLDivElement>(null);
-  const searchable = options.length > SEARCH_FROM;
+  const searchable = alwaysSearch || options.length > SEARCH_FROM;
 
   useEffect(() => {
     listRef.current?.querySelector('[data-active="true"]')?.scrollIntoView({ block: 'nearest' });

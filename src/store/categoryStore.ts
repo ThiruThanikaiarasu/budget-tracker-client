@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import toast from 'react-hot-toast';
 import api from '../api/axios';
+import type { RecurringConfig, RecurringInput } from '../utils/recurring';
 
 export interface Category {
   _id: string;
@@ -8,12 +9,16 @@ export interface Category {
   type: 'income' | 'expense';
   icon: string;
   userId?: string;
+  /** Set when the whole category repeats (e.g. Rent). */
+  recurring?: RecurringConfig;
 }
 
 interface CategoryFormData {
   name: string;
   type: 'income' | 'expense';
   icon?: string;
+  /** `null` clears the schedule, absent leaves it. */
+  recurring?: RecurringInput | null;
 }
 
 interface CategoryState {

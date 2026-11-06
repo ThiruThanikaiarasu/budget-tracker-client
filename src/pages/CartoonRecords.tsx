@@ -1,9 +1,17 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
-import type { RefObject } from 'react';
+import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
+import type { ReactNode, RefObject } from 'react';
 import type { Transaction } from '../store/transactionStore';
 import type { Category } from '../store/categoryStore';
 import type { Account } from '../store/accountStore';
 import Amount from '../components/Amount';
+import { useNavigate } from 'react-router-dom';
+import api from '../api/axios';
+import { monthShort } from '../utils/tagMonth';
+import { tagVars } from '../utils/tagColor';
+import TagRibbon from '../components/TagRibbon';
+import { kindOf, titleOf } from '../utils/recordLook';
+import RecurringBadge from '../components/RecurringBadge';
+import useRecurringInfo from '../hooks/useRecurringInfo';
 import CartoonIcon, { CartoonTile } from '../components/CartoonIcon';
 import ThemedSelect from '../components/ThemedSelect';
 import { accountKind, categoryKind, itemKind, kindTint } from '../utils/cartoonKinds';
@@ -70,6 +78,51 @@ export default function CartoonRecords({
   const coverPct = totalExpense > 0 ? Math.round((totalIncome / totalExpense) * 100) : 0;
   const earnedWidth = totalExpense + totalIncome > 0 ? (totalIncome / (totalExpense + totalIncome)) * 100 : 0;
 
+  const recurringInfo = useRecurringInfo();
+
+  // Entries that share a tag on the same day fold into one card (collapsed by default).
+  // The same tag on different days stays as separate rows with just the chip.
+  const [openGroups, setOpenGroups] = useState<Set<string>>(new Set());
+  const toggleGroup = (key: string) =>
+    setOpenGroups((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  const navigate = useNavigate();
+
+  // How many entries each tag group has all month (for "same 4 entries all month").
+  const [monthCounts, setMonthCounts] = useState<Map<string, number>>(new Map());
+  useEffect(() => {
+    api.get('/transactions/tags')
+      .then(({ data }) => setMonthCounts(new Map((data.tags ?? []).map((t: { _id: string; count: number }) => [t._id, t.count]))))
+      .catch(() => { /* the footer just omits the count */ });
+  }, [transactions]);
+
+  // For a lone tagged entry: the other days its group shows up on (loaded rows only).
+  const tagDays = useMemo(() => {
+    const days = new Map<string, Map<string, number>>();
+    for (const key of sortedDates) {
+      for (const t of grouped[key] ?? []) {
+        if (!t.tagId) continue;
+        const m = days.get(t.tagId._id) ?? new Map<string, number>();
+        m.set(key, (m.get(key) ?? 0) + 1);
+        days.set(t.tagId._id, m);
+      }
+    }
+    return days;
+  }, [sortedDates, grouped]);
+
+  const groupOf = (tx: Transaction, dateKey: string, rows: Transaction[]) => {
+    const tagId = tx.tagId?._id;
+    if (!tagId) return null;
+    const members = rows.filter((r) => r.tagId?._id === tagId);
+    if (members.length < 2) return null;
+    const key = `${dateKey}:${tagId}`;
+    return { key, members, open: openGroups.has(key), first: members[0]._id === tx._id };
+  };
+
   // Quick chips: the categories used most in what's loaded, plus the active filter.
   const chipCategories = useMemo(() => {
     const count = new Map<string, number>();
@@ -80,10 +133,10 @@ export default function CartoonRecords({
   }, [transactions, categories, categoryFilter]);
 
   const tiles = [
-    { key: 'spent', label: 'Spent', kind: 'shopping', node: <Amount value={totalExpense} /> },
-    { key: 'earned', label: 'Earned', kind: 'salary', node: <Amount value={totalIncome} /> },
-    { key: 'net', label: 'Net', kind: 'budgets', node: <Amount value={Math.abs(net)} prefix={net < 0 ? '−' : net > 0 ? '+' : ''} /> },
-    { key: 'records', label: 'Records', kind: 'records', node: <>{recordCount}</> },
+    { key: 'spent', label: 'Spent', kind: 'shopping', node: <Amount value={totalExpense} />, long: totalExpense >= 10000 },
+    { key: 'earned', label: 'Earned', kind: 'salary', node: <Amount value={totalIncome} />, long: totalIncome >= 10000 },
+    { key: 'net', label: 'Net', kind: 'budgets', node: <Amount value={Math.abs(net)} prefix={net < 0 ? '−' : net > 0 ? '+' : ''} />, long: Math.abs(net) >= 10000 },
+    { key: 'records', label: 'Records', kind: 'records', node: <>{recordCount}</>, long: false },
   ];
 
   // Records that just appeared (a save) get a flash and a little slide-in; the first load doesn't.
@@ -263,7 +316,7 @@ export default function CartoonRecords({
               <p className="cartoon-label">{t.label}</p>
               <CartoonIcon kind={t.kind} size={30} />
             </div>
-            <p className="cartoon-stat-value">{t.node}</p>
+            <p className={`cartoon-stat-value ${t.long ? 'is-long' : ''}`}>{t.node}</p>
           </div>
         ))}
       </div>
@@ -296,18 +349,34 @@ export default function CartoonRecords({
           <p>{debouncedSearch ? 'No matching records this month' : 'No records this month yet'}</p>
         </div>
       ) : sortedDates.map(dateKey => {
-        const rows = grouped[dateKey];
+        const rows = clusterByTag(grouped[dateKey]);
         return (
           <section key={dateKey} className="cartoon-day" data-date={dateKey}>
             <div className="cartoon-day-head">{renderDayRow(dateKey)}</div>
 
             {rows.map(tx => {
+              const grp = groupOf(tx, dateKey, rows);
+              if (grp) {
+                if (!grp.first) return null;
+                return (
+                  <TagStack
+                    key={grp.key}
+                    members={grp.members}
+                    open={grp.open}
+                    onToggle={() => toggleGroup(grp.key)}
+                    onOpen={onOpen}
+                    monthCount={monthCounts.get(tx.tagId!._id)}
+                    onOpenTag={() => navigate(`/tags?tag=${tx.tagId!._id}`)}
+                    accountTypes={accountTypes}
+                  />
+                );
+              }
+              const rec = recurringInfo(tx);
               const isSplit = tx.personalShare != null && tx.personalShare !== tx.amount;
-              const kind = tx.isAdjustment ? 'cleanup'
-                : tx.type === 'transfer' ? 'bank'
-                : tx.categoryId ? categoryKind(tx.categoryId.icon, tx.categoryId.name) : 'coins';
-              const title = tx.isAdjustment ? 'Clean up' : tx.type === 'transfer' ? 'Transfer' : tx.categoryId?.name || 'Unknown';
-              const faces = (tx.items ?? []).map(i => itemKind(i.name)).filter((k): k is string => !!k).slice(0, 3);
+              const kind = kindOf(tx);
+              const title = titleOf(tx);
+              // Small item pictures beside the title, minus one the big tile already shows (Netflix).
+              const faces = (tx.items ?? []).map(i => itemKind(i.name)).filter((k): k is string => !!k && k !== kind).slice(0, 3);
               const groups = tx.type === 'transfer' || tx.isAdjustment ? [] : categoryGroups(tx, categories);
               const multiCat = groups.length > 1;
               const catKind = (g: { icon: string; name: string }) => categoryKind(g.icon, g.name);
@@ -315,6 +384,13 @@ export default function CartoonRecords({
               const tags = (
                 <>
                   {tx.merchant && <span className="cartoon-account"><CartoonIcon kind="shopping" size={16} />{tx.merchant}</span>}
+                  {tx.transferFriend && (
+                    <span className="cartoon-account">
+                      <CartoonIcon kind="face2" size={16} />
+                      {tx.transferFriend.direction === 'sent' ? '→' : '←'} {tx.transferFriend.name}
+                    </span>
+                  )}
+                  {tx.tagId && <TagRibbon tag={tx.tagId} />}
                   {tx.accountId ? (
                     <span className="cartoon-account">
                       <CartoonIcon kind={accountKind(accountTypes.get(tx.accountId._id))} size={16} />
@@ -326,6 +402,9 @@ export default function CartoonRecords({
                       {tx.paidByFriendId ? `Paid by ${tx.paidByFriendId.name}` : 'Debt'}
                     </span>
                   )}
+                  {tx.passedToFriendId && (
+                    <span className="cartoon-account"><CartoonIcon kind="face2" size={16} />→ {tx.passedToFriendId.name}</span>
+                  )}
                   {tx.type === 'income' && tx.receivedFromFriendId && (
                     <span className="cartoon-account"><CartoonIcon kind="face3" size={16} />From {tx.receivedFromFriendId.name}</span>
                   )}
@@ -336,13 +415,14 @@ export default function CartoonRecords({
                 : [];
               const reaction = tx.type === 'expense' && !tx.isAdjustment ? reactionFor(ownAmount(tx), usual) : null;
               const tone = tx.type === 'income' ? 'earn' : tx.type === 'expense' ? 'spend' : 'move';
-              return (
+              const row = (
                 <button
                   key={tx._id}
                   type="button"
                   onClick={() => onOpen(tx)}
-                  className={`cartoon-record ${multiCat ? '' : 'is-two-row'} ${tx._id === selectedId ? 'is-selected' : ''} ${freshIds.has(tx._id) ? 'is-fresh' : ''}`}
+                  className={`cartoon-record ${multiCat ? '' : 'is-two-row'} ${tx._id === selectedId ? 'is-selected' : ''} ${freshIds.has(tx._id) ? 'is-fresh' : ''} ${rec?.autopay ? 'has-ribbon' : ''}`}
                 >
+                  {rec?.autopay && <span className="autopay-ribbon" aria-label="Autopay">↻ AUTO PAY</span>}
                   {multiCat ? (
                     <span className="cartoon-tile cartoon-stack" style={{ width: 64, height: 64, background: '#fff' }} aria-hidden>
                       <span className="cartoon-stack-main"><CartoonIcon kind={catKind(groups[0])} size={34} /></span>
@@ -350,7 +430,10 @@ export default function CartoonRecords({
                       <span className="cartoon-stack-count">{groups.length}</span>
                     </span>
                   ) : (
-                    <CartoonTile kind={kind} size={64} />
+                    <span className="rec-wrap">
+                      <CartoonTile kind={kind} size={64} />
+                      {rec && !rec.autopay && <RecurringBadge autopay={false} overlay />}
+                    </span>
                   )}
                   <div className="cartoon-record-body">
                     <div className="cartoon-record-line">
@@ -415,6 +498,21 @@ export default function CartoonRecords({
                   </div>
                 </button>
               );
+              // A lone tagged entry: say where else its group turns up this month.
+              const elsewhere = tx.tagId
+                ? [...(tagDays.get(tx.tagId._id) ?? new Map<string, number>())].filter(([key]) => key !== dateKey)
+                : [];
+              if (elsewhere.length === 0) return row;
+              const more = elsewhere.reduce((sum, [, n]) => sum + n, 0);
+              const on = elsewhere.map(([key]) => new Date(`${key}T00:00:00`).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })).join(', ');
+              return (
+                <Fragment key={tx._id}>
+                  {row}
+                  <span className="tag-more-pill" style={tagVars(tx.tagId!.name)}>
+                    +{more} more in # {tx.tagId!.name} · {monthShort(tx.tagId!.month).split(' ')[0]} on {on}
+                  </span>
+                </Fragment>
+              );
             })}
           </section>
         );
@@ -424,4 +522,134 @@ export default function CartoonRecords({
       {isLoadingMore && <div className="flex justify-center py-4"><div className="cartoon-spinner is-small" /></div>}
     </div>
   );
+}
+
+// The sub-line a record uses, for the compact rows inside a tag stack.
+// "🏛 SBI · 🙂 → Bala": the account first, then who else is involved, each with its icon.
+function subOf(tx: Transaction, accountTypes: Map<string, Account['type']>): ReactNode {
+  const acct = (a?: { _id: string; name: string }) =>
+    a && <><CartoonIcon kind={accountKind(accountTypes.get(a._id))} size={15} />{a.name}</>;
+  const parts: ReactNode[] = [];
+  if (tx.type === 'transfer') {
+    parts.push(<>{acct(tx.accountId)} → {tx.toAccountId?.name ?? '?'}</>);
+  } else {
+    if (tx.merchant) parts.push(<><CartoonIcon kind="shopping" size={15} />{tx.merchant}</>);
+    if (tx.accountId) parts.push(acct(tx.accountId));
+    else if (tx.paidByFriendId) parts.push(<><CartoonIcon kind="face2" size={15} />Paid by {tx.paidByFriendId.name}</>);
+  }
+  const friend = tx.passedToFriendId
+    ? `→ ${tx.passedToFriendId.name}`
+    : tx.transferFriend
+      ? `${tx.transferFriend.direction === 'sent' ? '→' : '←'} ${tx.transferFriend.name}`
+      : tx.receivedFromFriendId ? `From ${tx.receivedFromFriendId.name}` : null;
+  if (friend) parts.push(<><CartoonIcon kind="face2" size={15} />{friend}</>);
+  return parts.map((p, i) => <span key={i} className="tag-rail-part">{i > 0 && <i>·</i>}{p}</span>);
+}
+const rupees = (n: number) => `₹${n.toLocaleString('en-IN', { maximumFractionDigits: 2 })}`;
+
+// "Bala paid +₹12,000, you moved ₹24,000 ICICI → Cash"
+function stackSummary(members: Transaction[]): string {
+  const parts: string[] = [];
+  for (const m of members.filter((x) => x.type === 'income')) {
+    const who = m.receivedFromFriendId?.name || m.merchant || m.note || m.categoryId?.name || 'Someone';
+    parts.push(`${who} paid +${rupees(m.amount)}`);
+  }
+  const routes = new Map<string, number>();
+  for (const m of members.filter((x) => x.type === 'transfer')) {
+    const route = `${m.accountId?.name ?? '?'} → ${m.toAccountId?.name ?? '?'}`;
+    routes.set(route, (routes.get(route) ?? 0) + m.amount);
+  }
+  for (const [route, total] of routes) parts.push(`you moved ${rupees(total)} ${route}`);
+  const spent = members.filter((x) => x.type === 'expense').reduce((sum, m) => sum + m.amount, 0);
+  if (spent > 0) parts.push(`you spent ${rupees(spent)}`);
+  return parts.join(', ');
+}
+
+/**
+ * Entries that share a tag on the same day, folded into one stack: the tag, how
+ * many, and out / in / net for that day. Open, they sit on one coloured rail
+ * (no tag chip each: the rail says it), with a link to the whole month's group.
+ */
+function TagStack({ members, open, onToggle, onOpen, monthCount, onOpenTag, accountTypes }: {
+  members: Transaction[];
+  open: boolean;
+  onToggle: () => void;
+  onOpen: (tx: Transaction) => void;
+  /** Entries in this group across the whole month, when known. */
+  monthCount?: number;
+  onOpenTag: () => void;
+  accountTypes: Map<string, Account['type']>;
+}) {
+  const tag = members[0].tagId!;
+  const out = members.filter((m) => m.type !== 'income').reduce((sum, m) => sum + m.amount, 0);
+  const inn = members.filter((m) => m.type === 'income').reduce((sum, m) => sum + m.amount, 0);
+  const net = Math.round((out - inn) * 100) / 100;
+  return (
+    <div className={`tag-stack ${open ? 'is-open' : 'is-closed'}`} style={tagVars(tag.name)}>
+      <button type="button" className="tag-stack-head" onClick={onToggle} aria-expanded={open}>
+        <TagRibbon tag={tag} />
+        <span className="tag-count-pill">{members.length} entries today</span>
+        <span className="tag-stack-totals">
+          <small>
+            {out > 0 && <span className="is-out">out {rupees(out)}</span>}
+            {inn > 0 && <span className="is-in">in {rupees(inn)}</span>}
+          </small>
+          <span className={`tag-stack-net ${net >= 0 ? 'is-out' : 'is-in'}`}>
+            <em>net</em><Amount value={Math.abs(net)} />
+          </span>
+        </span>
+        <span className={`tag-chev ${open ? 'is-open' : ''}`} aria-hidden>
+          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 6 15 12 9 18" /></svg>
+        </span>
+      </button>
+
+      {!open ? (
+        <div className="tag-stack-sum">
+          <span className="tag-avatars">
+            {members.map((m) => <span key={m._id}><CartoonIcon kind={kindOf(m)} size={22} /></span>)}
+          </span>
+          <span className="tag-stack-text">{stackSummary(members)}</span>
+        </div>
+      ) : (
+        <>
+          <div className="tag-rail-list">
+            {members.map((m) => (
+              <button key={m._id} type="button" className="tag-rail-row" onClick={() => onOpen(m)}>
+                <CartoonTile kind={kindOf(m)} size={46} />
+                <span className="tag-rail-body">
+                  <span className="tag-rail-title">{titleOf(m)} <small>{fmtTime(m.date)}</small></span>
+                  <span className="tag-rail-sub">{subOf(m, accountTypes)}</span>
+                </span>
+                <span className={`tag-rail-amt is-${m.type === 'income' ? 'earn' : m.type === 'expense' ? 'spend' : 'move'}`}>
+                  <Amount value={m.amount} prefix={m.type === 'income' ? '+' : m.type === 'expense' ? '−' : ''} />
+                </span>
+              </button>
+            ))}
+          </div>
+          <div className="tag-stack-foot">
+            <button type="button" onClick={onOpenTag}>Open # {tag.name} · {monthShort(tag.month)} →</button>
+            {monthCount != null && (
+              <span>{monthCount === members.length ? `same ${monthCount} entries all month` : `${monthCount} entries all month`}</span>
+            )}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+/** Keep entries that share a tag on the same day side by side, at the first one's place. */
+function clusterByTag(rows: Transaction[]): Transaction[] {
+  const byTag = new Map<string, Transaction[]>();
+  for (const tx of rows) {
+    if (tx.tagId) byTag.set(tx.tagId._id, [...(byTag.get(tx.tagId._id) ?? []), tx]);
+  }
+  const placed = new Set<string>();
+  const out: Transaction[] = [];
+  for (const tx of rows) {
+    if (placed.has(tx._id)) continue;
+    const mates = tx.tagId ? byTag.get(tx.tagId._id) ?? [tx] : [tx];
+    for (const m of mates) { placed.add(m._id); out.push(m); }
+  }
+  return out;
 }

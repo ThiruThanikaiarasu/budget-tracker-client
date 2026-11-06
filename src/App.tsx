@@ -8,6 +8,7 @@ import Dashboard from './pages/Dashboard';
 import Accounts from './pages/Accounts';
 import Transactions from './pages/Transactions';
 import Friends from './pages/Friends';
+import Tags from './pages/Tags';
 import PortfolioOverview from './pages/investments/PortfolioOverview';
 import AssetClassesPage from './pages/investments/AssetClassesPage';
 import StocksPage from './pages/investments/StocksPage';
@@ -44,6 +45,7 @@ function App() {
             <Route path="/accounts" element={<Accounts />} />
             <Route path="/transactions" element={<Transactions />} />
             <Route path="/friends" element={<Friends />} />
+            <Route path="/tags" element={<Tags />} />
             <Route path="/investment" element={<InvestmentLayout />}>
               <Route index element={<PortfolioOverview />} />
               <Route path="assets" element={<AssetClassesPage />} />

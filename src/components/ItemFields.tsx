@@ -2,8 +2,12 @@ import { useEffect, useState } from 'react';
 import { type CategoryItem, type CategoryItemFormData } from '../store/categoryItemStore';
 import useUnitGroupStore, { presetsFor, type Unit } from '../store/unitGroupStore';
 import { normalizeName } from '../utils/normalizeName';
+import { itemKind } from '../utils/cartoonKinds';
+import CartoonIcon from './CartoonIcon';
 import QuantityPicker from './QuantityPicker';
 import ValueChipsEditor from './ValueChipsEditor';
+import RecurringFields from './RecurringFields';
+import { recurringValid, toRecurringInput, type RecurringConfig, type RecurringInput } from '../utils/recurring';
 
 /**
  * Item form: name, how it's measured (unit group), which of the group's units
@@ -11,7 +15,7 @@ import ValueChipsEditor from './ValueChipsEditor';
  * Flags a duplicate name (case/space-insensitive) before saving.
  */
 export default function ItemFields({
-  categoryItems, initial, excludeId, submitLabel, onSubmit, onCancel, onDuplicate,
+  categoryItems, initial, excludeId, submitLabel, onSubmit, onCancel, onDuplicate, card,
 }: {
   /** Items already in this category — used for the duplicate check. */
   categoryItems: CategoryItem[];
@@ -23,6 +27,11 @@ export default function ItemFields({
   onCancel?: () => void;
   /** When given, the duplicate warning offers to use the existing item. */
   onDuplicate?: (existing: CategoryItem) => void;
+  /**
+   * Editing an item in its list: a yellow EDITING card with the name as its big,
+   * editable title, `meta` under it (last purchase), ✕ to close, and "Save <name>".
+   */
+  card?: { meta?: string };
 }) {
   const { groups, loaded, fetchGroups } = useUnitGroupStore();
   useEffect(() => { if (!loaded) fetchGroups(); }, [loaded, fetchGroups]);
@@ -39,6 +48,9 @@ export default function ItemFields({
     Object.fromEntries((initial?.presetOverrides ?? []).map((o) => [o.unitId, o.values]))
   );
   const [saving, setSaving] = useState(false);
+  // Editing passes the stored schedule (with its nextDue); the form edits the input shape.
+  const storedRecurring = initial?.recurring as RecurringConfig | null | undefined;
+  const [recurring, setRecurring] = useState<RecurringInput | null>(() => toRecurringInput(storedRecurring ?? undefined));
 
   const allowedUnits: Unit[] = group
     ? (allowedIds.length > 0 ? group.units.filter((u) => allowedIds.includes(u._id)) : group.units)
@@ -59,7 +71,7 @@ export default function ItemFields({
   const duplicate = key
     ? categoryItems.find((i) => i._id !== excludeId && normalizeName(i.name) === key)
     : undefined;
-  const canSave = !!name.trim() && !duplicate && !saving;
+  const canSave = !!name.trim() && !duplicate && !saving && recurringValid(recurring);
 
   const pickGroup = (id: string) => {
     setGroupId(id);
@@ -89,8 +101,9 @@ export default function ItemFields({
         defaultUnitId: group ? (allowedUnits.find((u) => u._id === defaultUnitId) ?? allowedUnits[0])?._id : undefined,
         defaultQuantity: defaultQty,
         presetOverrides: group ? effectiveOverrides : undefined,
+        recurring,
       });
-      setName(''); setDefaultQty(undefined);
+      setName(''); setDefaultQty(undefined); setRecurring(null);
     } catch { /* toast shown by the store */ }
     setSaving(false);
   };
@@ -100,18 +113,43 @@ export default function ItemFields({
     background: active ? 'var(--c-accent)' : 'var(--c-surface2)',
     color: active ? 'var(--c-accent-fg)' : 'var(--c-text)',
   });
+  const MEASURE_ICON: Record<string, string> = { weight: '⚖️', volume: '🥛', count: '🔢' };
+  const measureChip = (active: boolean, label: string, onClick: () => void, key: string) => card ? (
+    <button key={key} type="button" onClick={onClick} aria-pressed={active} className={`ie-chip ${active ? 'is-on' : ''}`}>
+      {active ? '✓ ' : MEASURE_ICON[label.toLowerCase()] ? `${MEASURE_ICON[label.toLowerCase()]} ` : ''}{label}
+    </button>
+  ) : (
+    <button key={key} type="button" onClick={onClick} className="text-xs rounded-full px-3 py-1" style={chip(active)}>{label}</button>
+  );
+  const savingLabel = card ? `Save ${name.trim() || 'item'}` : submitLabel;
 
+  const kind = itemKind(name);
   return (
-    <div className="space-y-3">
-      <div>
+    <div className={card ? 'ie-card' : 'space-y-3'}>
+      {card && <span className="ie-tag">✏️ EDITING</span>}
+      <div className={card ? 'ie-head' : ''}>
+        {card && (
+          <span className="ie-avatar" aria-hidden>
+            {kind ? <CartoonIcon kind={kind} size={34} /> : (name.trim().charAt(0).toUpperCase() || '?')}
+          </span>
+        )}
+        <div className={card ? 'min-w-0 flex-1' : ''}>
         <input
           value={name}
           onChange={(e) => setName(e.target.value)}
           onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); submit(); } }}
           placeholder="Item name, e.g. Tomato"
-          className="t-input"
+          className={card ? 'ie-title' : 't-input'}
+          aria-label="Item name"
           autoFocus
         />
+        {card && <p className="ie-meta">{[card.meta, 'tap the name to rename'].filter(Boolean).join(' · ')}</p>}
+        </div>
+        {card && onCancel && (
+          <button type="button" className="ie-close" onClick={onCancel} aria-label="Close">✕</button>
+        )}
+      </div>
+      <div>
         {duplicate && (
           <p className="text-xs mt-1" style={{ color: 'var(--c-expense)' }}>
             "{duplicate.name}" already exists.
@@ -126,14 +164,13 @@ export default function ItemFields({
 
       <div>
         <span className={sectionLabel} style={{ color: 'var(--c-muted)' }}>Measured in</span>
-        <div className="flex flex-wrap gap-1.5">
-          <button type="button" onClick={() => pickGroup('')} className="text-xs rounded-full px-3 py-1" style={chip(!group)}>None</button>
-          {groups.map((g) => (
-            <button key={g._id} type="button" onClick={() => pickGroup(g._id)} className="text-xs rounded-full px-3 py-1" style={chip(g._id === groupId)}>
-              {g.name}
-            </button>
-          ))}
+        <div className={card ? 'flex flex-wrap gap-2' : 'flex flex-wrap gap-1.5'}>
+          {measureChip(!group, 'None', () => pickGroup(''), 'none')}
+          {groups.map((g) => measureChip(g._id === groupId, g.name, () => pickGroup(g._id), g._id))}
         </div>
+        {card && !group && (
+          <p className="ie-hint">No default quantity needed for “None”, so that field is hidden</p>
+        )}
       </div>
 
       {group && (
@@ -152,7 +189,7 @@ export default function ItemFields({
         </div>
       )}
 
-      <div>
+      {(!card || group) && <div>
         <span className={sectionLabel} style={{ color: 'var(--c-muted)' }}>Default quantity</span>
         {group ? (
           <QuantityPicker
@@ -172,7 +209,7 @@ export default function ItemFields({
             className="t-input w-28 text-sm"
           />
         )}
-      </div>
+      </div>}
 
       {group && (
         <div>
@@ -198,10 +235,12 @@ export default function ItemFields({
         </div>
       )}
 
-      <div className="flex gap-2">
-        {onCancel && <button type="button" onClick={onCancel} className="t-btn-ghost flex-1">Cancel</button>}
-        <button type="button" onClick={submit} disabled={!canSave} className="t-btn-primary flex-1 disabled:opacity-40">
-          {saving ? 'Saving...' : submitLabel}
+      <RecurringFields value={recurring} onChange={setRecurring} nextDue={storedRecurring?.nextDue} name={name} />
+
+      <div className={card ? 'ie-actions' : 'flex gap-2'}>
+        {onCancel && <button type="button" onClick={onCancel} className={card ? 'ie-cancel' : 't-btn-ghost flex-1'}>Cancel</button>}
+        <button type="button" onClick={submit} disabled={!canSave} className={card ? 'ie-save' : 't-btn-primary flex-1 disabled:opacity-40'}>
+          {saving ? 'Saving...' : savingLabel}
         </button>
       </div>
     </div>

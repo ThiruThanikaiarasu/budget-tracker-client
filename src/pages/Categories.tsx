@@ -34,6 +34,8 @@ import { CartoonHead, Sticker } from '../components/cartoon';
 import { CATEGORY_KINDS, categoryKind } from '../utils/cartoonKinds';
 import useCategoryItemStore, { type CategoryItem } from '../store/categoryItemStore';
 import ItemFields from '../components/ItemFields';
+import RecurringFields from '../components/RecurringFields';
+import { recurringValid, toRecurringInput, type RecurringInput } from '../utils/recurring';
 import EmptyState from '../components/EmptyState';
 import useUnitGroupStore, { defaultLabel } from '../store/unitGroupStore';
 
@@ -186,6 +188,7 @@ function Categories() {
             onSubmit={async (data) => { await updateCategory(editingCategory._id, data); setEditingCategory(null); }}
             title="Edit category" submitLabel="Save changes"
             defaultValues={{ name: editingCategory.name, type: editingCategory.type as 'income' | 'expense', icon: editingCategory.icon || '' }}
+            defaultRecurring={editingCategory.recurring}
           />
         )}
         {itemsCategory && <CategoryItemsModal category={itemsCategory} onClose={() => setItemsCategory(null)} />}
@@ -325,6 +328,7 @@ function Categories() {
           title="Edit Category"
           submitLabel="Save"
           defaultValues={{ name: editingCategory.name, type: editingCategory.type as 'income' | 'expense', icon: editingCategory.icon || '' }}
+            defaultRecurring={editingCategory.recurring}
         />
       )}
       {itemsCategory && (
@@ -522,11 +526,13 @@ function ModalWrap({ title, children, onClose }: { title: string; children: Reac
   );
 }
 
-function CategoryModal({ open, onClose, onSubmit, title, submitLabel, defaultValues }: {
+function CategoryModal({ open, onClose, onSubmit, title, submitLabel, defaultValues, defaultRecurring }: {
   open: boolean; onClose: () => void;
-  onSubmit: (data: CategoryFormData) => Promise<void>;
+  onSubmit: (data: CategoryFormData & { recurring: RecurringInput | null }) => Promise<void>;
   title: string; submitLabel: string;
   defaultValues?: CategoryFormData;
+  /** The category's stored schedule when editing. */
+  defaultRecurring?: Category['recurring'];
 }) {
   const { register, handleSubmit, reset, setValue, watch, formState: { errors, isSubmitting } } = useForm<CategoryFormData>({
     resolver: zodResolver(categorySchema),
@@ -536,9 +542,13 @@ function CategoryModal({ open, onClose, onSubmit, title, submitLabel, defaultVal
   const isCartoon = useThemeStore((s) => s.theme === 'cartoon');
   const typeValue = watch('type');
   const nameValue = watch('name');
+  const [recurring, setRecurring] = useState<RecurringInput | null>(() => toRecurringInput(defaultRecurring));
 
   useEffect(() => { if (open) reset(defaultValues || { name: '', type: 'expense', icon: '' }); }, [open, reset, defaultValues]);
-  const handleFormSubmit = async (data: CategoryFormData) => { try { await onSubmit(data); reset(); } catch {} };
+  const handleFormSubmit = async (data: CategoryFormData) => {
+    if (!recurringValid(recurring)) return;
+    try { await onSubmit({ ...data, recurring }); reset(); setRecurring(null); } catch {}
+  };
   if (!open) return null;
 
   return (
@@ -571,9 +581,10 @@ function CategoryModal({ open, onClose, onSubmit, title, submitLabel, defaultVal
               })}
             </div>
           </div>
+          <RecurringFields value={recurring} onChange={setRecurring} nextDue={defaultRecurring?.nextDue} name={nameValue} />
           <div className="flex gap-3 pt-1">
             <button type="button" onClick={onClose} className="cartoon-btn flex-1">Cancel</button>
-            <button type="submit" disabled={isSubmitting} className="cartoon-btn is-primary flex-1">{isSubmitting ? 'Saving...' : submitLabel}</button>
+            <button type="submit" disabled={isSubmitting || !recurringValid(recurring)} className="cartoon-btn is-primary flex-1">{isSubmitting ? 'Saving...' : submitLabel}</button>
           </div>
         </form>
       ) : (
@@ -643,9 +654,11 @@ function CategoryModal({ open, onClose, onSubmit, title, submitLabel, defaultVal
           )}
         </div>
 
+        <RecurringFields value={recurring} onChange={setRecurring} nextDue={defaultRecurring?.nextDue} name={nameValue} />
+
         <div className="flex gap-3 pt-2">
           <button type="button" onClick={onClose} className="t-btn-ghost flex-1">Cancel</button>
-          <button type="submit" disabled={isSubmitting} className="t-btn-primary flex-1">{isSubmitting ? 'Saving...' : submitLabel}</button>
+          <button type="submit" disabled={isSubmitting || !recurringValid(recurring)} className="t-btn-primary flex-1">{isSubmitting ? 'Saving...' : submitLabel}</button>
         </div>
       </form>
       )}

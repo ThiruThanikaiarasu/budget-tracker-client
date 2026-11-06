@@ -17,8 +17,8 @@ const nextPaint = () => new Promise<void>((r) => requestAnimationFrame(() => req
  * copies the text. The text carries a UPI deep link when a UPI ID is saved in Settings.
  * While it works the button shows a little receipt sliding out.
  */
-export default function RemindButton({ friend, amount, lines, dateLabel, className = 'rcpt-pill' }: {
-  friend: string; amount: number; lines: ShareLine[]; dateLabel: string; className?: string;
+export default function RemindButton({ friend, amount, lines, dateLabel, className = 'rcpt-pill', label }: {
+  friend: string; amount: number; lines: ShareLine[]; dateLabel: string; className?: string; label?: string;
 }) {
   // First name only: the card and the message read better than a long full name.
   const you = (useAuthStore((s) => s.user?.name) ?? 'me').trim().split(/\s+/)[0];
@@ -64,7 +64,7 @@ export default function RemindButton({ friend, amount, lines, dateLabel, classNa
             </motion.span>
             Printing…
           </span>
-        ) : `Remind ${friend}`}
+        ) : (label ?? `Remind ${friend}`)}
       </button>
       {busy && createPortal(
         <div className="sharecard-stage" aria-hidden>

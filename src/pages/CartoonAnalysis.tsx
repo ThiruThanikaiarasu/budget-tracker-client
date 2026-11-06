@@ -307,10 +307,17 @@ function ItemsPanel({ data }: { data: MonthAnalysis }) {
                     {i.avgUnit != null && <> · avg {inrExact(i.avgUnit)}/{i.unit}</>}
                     {i.minUnit != null && i.maxUnit != null && i.minUnit !== i.maxUnit && <> (from {inrExact(i.minUnit)} to {inrExact(i.maxUnit)})</>}
                   </p>
-                  <p className="an-from">
-                    {i.merchants.slice(0, 3).map((m) => <span key={m.name} className="an-chip">{m.name === 'No merchant noted' ? 'place not noted' : m.name}</span>)}
-                    {i.merchants.length > 3 && <span className="an-chip">+{i.merchants.length - 3}</span>}
-                  </p>
+                  {(() => {
+                    // Only real places; purchases with no place noted get no chip.
+                    const places = i.merchants.filter((m) => m.name !== 'No merchant noted');
+                    if (places.length === 0) return null;
+                    return (
+                      <p className="an-from">
+                        {places.slice(0, 3).map((m) => <span key={m.name} className="an-chip">{m.name}</span>)}
+                        {places.length > 3 && <span className="an-chip">+{places.length - 3}</span>}
+                      </p>
+                    );
+                  })()}
                 </div>
                 <div className="an-item-right">
                   <b className="an-money">{inrExact(i.spent)}</b>

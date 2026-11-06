@@ -20,16 +20,20 @@ const NAME_TO_KIND: Record<string, string> = {
   groceries: 'groceries', grocery: 'groceries', vegetables: 'carrot',
   food: 'food', breakfast: 'breakfast', lunch: 'lunch', dinner: 'dinner', snacks: 'snacks', tea: 'tea', dining: 'food',
   transport: 'transport', travel: 'travel', petrol: 'fuel', fuel: 'fuel',
-  rent: 'rent', bills: 'bills', broadband: 'bills', 'mobile recharge': 'recharge',
+  rent: 'rent', bills: 'bills', broadband: 'router', 'mobile recharge': 'recharge',
   shopping: 'shopping', 'clothing & accessories': 'clothing', clothing: 'clothing',
-  health: 'health', education: 'education', books: 'education', learning: 'education',
-  entertainment: 'fun', salary: 'salary', freelance: 'freelance', 'investment return': 'investment',
-  interest: 'interest', reward: 'reward', rewards: 'reward', social: 'social', transfer: 'transfer', reconcile: 'reconcile', gift: 'gift', settlement: 'settlement', waived: 'settlement',
+  health: 'health', education: 'education', books: 'books', learning: 'learning',
+  entertainment: 'fun', salary: 'salary', freelance: 'freelance', 'investment return': 'investment-return',
+  interest: 'interest', reward: 'reward', rewards: 'reward', social: 'social', transfer: 'transfer', reconcile: 'reconcile', gift: 'gift', settlement: 'settlement', waived: 'waived',
   'clean up': 'cleanup',
-  fruits: 'banana', other: 'other', 'bank charges': 'bank', investment: 'investment', 'cred reward': 'reward',
-  rentomojo: 'rent', emi: 'card',
+  electricity: 'electricity', water: 'water', treat: 'treat',
+  fruits: 'banana', other: 'other', 'bank charges': 'bank-charges', investment: 'investment', 'cred reward': 'cred-reward',
+  rentomojo: 'rentomojo', emi: 'emi',
   juice: 'juice', sweet: 'sweet', sweets: 'sweet', 'gadget & accessories': 'gadget', 'personal care': 'personalcare', workspace: 'workspace', household: 'household',
   subscriptions: 'subscription', subscription: 'subscription', 'accesories repair': 'repair', 'accessories repair': 'repair', repair: 'repair',
+  // Each had only the tag fallback before.
+  'sent home': 'sent-home', 'passed on': 'passed-on', 'friend transfer': 'lent',
+  fnf: 'fnf', 'rent advance return': 'rent-advance-return', refund: 'refund', epfo: 'epfo',
 };
 
 const KIND_TINT: Record<string, string> = {
@@ -43,7 +47,13 @@ const KIND_TINT: Record<string, string> = {
   freelance: 'var(--c-earn-tint)', interest: 'var(--c-earn-tint)', reward: 'var(--c-grape-tint)', social: 'var(--c-sky-tint)', transfer: 'var(--c-sky-tint)', reconcile: 'var(--c-grape-tint)',
   settlement: 'var(--c-sky-tint)', cleanup: 'var(--c-grape-tint)', tag: 'var(--c-sun-tint)',
   juice: 'var(--c-sun-tint)', sweet: 'var(--c-spend-tint)', gadget: 'var(--c-sky-tint)', personalcare: 'var(--c-grape-tint)',
+  electricity: 'var(--c-sun-tint)', water: 'var(--c-sky-tint)', books: 'var(--c-sky-tint)', learning: 'var(--c-sky-tint)',
+  treat: 'var(--c-spend-tint)', waived: 'var(--c-sky-tint)', rentomojo: 'var(--c-spend-tint)', 'investment-return': 'var(--c-earn-tint)',
+  emi: 'var(--c-spend-tint)', 'bank-charges': 'var(--c-sky-tint)', 'cred-reward': 'var(--c-grape-tint)', router: 'var(--c-sky-tint)',
   workspace: 'var(--c-sky-tint)', household: 'var(--c-earn-tint)', carrot: 'var(--c-earn-tint)', subscription: 'var(--c-grape-tint)', repair: 'var(--c-sun-tint)',
+  lent: 'var(--c-spend-tint)', borrowed: 'var(--c-earn-tint)', 'paid-back': 'var(--c-grape-tint)', 'got-back': 'var(--c-earn-tint)',
+  'sent-home': 'var(--c-spend-tint)', 'passed-on': 'var(--c-grape-tint)', fnf: 'var(--c-earn-tint)', 'rent-advance-return': 'var(--c-sun-tint)',
+  refund: 'var(--c-earn-tint)', epfo: 'var(--c-sky-tint)', 'apple-music': 'var(--c-grape-tint)', netflix: 'var(--c-spend-tint)',
 };
 
 const SPECIFIC_NAME_KINDS = new Set([
@@ -51,6 +61,8 @@ const SPECIFIC_NAME_KINDS = new Set([
   'fruits', 'other', 'bank charges', 'investment', 'cred reward', 'rentomojo', 'emi',
   'vegetables', 'juice', 'sweet', 'sweets', 'gadget & accessories', 'personal care', 'workspace', 'household', 'subscriptions', 'subscription',
   'accesories repair', 'accessories repair', 'repair',
+  'books', 'learning', 'waived', 'treat', 'electricity', 'water', 'broadband', 'investment return',
+  'sent home', 'passed on', 'friend transfer', 'fnf', 'rent advance return', 'refund', 'epfo',
 ]);
 
 /** Pictures offered when creating or editing a category. Stored as `kind:<name>`. */
@@ -60,6 +72,8 @@ export const CATEGORY_KINDS = [
   'gift', 'salary', 'freelance', 'interest', 'investment', 'reward', 'social', 'cash', 'bank', 'coins',
   'carrot', 'juice', 'sweet', 'gadget', 'personalcare', 'workspace', 'household', 'subscription', 'repair',
   'receipt', 'settlement', 'cleanup', 'tag',
+  'electricity', 'water', 'router', 'books', 'learning', 'treat', 'waived', 'rentomojo', 'investment-return', 'emi', 'bank-charges', 'cred-reward',
+  'lent', 'borrowed', 'sent-home', 'passed-on', 'fnf', 'rent-advance-return', 'refund', 'epfo',
 ];
 
 export function categoryKind(iconKey: string | undefined, name: string): string {
@@ -94,6 +108,26 @@ export function itemKind(name: string): string | null {
 
 // Things with a drawing that isn't named like the item: matched on a word in the name.
 const ITEM_KEYWORDS: [string, string][] = [
+  // Brands and specific things first: the first match wins, so these beat the generic words further down.
+  ['apple music', 'apple-music'], ['netflix', 'netflix'],
+  ['masala dosa', 'masala-dosa'], ['chicken masala', 'chicken-masala'], ['kebab masala', 'kebab-masala'],
+  ['sesame oil', 'sesame-oil'], ['gold winner', 'gold-winner-oil'],
+  ['black pepper', 'black-pepper'], ['pepper powder', 'pepper-powder'], ['cardamom', 'cardamom'], ['cloves', 'cloves'],
+  ['coriander', 'coriander-powder'], ['cumin', 'cumin-seeds'], ['fenugreek', 'fenugreek'], ['mustard', 'mustard'],
+  ['chilli powder', 'red-chilli-powder'], ['red chilli', 'red-chilli-powder'], ['turmeric', 'turmeric-powder'],
+  ['green peas', 'green-peas'], ['green gram', 'green-gram'], ['rajma', 'rajma'], ['toor', 'toor-dal'],
+  ['chana dal', 'chana-dal'], ['kabul chana', 'kabul-chana'], ['black chickpea', 'black-chickpeas'],
+  ['tooth brush', 'toothbrush'], ['toothbrush', 'toothbrush'], ['dabur', 'dabur-red-toothpaste'],
+  ['cinthol', 'cinthol-soap'], ['rin soap', 'rin-soap'], ['hand wash', 'hand-wash-liquid'],
+  ['harpic', 'harpic'], ['vim bar', 'vim-bar'], ['washing machine', 'washing-machine-liquid'],
+  ['continental coffee', 'continental-coffee-powder'], ['sunrise coffee', 'sunrise-coffee-sachet'],
+  ['toilet brush', 'toilet-brush'], ['grout', 'grout-brush'], ['knife', 'knife'], ['spoon', 'steel-spoon'],
+  ['mutton biriyani', 'mutton-biriyani'], ['mutton biryani', 'mutton-biriyani'],
+  ['soya chaap', 'soya-chaap-biriyani'], ['soy chaap', 'soya-chaap-biriyani'], ['dairy milk', 'dairy-milk-chocolate'],
+  ['bath mesh', 'bath-mesh'], ['camphor', 'camphor'], ['cleaning cloth', 'cleaning-cloth'], ['dustpan', 'dustpan'],
+  ['groundnut', 'groundnut'], ['hand towel', 'hand-towel'], ['happydent', 'happydent'], ['mesher', 'mesher'],
+  ['mix seeds', 'mix-seeds'], ['moov', 'moov-ointment'], ['hanger', 'plastic-hanger'], ['plastic jar', 'plastic-jar'],
+  ['sealing clip', 'sealing-clip'], ['soan papdi', 'soan-papdi'], ['table mat', 'table-mat'],
   ['coffee', 'coffee'], ['petrol', 'fuel'], ['diesel', 'fuel'], ['biriyani', 'rice'], ['biryani', 'rice'],
   ['sandwich', 'snacks'], ['samosa', 'snacks'],
   ['trimmer', 'trimmer'], ['shampoo', 'shampoo'], ['dryer', 'dryer'], ['shoe rack', 'shoerack'], ['rasagulla', 'sweet'], ['rasgulla', 'sweet'],
@@ -103,7 +137,7 @@ const ITEM_KEYWORDS: [string, string][] = [
   ['masala', 'spice'], ['pepper', 'spice'], ['chilli', 'spice'], ['turmeric', 'spice'], ['cumin', 'spice'], ['clove', 'spice'],
   ['cardamom', 'spice'], ['coriander', 'spice'], ['fenugreek', 'spice'], ['mustard', 'spice'],
   [' oil', 'oil'], ['maggi', 'noodles'], ['noodle', 'noodles'], ['musel', 'cereal'], ['muesli', 'cereal'], ['cereal', 'cereal'],
-  ['chocolate', 'chocolate'], ['dairy milk', 'chocolate'], ['biscuit', 'biscuit'], ['lays', 'chips'], ['chips', 'chips'], ['pudding', 'pudding'],
+  ['chocolate', 'chocolate'], ['biscuit', 'biscuit'], ['lays', 'chips'], ['chips', 'chips'], ['pudding', 'pudding'],
   ['candle', 'candle'], ['soap', 'soap'], ['hand wash', 'soap'], ['tooth', 'toothpaste'],
   ['detergent', 'detergent'], ['washing', 'detergent'], ['harpic', 'detergent'], ['vim', 'detergent'],
   ['brush', 'brush'], ['bulb', 'bulb'], ['lunch box', 'lunchbox'], ['knife', 'kitchenware'], ['spoon', 'kitchenware'],

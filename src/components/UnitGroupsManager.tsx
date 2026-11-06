@@ -3,6 +3,8 @@ import useUnitGroupStore, { type UnitGroup, type UnitGroupFormData } from '../st
 import { normalizeName } from '../utils/normalizeName';
 import EmptyState from './EmptyState';
 import ValueChipsEditor from './ValueChipsEditor';
+import CartoonUnitGroups from './CartoonUnitGroups';
+import useThemeStore from '../store/themeStore';
 
 type UnitDraft = { key: string; _id?: string; name: string; factor: string; presets: number[] };
 
@@ -10,6 +12,11 @@ const draftKey = () => Math.random().toString(36).slice(2);
 
 /** Unit groups (Weight, Volume, Count…): their units, conversions and quick values. */
 export default function UnitGroupsManager() {
+  const isCartoon = useThemeStore((st) => st.theme === 'cartoon');
+  return isCartoon ? <CartoonUnitGroups /> : <ClassicUnitGroups />;
+}
+
+function ClassicUnitGroups() {
   const { groups, loaded, fetchGroups, createGroup, updateGroup, deleteGroup } = useUnitGroupStore();
   const [editingId, setEditingId] = useState<string | 'new' | null>(null);
 

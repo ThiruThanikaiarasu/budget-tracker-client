@@ -14,8 +14,11 @@ import { formatCurrency } from '../utils/format';
 import Amount from '../components/Amount';
 import ThemedSelect from '../components/ThemedSelect';
 import StampBurst from '../components/StampBurst';
+import CartoonFriendView from '../components/CartoonFriendView';
 import { renderAccountIcon } from '../utils/accountIcons';
 import { sortByFrecency } from '../utils/frecency';
+import { balanceContribution, getFriendName, sharedExpenseLabel, signedShare, transferThreads } from '../utils/friendBalance';
+import { TransferModal, TransferThreads, type TransferRequest } from '../components/FriendTransfers';
 
 // --- Schemas ---
 
@@ -35,48 +38,6 @@ const expenseSchema = z.object({
 type FriendFormData = z.infer<typeof friendSchema>;
 type ExpenseFormData = z.infer<typeof expenseSchema>;
 
-// --- Balance helpers (mirror the server's split balance rules) ---
-
-function splitFriendId(split: SharedExpense['splits'][number]): string {
-  return typeof split.friendId === 'object' ? split.friendId._id : split.friendId;
-}
-
-// Signed outstanding share of a single (non-settlement) expense for a friend:
-// positive => friend owes you, negative => you owe the friend.
-function signedShare(expense: SharedExpense, friendId: string): number {
-  const friendSplit = expense.splits.find((s) => splitFriendId(s) === friendId);
-  if (expense.paidBy === 'user') {
-    return friendSplit ? friendSplit.amount : 0;
-  }
-  if (expense.paidBy === friendId) {
-    const totalSplits = expense.splits.reduce((sum, s) => sum + s.amount, 0);
-    return -(expense.totalAmount - totalSplits);
-  }
-  return 0;
-}
-
-function sharedExpenseLabel(expense: SharedExpense): string {
-  const description = expense.description.trim();
-  if (description && description.toLowerCase() !== 'shared expense') return description;
-
-  if (expense.transactionId && typeof expense.transactionId !== 'string') {
-    return expense.transactionId.categoryId?.name || 'Shared expense';
-  }
-
-  return 'Shared expense';
-}
-
-// A single expense's contribution to the running net balance, including
-// settlements (which cancel debt in the opposite direction).
-function balanceContribution(expense: SharedExpense, friendId: string): number {
-  if (!expense.isSettlement) return signedShare(expense, friendId);
-  const friendSplit = expense.splits.find((s) => splitFriendId(s) === friendId);
-  if (!friendSplit) return 0;
-  if (expense.paidBy === 'user') return -friendSplit.amount;
-  if (expense.paidBy === friendId) return friendSplit.amount;
-  return 0;
-}
-
 // CSV of every shared expense and settlement with this friend (outstanding and settled).
 function downloadFriendCsv(friend: Friend, expenses: SharedExpense[]) {
   const cell = (v: string) => `"${v.replace(/"/g, '""')}"`;
@@ -87,8 +48,8 @@ function downloadFriendCsv(friend: Friend, expenses: SharedExpense[]) {
   for (const e of [...expenses].sort((a, b) => +new Date(b.date) - +new Date(a.date))) {
     rows.push([
       new Date(e.date).toISOString().slice(0, 10),
-      e.isSettlement ? 'Settlement' : 'Expense',
-      e.isSettlement ? 'Settlement' : text(sharedExpenseLabel(e)),
+      e.isTransfer ? 'Transfer' : e.isSettlement ? 'Settlement' : 'Expense',
+      e.isSettlement ? (e.isTransfer ? text(e.description) : 'Settlement') : text(sharedExpenseLabel(e)),
       e.paidBy === 'user' ? 'You' : text(getFriendName(e, friend)),
       e.totalAmount.toFixed(2),
       // + friend owes you, - you owe friend
@@ -771,6 +732,8 @@ function FriendDetail({ friend, onBack }: { friend: Friend; onBack: () => void }
   const [selectionMode, setSelectionMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [showHistory, setShowHistory] = useState(false);
+  const [transferReq, setTransferReq] = useState<TransferRequest | null>(null);
+  const isCartoon = useThemeStore((st) => st.theme === 'cartoon');
 
   // Expenses cleared by a settlement move out of the outstanding list.
   const coveredIds = useMemo(() => {
@@ -787,10 +750,14 @@ function FriendDetail({ friend, onBack }: { friend: Friend; onBack: () => void }
     () => expenses.filter((e) => !e.isSettlement && !coveredIds.has(e._id)),
     [expenses, coveredIds]
   );
+  // Transfers have their own section; history is only for settle-ups.
   const settlements = useMemo(
-    () => expenses.filter((e) => e.isSettlement),
+    () => expenses.filter((e) => e.isSettlement && !e.isTransfer),
     [expenses]
   );
+  const threads = useMemo(() => transferThreads(expenses), [expenses]);
+  // A settle-all also clears transfers, which already count in the balance.
+  const transferIds = useMemo(() => expenses.filter((e) => e.isTransfer).map((e) => e._id), [expenses]);
   const hasHistory = settlements.length > 0;
 
   // Live net balance from the fetched expenses, so the page stays correct after
@@ -843,6 +810,24 @@ function FriendDetail({ friend, onBack }: { friend: Friend; onBack: () => void }
     fetchFriends();
   };
 
+  const afterTransfer = () => {
+    setTransferReq(null);
+    fetchExpenses(friend._id);
+    fetchFriends();
+  };
+
+  const transferModal = transferReq && (
+    <TransferModal friend={friend} request={transferReq} onClose={() => setTransferReq(null)} onDone={afterTransfer} />
+  );
+  const threadList = (
+    <TransferThreads
+      friend={friend}
+      threads={threads}
+      onRepay={(t) => setTransferReq({ direction: t.sent ? 'received' : 'sent', repays: t })}
+      onDelete={async (id) => { await deleteExpense(id); fetchFriends(); fetchExpenses(friend._id); }}
+    />
+  );
+
   useEffect(() => {
     const close = () => setOpenMenuId(null);
     document.addEventListener('click', close);
@@ -860,6 +845,40 @@ function FriendDetail({ friend, onBack }: { friend: Friend; onBack: () => void }
         settlements={settlements}
         onBack={() => setShowHistory(false)}
       />
+    );
+  }
+
+  if (isCartoon) {
+    return (
+      <>
+        <CartoonFriendView
+          friend={friend}
+          netBalance={netBalance}
+          expenses={expenses}
+          isLoading={isLoading}
+          selectionMode={selectionMode}
+          selectedIds={selectedIds}
+          onToggleSelect={toggleSelect}
+          onSelectMode={(on) => (on ? setSelectionMode(true) : exitSelection())}
+          onSettle={setSettleTarget}
+          onDelete={deleteExpense}
+          onBack={onBack}
+          onTransfer={setTransferReq}
+          transfers={threadList}
+        />
+        {transferModal}
+        {settleTarget && (
+          <SettleModal
+            friend={friend}
+            amount={settleTarget.amount}
+            friendOwes={settleTarget.friendOwes}
+            coveredExpenseIds={settleTarget.coveredExpenseIds}
+            onClose={() => setSettleTarget(null)}
+            onDone={afterSettle}
+          />
+        )}
+        {stamped && <StampBurst onDone={() => setStamped(false)} />}
+      </>
     );
   }
 
@@ -905,7 +924,7 @@ function FriendDetail({ friend, onBack }: { friend: Friend; onBack: () => void }
                 setSettleTarget({
                   amount: Math.abs(netBalance),
                   friendOwes: netBalance > 0,
-                  coveredExpenseIds: openExpenses.map((e) => e._id),
+                  coveredExpenseIds: [...openExpenses.map((e) => e._id), ...transferIds],
                 })
               }
               className="t-btn-primary mt-3 px-6 py-2"
@@ -913,8 +932,18 @@ function FriendDetail({ friend, onBack }: { friend: Friend; onBack: () => void }
               Settle up
             </button>
           )}
+          <div className="mt-3 flex gap-2">
+            <button onClick={() => setTransferReq({ direction: 'sent' })} className="rounded-md border border-[var(--c-border)] px-4 py-1.5 text-sm font-medium text-[var(--c-text)] hover:bg-[var(--c-surface2)]">
+              Send money
+            </button>
+            <button onClick={() => setTransferReq({ direction: 'received' })} className="rounded-md border border-[var(--c-border)] px-4 py-1.5 text-sm font-medium text-[var(--c-text)] hover:bg-[var(--c-surface2)]">
+              Got money
+            </button>
+          </div>
         </div>
       </div>
+
+      {threadList}
 
       {/* Outstanding items */}
       <div className="mt-6">
@@ -1096,20 +1125,10 @@ function FriendDetail({ friend, onBack }: { friend: Friend; onBack: () => void }
           onDone={afterSettle}
         />
       )}
+      {transferModal}
       {stamped && <StampBurst onDone={() => setStamped(false)} />}
     </div>
   );
-}
-
-function getFriendName(expense: SharedExpense, currentFriend: Friend): string {
-  if (expense.paidBy === currentFriend._id) return currentFriend.name;
-  // Check populated splits for name
-  for (const split of expense.splits) {
-    if (typeof split.friendId === 'object' && split.friendId._id === expense.paidBy) {
-      return split.friendId.name;
-    }
-  }
-  return 'friend';
 }
 
 // --- Settle Modal ---
